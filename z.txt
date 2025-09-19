@@ -1,0 +1,7 @@
+~~~
+This repository contains all the contents from the MkDocs site directory.
+MkDocs cannot be used directly because it requires a docs directory, which conflicts with GitHub Pages.
+When GitHub Pages builds with Jekyll, it raises errors about the docs folder.
+The issue may also be related to symlinks.
+
+~~~
