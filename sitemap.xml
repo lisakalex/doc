@@ -141,6 +141,10 @@
          <lastmod>2025-11-30</lastmod>
     </url>
     <url>
+         <loc>https://sitename.example/java/credentials-externalization-aws/</loc>
+         <lastmod>2025-11-30</lastmod>
+    </url>
+    <url>
          <loc>https://sitename.example/java/credentials-responsibility/</loc>
          <lastmod>2025-11-30</lastmod>
     </url>
@@ -158,6 +162,18 @@
     </url>
     <url>
          <loc>https://sitename.example/java/maven-security-references/</loc>
+         <lastmod>2025-11-30</lastmod>
+    </url>
+    <url>
+         <loc>https://sitename.example/java/rotate-password-automatically/</loc>
+         <lastmod>2025-11-30</lastmod>
+    </url>
+    <url>
+         <loc>https://sitename.example/java/secure-example-cloudhub/</loc>
+         <lastmod>2025-11-30</lastmod>
+    </url>
+    <url>
+         <loc>https://sitename.example/java/secure-example-hybrid/</loc>
          <lastmod>2025-11-30</lastmod>
     </url>
     <url>
