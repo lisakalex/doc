@@ -2562,6 +2562,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../job/stark/questions-1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Questions 1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../job/stark/questions/" class="md-nav__link">
         
   
@@ -6798,10 +6826,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#job-stark-questions-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.20.1 Questions 1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#job-stark-questions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        9.20.1 Questions
+        9.20.2 Questions
       
     </span>
   </a>
@@ -6812,7 +6851,7 @@
   <a href="#job-stark-stark-company-history" class="md-nav__link">
     <span class="md-ellipsis">
       
-        9.20.2 Stark company history
+        9.20.3 Stark company history
       
     </span>
   </a>
@@ -13045,7 +13084,124 @@ DevOps roles?</p></section>
                     <section class='print-page md-section' id='section-9-20' heading-number='9.20'>
                         <h1>Stark<a class='headerlink' href='#section-9-20' title='Permanent link'></a>
                         </h1>
-                    <section class="print-page" id="job-stark-questions" heading-number="9.20.1"><h1 id="job-stark-questions-questions">Questions</h1>
+                    <section class="print-page" id="job-stark-questions-1" heading-number="9.20.1"><h1 id="job-stark-questions-1-questions-1">Questions 1</h1>
+<p>Here are thoughtful, structured answers to the interview questions/topics you listed. These are phrased in a natural,
+first-person way so you can adapt them directly for your responses (e.g., during a behavioral or technical discussion).
+They align with the role's focus: <strong>Platform Engineering</strong> mindset, heavy emphasis on <strong>Developer Experience (DevEx)</strong>
+within a software development team, on-prem/hybrid environment (80% on-prem), standardization, and influencing practices
+without being purely infra/cloud-heavy.</p>
+<h3 id="job-stark-questions-1-1-tell-me-what-you-know-about-git">1. Tell me what you know about Git.</h3>
+<p>Git is a <strong>distributed version control system</strong> created by Linus Torvalds in 2005, designed for speed, efficiency, and
+handling everything from small to massive projects (like the Linux kernel). Unlike centralized systems (e.g., older
+SVN), every developer gets a full local copy of the repository, including history, branches, and commits—this enables
+offline work, fast operations, and powerful branching/merging.</p>
+<p>Key features I rely on daily:</p>
+<ul>
+<li><strong>Commits</strong> as atomic snapshots with messages for traceability.</li>
+<li><strong>Branching</strong> — cheap and fast, core to workflows (create, switch, merge, rebase).</li>
+<li><strong>Merging</strong> strategies (fast-forward, recursive, squash) and conflict resolution.</li>
+<li><strong>Distributed nature</strong> — push/pull to remotes (GitHub, GitLab, Azure Repos), remotes for collaboration.</li>
+<li>Tools like <strong>.gitignore</strong>, submodules, hooks, stash, cherry-pick, bisect for debugging history.</li>
+</ul>
+<p>For branching strategies (very relevant to standardizing practices):</p>
+<ul>
+<li>I prefer <strong>trunk-based development</strong> or simplified <strong>GitHub Flow</strong> for most teams—short-lived feature branches off
+  main, frequent merges via pull requests (PRs) with reviews, to keep integration fast and reduce merge hell.</li>
+<li>In more release-heavy environments, <strong>GitFlow</strong> (with develop, release, hotfix branches) works well, but I avoid it if
+  it slows velocity unless needed for strict versioning.</li>
+<li>Best practices: Small, focused commits; meaningful messages (Conventional Commits style); rebase for clean history
+  before PR; protect main branch; use PR templates/checks.</li>
+</ul>
+<p>In a team, I'd advocate evaluating the current strategy and proposing one that fits release cadence, team size, and
+on-prem constraints (e.g., self-hosted GitLab runners for CI).</p>
+<h3 id="job-stark-questions-1-2-tell-me-about-a-time-youve-investigatedrecommended-a-technology-for-use-within-the-team">2. Tell me about a time you’ve investigated/recommended a technology for use within the team.</h3>
+<p><strong>Example scenario</strong> (adapt to your real experience; this is a strong, realistic one for a platform-focused role):</p>
+<p>In a previous mid-sized team (~15–25 devs, hybrid on-prem/cloud setup), we had fragmented CI/CD: some used Jenkins
+on-prem, others manual scripts or basic GitHub Actions. Builds were slow, inconsistent, and lacked visibility—devs spent
+too much time waiting or debugging pipelines.</p>
+<p>I took ownership to investigate alternatives. I:</p>
+<ul>
+<li>Surveyed the team on pain points (slow feedback, no standardized environments, hard to reproduce issues).</li>
+<li>Evaluated options: Stick with Jenkins (mature but heavy maintenance), move to GitLab CI (self-hosted runners fit our
+  on-prem needs), Azure DevOps (good Microsoft integration), or GitHub Actions (cloud-first but we had data concerns).</li>
+<li>Built a quick PoC with self-hosted GitLab Runners on our existing infra—demonstrated faster parallel jobs, better
+  caching, and integrated artifact handling.</li>
+<li>Presented pros/cons in a team session (cost, maintenance, DevEx impact, security for on-prem data).</li>
+<li>Recommended GitLab CI + self-hosted runners, with a migration plan phased over 2 sprints.</li>
+</ul>
+<p>We adopted it, reduced build times ~40%, improved consistency, and devs loved the YAML-based pipelines + built-in MR
+reviews. It became the standard, and I later mentored others on it.</p>
+<p>This shows opinionated evaluation, focus on DevEx, and driving adoption—key for this role.</p>
+<h3 id="job-stark-questions-1-3-experience-with-cicd">3. Experience with CI/CD.</h3>
+<p>I've built and maintained CI/CD pipelines extensively, focusing on reliability, speed, and developer
+productivity—especially in hybrid/on-prem environments.</p>
+<ul>
+<li>Tools: Azure DevOps Pipelines (YAML, classic), GitLab CI/CD (self-hosted runners), GitHub Actions.</li>
+<li>Patterns: Multi-stage pipelines (build → test → deploy), parallel jobs, caching (Docker layers, dependencies),
+  artifact promotion.</li>
+<li>Branching integration: PR-triggered builds, protected branches, status checks before merge.</li>
+<li>Automation: IaC with Terraform for env provisioning, PowerShell/Bash for custom tasks (e.g., data obfuscation in test
+  envs).</li>
+<li>Observability in pipelines: Logging outputs, notifications (Teams/Slack), dashboards for pipeline health.</li>
+<li>On-prem specifics: Self-hosted runners/agents for compliance (no cloud egress for sensitive data), handling air-gapped
+  setups if needed.</li>
+</ul>
+<p>In one project, I standardized pipelines across squads, adding automated security scans (e.g., container vuln checks)
+and environment promotion—cut deployment friction and gave devs faster feedback loops.</p>
+<h3 id="job-stark-questions-1-4-platform-engineering-mindset-and-how-you-differentiate-between-platform-devops-and-sre-roles">4. Platform engineering mindset, and how you differentiate between Platform, DevOps, and SRE roles.</h3>
+<p>(Emphasize DevEx focus, as the role sits in SW Development team—not pure infra.)</p>
+<p><strong>Platform Engineering mindset</strong> (what I'd bring here): Treat internal tools, environments, and workflows as **products
+** for developers. The goal is golden paths that are self-service, secure-by-default, observable, and reduce cognitive
+load—so devs focus on features, not fighting infra. It's about abstraction, standardization, and long-term enablement (
+e.g., "inner dev loop" improvements like fast local envs, consistent CI, easy tracing).</p>
+<p><strong>Differentiation</strong>:</p>
+<ul>
+<li><strong>DevOps</strong> — Cultural/practice shift: Break silos between dev and ops, automate delivery, emphasize collaboration and
+  velocity (CI/CD, IaC). It's broad—"how we ship software faster and more reliably together."</li>
+<li><strong>SRE</strong> — Applies software engineering to operations for <strong>reliability</strong>. Focus: Production systems uptime, SLOs/error
+  budgets, incident response, toil reduction. Metrics-driven (MTTR, availability), often "you build it, you run it" with
+  on-call.</li>
+<li><strong>Platform Engineering</strong> — Builds the <strong>internal developer platform</strong> (IDP): Reusable tools, frameworks, self-service
+  portals, golden paths. Primary stakeholder: Developers (improve productivity, happiness, onboarding). Less about
+  running production 24/7, more about enabling squads to deliver. In 2026, it's the "how to scale DevEx" layer—often
+  sits closer to dev teams.</li>
+</ul>
+<p>In this role (inside SW Development), it's classic Platform Eng: Standardize practices/tooling, embed
+observability/security, improve workflows—prioritizing DevEx over heavy ops/SRE duties.</p>
+<h3 id="job-stark-questions-1-5-discussion-around-observability-logging-approaches-and-how-you-would-approach-improving-developer-workflows-in-an-on-prem-environment">5. Discussion around observability, logging approaches, and how you would approach improving developer workflows in an on-prem environment.</h3>
+<p><strong>Observability</strong> (three pillars: metrics, logs, traces) is essential for understanding system behavior without
+guessing—especially in distributed/on-prem setups where debugging is harder.</p>
+<p><strong>Logging approaches</strong> I'd advocate:</p>
+<ul>
+<li><strong>Structured logging</strong> (JSON over plain text): Easy to parse/query (e.g., via ELK, Grafana Loki, or on-prem tools).</li>
+<li>Levels: DEBUG (local/dev), INFO (normal ops), WARN/ERROR (actionable).</li>
+<li>Context-rich: Correlation IDs (trace/span), service name/version, env, user/session if relevant—no PII.</li>
+<li>Semantic events: "payment_failed" vs generic "error."</li>
+<li>Best practices: Avoid logging secrets, rate-limit noisy logs, sample high-volume ones.</li>
+</ul>
+<p><strong>Improving developer workflows in on-prem</strong> (80% focus here):</p>
+<ol>
+<li><strong>Start with assessment</strong> — Audit current logging (scattered files? No central view?), tracing (none?), metrics (
+   basic server CPU?).</li>
+<li><strong>Embed observability by default</strong> — Push libraries/standards (e.g., OpenTelemetry for auto-instrumentation in .NET
+   apps) so devs get traces/logs with minimal code.</li>
+<li><strong>Centralized, on-prem-friendly stack</strong> — Self-hosted Prometheus + Grafana for metrics/dashboards; Loki or EFK for
+   logs; Jaeger/Tempo for traces. Avoid cloud-only if data sovereignty matters.</li>
+<li><strong>DevEx wins</strong>:<ul>
+<li>Fast local envs with Docker Compose + pre-configured observability (e.g., local Grafana).</li>
+<li>Automated test env refresh/obfuscation (scripted via pipelines).</li>
+<li>Unified dashboards per service—devs see their app's health without ops tickets.</li>
+<li>Tracing across services (e.g., RabbitMQ message correlation).</li>
+</ul>
+</li>
+<li><strong>Iterate</strong> — Pilot with one squad, gather feedback, roll out standards via templates/docs/mentoring.</li>
+<li><strong>Security</strong> — RBAC on dashboards, encrypt logs in transit/rest.</li>
+</ol>
+<p>Goal: Make "what broke?" answerable in minutes, not hours—boosting velocity and reducing frustration in on-prem
+constraints.</p>
+<p>These should position you as thoughtful, experienced, and aligned with their emphasis on DevEx, standardization, and
+on-prem realities. Practice delivering them conversationally, and tie back to their context (e.g., post-acquisition
+growth, energy data platforms). Good luck with the interview! If you want tweaks or more examples, just say.</p></section><section class="print-page" id="job-stark-questions" heading-number="9.20.2"><h1 id="job-stark-questions-questions">Questions</h1>
 <p>Here’s a compiled list of strong, targeted questions to ask during your interview for the <strong>DevOps Platform Engineer</strong>
 role at Stark Software International Limited. These questions are grouped by category to help you demonstrate interest,
 assess fit, and gather key info on the role, team, tech, company stability/growth, and day-to-day realities.</p>
@@ -13121,7 +13277,7 @@ company's context (energy sector specialist, recent Siemens UK Energy Services a
 <p>These questions show you've done your homework, are thoughtful about the challenges (on-prem heavy, legacy,
 first-in-role), and are genuinely interested in impact and fit. Prioritize 8–10 based on the interview flow—start with
 role/team ones to build rapport. Good luck; this seems like a role with real ownership in a purposeful, growing company!
-If you share more about your background or concerns, I can refine these further.</p></section><section class="print-page" id="job-stark-stark-company-history" heading-number="9.20.2"><h1 id="job-stark-stark-company-history-stark-company-history">Stark company history</h1>
+If you share more about your background or concerns, I can refine these further.</p></section><section class="print-page" id="job-stark-stark-company-history" heading-number="9.20.3"><h1 id="job-stark-stark-company-history-stark-company-history">Stark company history</h1>
 <p><strong>Stark Software International Limited (Stark UK)</strong> has a clear, evolution-focused history in the energy sector,
 spanning over <strong>45 years</strong> as of 2026. Here's a concise summary you can reference or weave into conversation during your
 interview—it shows you've done your homework and can tie into topics like innovation, growth, data expertise, and the
@@ -28070,9 +28226,11 @@ Great! Here’s how to <strong>permanently stop IntelliJ from wrapping your <cod
                 .print-site-enumerate-headings #job-wage-comparison h2 {  counter-increment: counter-job-wage-comparison-2 }
             
 .print-site-enumerate-headings #section-9-20 > h1:before { content: '9.20 ' }
-.print-site-enumerate-headings #job-stark-questions > h1:before { content: '9.20.1 ' }
+.print-site-enumerate-headings #job-stark-questions-1 > h1:before { content: '9.20.1 ' }
 
-.print-site-enumerate-headings #job-stark-stark-company-history > h1:before { content: '9.20.2 ' }
+.print-site-enumerate-headings #job-stark-questions > h1:before { content: '9.20.2 ' }
+
+.print-site-enumerate-headings #job-stark-stark-company-history > h1:before { content: '9.20.3 ' }
 
 .print-site-enumerate-headings #section-10 > h1:before { content: '10 ' }
 .print-site-enumerate-headings #linux-restore%20old%20ssh%20key%20%28if%20backed%20up%29 > h1:before { content: '10.1 ' }
