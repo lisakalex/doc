@@ -1,0 +1,40 @@
+@media print {
+    @page {
+        size: A4 portrait;           /* or letter */
+        margin: 2cm 2cm 2cm 2cm;   /* Smaller bottom margin since no footer needed */
+    }
+
+    /* Force remove any browser headers/footers and page counters */
+    @page {
+        @top-center {
+            content: none;
+        }
+        @bottom-center {
+            content: none;
+        }
+        @bottom-left {
+            content: none;
+        }
+        @bottom-right {
+            content: none;
+        }
+    }
+
+    /* Hide MkDocs/Material elements that are useless in print */
+    .md-header,
+    .md-footer,
+    .md-sidebar--primary,
+    .md-sidebar--secondary,
+    .md-nav,
+    .md-footer__inner,
+    .md-typeset .admonition-title::before {
+        display: none !important;
+    }
+
+    /* Optional: make the content use more width */
+    .md-main__inner,
+    .md-content {
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+}
