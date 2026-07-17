@@ -1,2 +1,21 @@
 https://lisakalex.github.io/doc/
 
+~~~
+hide all headers and sidebars - no headers or sidebars no nav bars
+
+~~
+    <style>
+        .md-header {
+            display: none;
+        }
+
+        .md-nav {
+            display: none;
+        }
+
+        footer {
+            display: none;
+        }
+    </style>
+~~
+~~~
