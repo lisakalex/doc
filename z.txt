@@ -1,4 +1,4 @@
-https://lisakalex.github.io/doc/
+https://lisakalex.github.io/doc/site
 
 ~~~
 hide all headers and sidebars - no headers or sidebars no nav bars
