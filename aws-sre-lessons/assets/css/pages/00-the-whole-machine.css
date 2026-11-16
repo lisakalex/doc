@@ -1,0 +1,23 @@
+/* orientation: the whole machine - terraform and kubernetes in one specimen */
+.facts{display:flex;flex-wrap:wrap;gap:.5rem;}
+.fact{font-family:"IBM Plex Mono",monospace;font-size:.72rem;font-weight:500;padding:.22rem .55rem;
+  border:1px solid var(--rule-strong);border-radius:4px;color:var(--ink-2);background:var(--surface);}
+.ladder{display:flex;flex-direction:column;border:1px solid var(--rule);border-radius:7px;
+  overflow:hidden;background:var(--surface);}
+.rung{display:grid;grid-template-columns:auto 1fr;gap:.9rem;padding:.85rem 1rem;
+  border-bottom:1px solid var(--rule);}
+.rung:last-child{border-bottom:none;}
+.rung .s{font-family:"IBM Plex Mono",monospace;font-size:.72rem;font-weight:600;color:var(--accent);
+  white-space:nowrap;padding-top:.2rem;}
+.rung p{font-size:.93rem;color:var(--ink-2);}
+.rung p+p{margin-top:.4rem;}
+.join{display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem;}
+.joincard{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--accent);
+  border-radius:0 7px 7px 0;padding:.95rem 1.05rem;display:flex;flex-direction:column;gap:.45rem;}
+.joincard h3{font-size:.95rem;}
+.joincard p{font-size:.9rem;color:var(--ink-2);}
+.joincard .wire{font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--muted);
+  line-height:1.8;overflow-wrap:anywhere;}
+ol.todo,ul.todo{margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.45rem;max-width:65ch;}
+ol.todo li,ul.todo li{font-size:.94rem;color:var(--ink-2);}
+.chip.warnchip{color:var(--warn);background:var(--warn-soft);border-color:var(--warn-rule);}

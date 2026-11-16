@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>001 · Does removing a git remote guarantee a push can&#x27;t reach GitHub?</title>
+<link rel="icon" href="assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="assets/fonts/fonts.css">
+<link rel="stylesheet" href="assets/css/lesson.css">
+<link rel="stylesheet" href="assets/css/pages/question.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Question 001 &#183; safety</p>
+<h1>Does removing a git remote guarantee a push can't reach GitHub?</h1>
+<div class="meta"><span class="chip">#001</span>
+<span class="chip">2026-11-15</span>
+<span class="chip">safety</span>
+<span class="chip ok">answered</span></div>
+</header>
+
+<section class="entry">
+<h2>The question, as asked</h2>
+<blockquote>
+<p>"Do you think if we remove a remote from this project repo, it will
+guarantee that any push doesn't reach the GitHub"</p>
+</blockquote>
+<h2>Short answer</h2>
+<p>No. <code>git remote remove origin</code> deletes three lines from <code>.git/config</code> and
+stops exactly one thing — a bare <code>git push</code> with no arguments, because the
+branch's upstream tracking goes with it. Pushing by URL needs no remote and no
+config at all, and the credential still works.</p>
+<p>The guarantee is server-side: archiving the repository on GitHub, which makes
+it read-only for every method and every credential.</p>
+<h2>The mechanism</h2>
+<p>A remote is a <strong>nickname</strong>, not a permission. <code>.git/config</code> maps the name
+<code>origin</code> to a URL so you can type less. Git accepts a URL anywhere it accepts
+a remote name, so deleting the nickname leaves this working:</p>
+<pre><code class="language-bash">git push git@github.com:lisakalex/aws-sre.git HEAD:main
+</code></pre>
+<p>Authorisation is separate and untouched. This machine pushes over SSH with
+<code>~/.ssh/id_rsa</code>, which is registered against the GitHub account; removing a
+config entry does not deregister a key. And the URL is recoverable from the
+reflog, the README and <code>argocd/applicationset.yaml</code> regardless.</p>
+<p>So removing the remote is a guard against a <em>reflex</em>, not against an
+<em>intention</em> — the same class as a shell alias. Three rungs of strength:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th>Stops</th>
+<th>Bypassed by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Remove the remote</td>
+<td>bare <code>git push</code></td>
+<td>naming the URL</td>
+</tr>
+<tr>
+<td><code>pre-push</code> hook</td>
+<td>every push, however addressed</td>
+<td><code>--no-verify</code>; and <code>.git/hooks</code> is untracked, so it needs <code>core.hooksPath</code> to survive a clone</td>
+</tr>
+<tr>
+<td>Archive the repo</td>
+<td>every push, period</td>
+<td>unarchiving it</td>
+</tr>
+</tbody>
+</table></div>
+<p>Only the third is enforced by the other end of the connection, so nothing in
+the working copy can weaken it. That is the same reasoning as preferring an
+IAM policy or an SCP over <code>prevent_destroy</code> for production deletion: a control
+the actor can edit is not a control over that actor.</p>
+<p><code>git remote set-url --push origin no_push</code> is a popular variant and is the
+same illusion — push-by-URL walks past it identically.</p>
+<h2>Where to look</h2>
+<p>Verified after archiving, on 2026-11-15:</p>
+<pre><code>$ git push --dry-run origin main
+ERROR: This repository was archived so it is read-only.
+fatal: Could not read from remote repository.
+
+$ git fetch origin        # reads still work
+From github.com:lisakalex/aws-sre
+ * [new branch]  claude/html-from-markdown-3n7ga4 -&gt; origin/...
+</code></pre>
+<ul>
+<li><code>aws-sre/docs/SAFETY.md</code> — "Layer 0 — the repository is archived"</li>
+<li>GitHub: Settings → Danger Zone → Archive this repository</li>
+</ul>
+<h2>What I thought first</h2>
+<p>The intuition was that a push needs a remote, so removing the remote removes
+the ability to push. Reasonable, because that is how it behaves day to day:
+every push you have ever typed was <code>git push</code> or <code>git push origin main</code>, and
+both stop working.</p>
+<p>What the intuition misses is that the thing which stops working is the
+<em>shorthand</em>. The underlying operation takes a URL and a credential, and both
+are still there. The general shape of the mistake — <strong>mistaking a convenience
+for a constraint</strong> — is worth more than the git detail.</p>
+<h2>Consequences worth remembering</h2>
+<p>Archiving also freezes things that are easy to forget:</p>
+<ul>
+<li><strong>GitHub Actions do not run on an archived repository</strong>, scheduled workflows
+  included. <code>drift.yml</code>'s nightly plan stopped. Harmless while nothing is
+  applied, but it is a guard that silently stopped working — unarchive and
+  confirm it runs before trusting it again.</li>
+<li>Open pull requests cannot be merged (there were 5).</li>
+<li>Most repository settings are locked; any change means unarchiving first.</li>
+<li>Archiving does not retract anything. Everything already pushed is still
+  there.</li>
+</ul>
+<h2>Related</h2>
+<ul>
+<li><a href="002-brikman-says-workspaces-are-wrong-for-environments.html">002 — Brikman says workspaces are wrong for environments</a>
+  — the same mistake in a different place: a file named <code>backend-prod.hcl</code>
+  that selects no environment, as <code>origin</code> carried no permission.</li>
+</ul>
+</section>
+
+<footer>
+<p><a class="backlink" href="index.html">&#8592; All questions</a></p>
+<p>From a private working record of reading the <a href="https://github.com/lisakalex/aws-sre">aws-sre</a> specimen. Nothing in that repository has ever been applied, so these notes describe what the configuration says, not what AWS did with it.</p>
+</footer>
+</div>
+</body>
+</html>

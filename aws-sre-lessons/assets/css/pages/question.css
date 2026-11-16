@@ -1,0 +1,55 @@
+/* Rendered question entries. The shared lesson.css styles a hand-written page;
+   markdown emits tags it never needed -- lists, blockquotes, <pre>, <h4> -- so
+   those are filled in here against the same tokens. */
+
+.entry{display:flex;flex-direction:column;gap:1.15rem;}
+
+.entry h2{margin-top:1.6rem;padding-top:1.5rem;border-top:1px solid var(--rule);}
+.entry h2:first-child{margin-top:0;padding-top:0;border-top:none;}
+.entry h3{margin-top:.5rem;color:var(--ink);}
+.entry h4{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--muted);margin:.4rem 0 0;font-weight:600;}
+
+.entry ul,.entry ol{margin:0;padding-left:1.35rem;display:flex;flex-direction:column;gap:.42rem;
+  max-width:65ch;color:var(--ink-2);}
+.entry li{line-height:1.6;}
+.entry li::marker{color:var(--accent);}
+.entry ul ul,.entry ol ol,.entry ul ol,.entry ol ul{margin-top:.42rem;}
+
+/* The verbatim question. The whole point of the entry, so it reads as a quote
+   rather than as an aside. */
+.entry blockquote{margin:0;padding:.9rem 1.15rem;background:var(--surface);
+  border:1px solid var(--rule);border-left:3px solid var(--accent);border-radius:0 7px 7px 0;
+  display:flex;flex-direction:column;gap:.5rem;}
+.entry blockquote p{font-size:1.02rem;color:var(--ink);max-width:62ch;}
+.entry blockquote p:last-child{font-size:.88rem;color:var(--muted);}
+.entry blockquote code{white-space:normal;}
+
+/* Fenced code. lesson.css styles a .code div; markdown emits pre>code, and the
+   build wraps it so both land in the same place. */
+.entry pre{background:var(--code-bg);color:var(--code-ink);border:1px solid var(--rule);
+  border-radius:7px;padding:1.05rem 1.15rem;overflow-x:auto;margin:0;
+  font-family:"IBM Plex Mono",monospace;font-size:.815rem;line-height:1.72;}
+.entry pre code{background:none;border:none;padding:0;font-size:inherit;color:inherit;
+  white-space:pre;}
+
+.entry hr{border:none;border-top:1px solid var(--rule);margin:.6rem 0;}
+
+/* Metadata strip under the title. */
+.meta{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;}
+.meta .chip{text-transform:none;letter-spacing:.04em;}
+
+/* The index. */
+.qlist{display:flex;flex-direction:column;gap:.75rem;}
+.qrow{background:var(--surface);border:1px solid var(--rule);border-radius:7px;
+  padding:.95rem 1.1rem;display:flex;flex-direction:column;gap:.5rem;}
+.qrow a{text-decoration:none;font-weight:600;font-size:1.02rem;line-height:1.35;
+  font-family:Archivo,"IBM Plex Sans",sans-serif;text-wrap:balance;}
+.qrow a:hover{text-decoration:underline;}
+.qrow .num{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.1em;
+  color:var(--muted);font-weight:600;}
+.qrow p{font-size:.9rem;color:var(--ink-2);}
+
+.backlink{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.08em;
+  text-transform:uppercase;text-decoration:none;}
+.backlink:hover{text-decoration:underline;}

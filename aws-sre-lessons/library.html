@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The book library</title>
+<link rel="icon" href="assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="assets/fonts/fonts.css">
+<link rel="stylesheet" href="assets/css/lesson.css">
+<link rel="stylesheet" href="assets/css/pages/question.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Reading &#183; 332 books</p>
+<h1>What the library covers, and what it does not</h1>
+<p class="lede">An index of a personal library by each book's own table of contents, so a pointer names a real chapter at a real page &mdash; and so absence is checkable too.</p>
+</header>
+
+<section class="entry">
+<p>An index of the 332 books in <code>~/Documents/books</code>, so a reading pointer in these
+notes names a real heading on a real page instead of being guessed from a
+filename.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>toc.tsv.gz</code></td>
+<td>68,502 section headings pulled from each book's own table of contents: <code>path</code>, <code>depth</code>, <code>page</code>, <code>title</code></td>
+</tr>
+<tr>
+<td><code>books.tsv</code></td>
+<td>one row per book: <code>path</code>, <code>pages</code>, <code>outline entries</code></td>
+</tr>
+<tr>
+<td><code>find-reading.sh</code></td>
+<td>look a topic up</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code>./find-reading.sh -s 'workspace'       # the devops/read shelf only
+./find-reading.sh -i 'secret'          # infra books, skipping java/python/...
+./find-reading.sh -b Brikman 'state'   # one book
+</code></pre>
+<p>Built with <code>mutool show &lt;file&gt; outline</code> for PDFs. EPUBs defeat <code>mutool</code> — it
+reads them as corrupt PDFs and returns nothing — so those are parsed from their
+<code>toc.ncx</code> instead; without that, <em>Kubernetes in Action</em> 2e would be absent from
+the index entirely while appearing to be covered.</p>
+<p>51 of the 332 books still have no table of contents at all and contribute
+nothing, including the 1,244-page <em>AWS DevOps Engineer Professional
+Certification Guide</em>, which has to be searched by hand.</p>
+<p>Pages in this index are <strong>PDF pages</strong>, which is what a viewer jumps to. Several
+of these are reflowed ebooks with no printed folios at all, so there is no
+printed page number to convert to.</p>
+<p>Manning titles (<em>Terraform in Action</em>, <em>Kubernetes in Action</em>) use named
+destinations rather than page numbers, so they index with a <code>-</code> page and get
+cited by section number, which is more durable anyway.</p>
+<h2>The shelf</h2>
+<p><code>devops/read/</code> holds 11 books that duplicate copies elsewhere in the library —
+an already-curated shortlist, and the right one:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Book</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Brikman, <em>Terraform: Up &amp; Running</em> 3e (680p)</td>
+<td>the reference for every Terraform decision here</td>
+</tr>
+<tr>
+<td>Winkler, <em>Terraform in Action</em></td>
+<td>zero-downtime deploys, custom providers, CI/CD</td>
+</tr>
+<tr>
+<td>Burns/Beda/Hightower, <em>Kubernetes: Up &amp; Running</em> 3e (290p)</td>
+<td>core objects, policy and governance</td>
+</tr>
+<tr>
+<td>Luksa, <em>Kubernetes in Action</em> 2e (epub, 367 sections)</td>
+<td>the deepest treatment of <em>why</em> Kubernetes behaves as it does; ch.6 on the pod lifecycle is the best thing in the library</td>
+</tr>
+<tr>
+<td>Kumar, <em>Modern Kubernetes</em> (2026)</td>
+<td>autoscaling, including predictive — 40 of its 307 sections</td>
+</tr>
+<tr>
+<td>Agarwal, <em>Modern DevOps Practices</em> 2e</td>
+<td>Argo CD and GitOps: 198 full-text hits, the most in the library</td>
+</tr>
+<tr>
+<td>Kapoor, <em>AWS DevOps Simplified</em></td>
+<td>AWS-specific observability and the EKS surface</td>
+</tr>
+<tr>
+<td>Krief, <em>Learning DevOps</em> 2e</td>
+<td>breadth; remote state, Helm</td>
+</tr>
+<tr>
+<td>Kothapalli, <em>DevOps for Software Engineers</em></td>
+<td>the enterprise-developer angle</td>
+</tr>
+<tr>
+<td>Freeman, <em>DevOps for Dummies</em></td>
+<td>culture and vocabulary, not mechanism</td>
+</tr>
+<tr>
+<td><code>741316028.pdf</code></td>
+<td>38 pages, no extractable text — a scan; unidentified</td>
+</tr>
+</tbody>
+</table></div>
+<p>Books off the shelf still matter for narrow topics: Jambor's <em>DevOps for
+Databases</em> for backup and PITR, Oggl's <em>Git</em> for the plumbing behind the
+remote-vs-permission question, Vehent's <em>Securing DevOps</em> (Russian edition) for
+IAM boundaries.</p>
+<h2>What this library covers, and what it does not</h2>
+<p>Measured by full-text search across the seven most relevant books, not by
+guessing. Counts are occurrences, so they show emphasis rather than quality.</p>
+<p><strong>Well covered — go to the book first</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Terraform state, backends, locking</td>
+<td>Brikman ch.3 (p145–194); 63 workspace hits</td>
+</tr>
+<tr>
+<td>Workspaces vs. file layout</td>
+<td>Brikman p161–175 — and he <strong>disagrees</strong> with this repo, see <code>questions/002</code></td>
+</tr>
+<tr>
+<td>Modules, versioning, gotchas</td>
+<td>Brikman ch.4 (p195–232), p427+ "Production-Grade Infrastructure Modules"</td>
+</tr>
+<tr>
+<td>Secrets in Terraform</td>
+<td>Brikman ch.6 (p304–339), incl. GitHub Actions OIDC at p321</td>
+</tr>
+<tr>
+<td><code>prevent_destroy</code></td>
+<td>Brikman (5 hits), Winkler (2)</td>
+</tr>
+<tr>
+<td>Argo CD / GitOps</td>
+<td>Agarwal — 198 hits, nothing else comes close</td>
+</tr>
+<tr>
+<td>HPA</td>
+<td>Kumar (70), Agarwal (33), Ahmed (31)</td>
+</tr>
+<tr>
+<td>Prometheus</td>
+<td>Kapoor (63), Kumar (53), Agarwal (52)</td>
+</tr>
+<tr>
+<td>SLOs and error budgets</td>
+<td>Agarwal (130), Kapoor (22)</td>
+</tr>
+<tr>
+<td>EKS as a Terraform target</td>
+<td>Brikman p390 "A Crash Course on Kubernetes", p407 EKS</td>
+</tr>
+<tr>
+<td>Admission control, OPA</td>
+<td>Burns ch.15 (p260–282)</td>
+</tr>
+<tr>
+<td>Pod lifecycle, probes, hooks</td>
+<td>Luksa ch.6 — including the sidebar on why a shell-form <code>ENTRYPOINT</code> swallows SIGTERM, which silently voids any <code>preStop</code>/grace-period tuning. <code>app/Dockerfile:51</code> uses the exec form, so this repo is fine, but nothing in the repo says why that matters.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Thin — the library will not finish the thought</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Reality</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cluster Autoscaler</td>
+<td>9 hits, all in Kumar. The ASG-discovery-tag mechanism is in none of them.</td>
+</tr>
+<tr>
+<td>PodDisruptionBudget</td>
+<td>3 hits, all in Burns. <code>unhealthyPodEvictionPolicy</code> appears nowhere.</td>
+</tr>
+<tr>
+<td><code>kubectl drain</code> / cordon</td>
+<td>5 hits, all in Burns.</td>
+</tr>
+<tr>
+<td>Helm beyond <code>install</code></td>
+<td>Kumar 37, Agarwal 20 — mostly consumption, not chart authoring</td>
+</tr>
+<tr>
+<td>SCPs</td>
+<td>4 hits, all Kapoor</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Absent — do not expect a book to help</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Hits across all seven</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>IRSA</strong> (IAM Roles for Service Accounts)</td>
+<td><strong>0.</strong> Brikman has 28 OIDC hits, but never joins them to a Kubernetes ServiceAccount.</td>
+</tr>
+<tr>
+<td><strong>Alertmanager</strong> routing, inhibition, Watchdog</td>
+<td><strong>1</strong>, in a Go book, in passing.</td>
+</tr>
+<tr>
+<td><strong><code>topologySpreadConstraints</code></strong></td>
+<td><strong>0.</strong></td>
+</tr>
+<tr>
+<td><code>preStop</code> / <code>terminationGracePeriodSeconds</code></td>
+<td>Luksa ch.6.3.2 and 6.4.3 cover the hook and the termination sequence properly, and he notes the <code>sleep</code> action exists — but gives <strong>no reason to use it</strong>, so the endpoint-propagation race is still unexplained. Burns adds 2 passing mentions.</td>
+</tr>
+</tbody>
+</table></div>
+<p>That last block is not incidental. IRSA, the PDB/drain interaction and
+Alertmanager routing are three of the mechanisms this repo leans on hardest,
+and they are the three the library is quietest about — which is roughly the
+state of the published material generally. For those, the primary sources are
+the AWS and Kubernetes docs and the upstream chart values, and the entries in
+<code>questions/</code> are the substitute.</p>
+<h2>Rebuilding</h2>
+<p>The index is derived from a library that is not in this repo, so it is
+committed rather than generated on clone.</p>
+<pre><code class="language-bash">find ~/Documents/books -type f \( -iname '*.pdf' -o -iname '*.epub' \) -print0 |
+while IFS= read -r -d '' f; do
+  mutool show &quot;$f&quot; outline 2&gt;/dev/null   # -&gt; path, depth, page, title
+done
+</code></pre>
+</section>
+
+<footer>
+<p><a class="backlink" href="index.html">&#8592; All questions</a></p>
+</footer>
+</div>
+</body>
+</html>

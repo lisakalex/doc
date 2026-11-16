@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>002 · Brikman says workspaces are the wrong way to separate environments…</title>
+<link rel="icon" href="assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="assets/fonts/fonts.css">
+<link rel="stylesheet" href="assets/css/lesson.css">
+<link rel="stylesheet" href="assets/css/pages/question.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Question 002 &#183; terraform</p>
+<h1>Brikman says workspaces are the wrong way to separate environments. <code>aws-sre</code> uses workspaces to separate environments. Who is right?</h1>
+<div class="meta"><span class="chip">#002</span>
+<span class="chip">2026-11-16</span>
+<span class="chip">terraform</span>
+<span class="chip ok">answered</span></div>
+</header>
+
+<section class="entry">
+<h2>The question, as asked</h2>
+<p>Nobody asked it. It fell out of pointing the library at the repo: the single
+most authoritative Terraform book on the shelf argues against the central
+design decision in <code>terraform/cluster/env.tf</code>.</p>
+<blockquote>
+<p>"Due to these drawbacks, workspaces are not a suitable mechanism for
+isolating one environment from another: e.g., isolating staging from
+production."</p>
+<p>— Brikman, <em>Terraform: Up &amp; Running</em> 3e, p171</p>
+</blockquote>
+<h2>Short answer</h2>
+<p>Brikman is right, and <code>env.tf</code> already says so in a comment — but the repo is
+weaker than that comment implies. The three <code>env/backend-*.hcl</code> files are
+<strong>byte-identical apart from a comment</strong>, so the per-environment backend config
+is decoration: <code>-backend-config=env/backend-prod.hcl</code> selects nothing. The
+environment comes entirely from <code>terraform workspace select</code>, which is exactly
+the invisible, same-credentials mechanism Brikman warns about.</p>
+<p>The repo's defence is that it is a teaching specimen that has to stay readable
+as one configuration. That is a legitimate trade, but it is a trade, and the
+missing half of it is that nothing enforces the choice.</p>
+<h2>The mechanism</h2>
+<p>Brikman's three objections, checked against this repo:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>His objection</th>
+<th>Does it land here?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>All workspaces share one backend, so one set of credentials and access controls covers every environment</td>
+<td><strong>Yes, fully.</strong> All three backend files name the same bucket <code>example-tfstate</code>, the same key <code>cluster/terraform.tfstate</code>, and the same lock table.</td>
+</tr>
+<tr>
+<td>Workspaces are invisible in the code and the terminal</td>
+<td><strong>Yes.</strong> Nothing in a diff tells you which environment it will hit.</td>
+</tr>
+<tr>
+<td>Therefore error-prone, with no second layer of defence</td>
+<td><strong>Yes</strong> — and <code>env.tf</code> makes it worse in one specific way, below.</td>
+</tr>
+</tbody>
+</table></div>
+<p>The thing worth taking away is <em>why</em> sharing a backend matters. State is not
+just a record; it is read-write credentials to everything it describes. An
+identity that can write <code>env:/dev/cluster/terraform.tfstate</code> can write
+<code>env:/prod/cluster/terraform.tfstate</code>, because they are two keys in one bucket
+under one bucket policy. So "dev and prod are separate" is true of the
+<em>resources</em> and false of the <em>authority over them</em>. Separate directories do not
+fix that by themselves either — separate <strong>accounts</strong> do, which is what the
+<code>env.tf</code> comment points at and what a real employer would have.</p>
+<p>Then there is the default-workspace fallback:</p>
+<pre><code class="language-hcl">env = terraform.workspace == &quot;default&quot; ? &quot;dev&quot; : terraform.workspace
+</code></pre>
+<p>The comment argues this is safe because dev is the survivable place to land.
+That reasoning is sound for a <em>forgotten</em> <code>workspace select</code>. It does not cover
+the more likely mistake: running <code>workspace select prod</code> once, walking away,
+and coming back to a shell that is still on prod. The workspace is sticky
+state on disk (<code>.terraform/environment</code>), not something you pass per command,
+so the dangerous case is not "no workspace" but "the wrong workspace, left
+over". A fallback cannot help with that. Only something that prints the target
+and refuses, or a separate account, can.</p>
+<h2>Where to look</h2>
+<p>Brikman, <em>Terraform: Up &amp; Running</em> 3e — <code>~/Documents/books/devops/read/</code>.
+Page numbers are <strong>PDF pages</strong> — that copy is a reflowed ebook with no
+printed folios, so a PDF page is the only citable position:</p>
+<ul>
+<li><strong>p161</strong> State File Isolation — frames the two options</li>
+<li><strong>p163</strong> Isolation via Workspaces — the walkthrough; the three drawbacks begin p170</li>
+<li><strong>p171</strong> the verdict quoted above, and the start of the alternative</li>
+<li><strong>p427</strong> Production-Grade Infrastructure Modules — where this lands in a real layout</li>
+</ul>
+<p>In the repo:</p>
+<ul>
+<li><code>terraform/cluster/env.tf:1-20</code> — the comment that concedes the point</li>
+<li><code>terraform/cluster/env.tf:27</code> — the <code>default</code> → <code>dev</code> fallback</li>
+<li><code>terraform/cluster/env/backend-{dev,staging,prod}.hcl</code> — the three identical files</li>
+</ul>
+<p>Demonstrate the identity:</p>
+<pre><code>$ cd terraform/cluster/env
+$ for f in backend-*.hcl; do
+    printf '%-22s %s\n' &quot;$f&quot; &quot;$(grep -vE '^\s*(#|$)' &quot;$f&quot; | md5sum | cut -c1-12)&quot;
+  done
+backend-dev.hcl        0ef17108eb0d
+backend-prod.hcl       0ef17108eb0d
+backend-staging.hcl    0ef17108eb0d
+</code></pre>
+<p>Same for <code>terraform/env/backend-*.hcl</code> (<code>62351e2f2904</code> three times).</p>
+<h2>What I thought first</h2>
+<p>That the per-environment backend files were doing real work — that
+<code>-backend-config=env/backend-prod.hcl</code> was what made prod prod. The naming
+invites that reading, the <code>Makefile</code> passes the flag on every <code>init</code>, and three
+separate files look like three separate configurations.</p>
+<p>They are three copies of one configuration. The flag is a no-op; the
+<code>terraform workspace select</code> on the next line of the <code>Makefile</code> is the whole
+mechanism. The files would only earn their names if they differed — a
+per-environment bucket, or at minimum a per-environment key.</p>
+<p>The general shape: <strong>a file named after a distinction does not create the
+distinction.</strong> Same error as 001, where a remote named <code>origin</code> looked like it
+carried permission. Both times the name described intent and was mistaken for
+enforcement.</p>
+<h2>What would actually fix it</h2>
+<p>In rough order of strength, weakest first:</p>
+<ol>
+<li>A <code>check</code> block asserting the workspace matches the bucket or key in use —
+   makes the mismatch visible, enforces nothing.</li>
+<li>Give each backend file a distinct <code>key</code> (e.g. <code>cluster/prod/terraform.tfstate</code>)
+   so the three files stop being identical, and drop the workspace prefix. The
+   files then mean what they are named.</li>
+<li>A distinct <strong>bucket</strong> per environment, with its own bucket policy — now a
+   dev credential cannot address prod state.</li>
+<li>A distinct <strong>AWS account</strong> per environment. This is the only one that is a
+   boundary rather than a convention, and it is what <code>env.tf</code> already names as
+   the real answer.</li>
+</ol>
+<p>None of this is applied; see the standing caveat in the README.</p>
+<h2>Related</h2>
+<ul>
+<li><a href="001-does-removing-a-remote-stop-a-push.html">001 — Does removing a git remote guarantee a push can't reach GitHub?</a> — the same mistake, naming vs. enforcement</li>
+<li><code>library/README.md</code> — where the books cover Terraform state, and where they don't</li>
+</ul>
+</section>
+
+<footer>
+<p class="note">not asked — surfaced by indexing the book library against the repo</p>
+<p><a class="backlink" href="index.html">&#8592; All questions</a></p>
+<p>From a private working record of reading the <a href="https://github.com/lisakalex/aws-sre">aws-sre</a> specimen. Nothing in that repository has ever been applied, so these notes describe what the configuration says, not what AWS did with it.</p>
+</footer>
+</div>
+</body>
+</html>

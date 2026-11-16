@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>aws-sre lessons</title>
+<link rel="icon" href="assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="assets/fonts/fonts.css">
+<link rel="stylesheet" href="assets/css/lesson.css">
+<link rel="stylesheet" href="assets/css/pages/question.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Working record &#183; Terraform, Kubernetes, AWS</p>
+<h1>Reading a production specimen</h1>
+<p class="lede">Notes from working through <a href="https://github.com/lisakalex/aws-sre">aws-sre</a>, a production-shaped AWS/Terraform/Kubernetes repository, one question at a time. It validates, lints and renders; it has never been applied, and no cluster has ever existed.</p>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The record</p>
+<h2>Questions</h2>
+</div>
+<p>One entry per question, each ending in what I thought the answer was before checking. That last part is the reason these exist.</p>
+<div class="qlist">
+<div class="qrow">
+<span class="num">001</span>
+<a href="001-does-removing-a-remote-stop-a-push.html">Does removing a git remote guarantee a push can't reach GitHub?</a>
+<p>No. <code>git remote remove origin</code> deletes three lines from <code>.git/config</code> and stops exactly one thing — a bare <code>git push</code> with no arguments, because the branch's upstream tracking goes with it.</p>
+<div class="meta"><span class="chip">safety</span> <span class="chip ok">answered</span></div>
+</div>
+<div class="qrow">
+<span class="num">002</span>
+<a href="002-brikman-says-workspaces-are-wrong-for-environments.html">Brikman says workspaces are the wrong way to separate environments. <code>aws-sre</code> uses workspaces to separate environments. Who is right?</a>
+<p>Brikman is right, and <code>env.tf</code> already says so in a comment — but the repo is weaker than that comment implies. The three <code>env/backend-*.hcl</code> files are <strong>byte-identical apart from a comment</strong>, so the per-environment backend config is decoration: <code>-backend-config=env/backend-prod.hcl</code> selects nothing.</p>
+<div class="meta"><span class="chip">terraform</span> <span class="chip ok">answered</span></div>
+</div>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Longer form</p>
+<h2>Walkthroughs</h2>
+</div>
+<p>Guided reads of the specimen, for when a question needed a map rather than an answer.</p>
+<div class="qlist">
+<div class="qrow">
+<a href="00-the-whole-machine.html">The Whole Machine</a>
+</div>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Reading</p>
+<h2>The book library</h2>
+</div>
+<p>An index of a 332-book library by each book's own table of contents, so a reading pointer names a real chapter at a real page. It also records what the library does <strong>not</strong> cover: three mechanisms the specimen leans on hardest appear in none of the books.</p>
+<div class="qlist">
+<div class="qrow">
+<a href="library.html">What the library covers, and what it does not</a>
+</div>
+</div>
+</section>
+
+<footer>
+<p>Generated from a private repository by <code>build-site.py</code>. State-bucket names are replaced with placeholders here.</p>
+</footer>
+</div>
+</body>
+</html>
