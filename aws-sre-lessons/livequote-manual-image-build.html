@@ -3,182 +3,300 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>LiveQuote Image Build</title>
+<title>Manual container image build</title>
 <link rel="icon" href="assets/img/favicon-lesson.svg">
 <link rel="stylesheet" href="assets/fonts/fonts.css">
 <link rel="stylesheet" href="assets/css/lesson.css">
-<link rel="stylesheet" href="assets/css/pages/00-the-whole-machine.css">
+<link rel="stylesheet" href="assets/css/pages/question.css">
 </head>
 <body>
 <div class="wrap">
 <header class="masthead">
-<p class="eyebrow">Runbook &#183; Jenkins host &#183; CodeCommit &#8594; Docker &#8594; ECR</p>
-<h1>LiveQuote: Build and Push Images by Hand</h1>
-<p class="lede">How to rebuild the LiveQuote <code>cmaweb</code> (nginx) and <code>php-fpm</code> images
-  from a CodeCommit branch on the Jenkins host and push them to Amazon ECR. The example uses branch
-  <code>ITST0113</code> and build <code>166</code>. Change both to match your release.</p>
-<div class="facts">
-<span class="fact">host &lt;jenkins-host&gt;</span>
-<span class="fact">user jenkins</span>
-<span class="fact">source eu-west-2</span>
-<span class="fact">registry eu-central-1</span>
-<span class="fact">2 images</span>
-</div>
+<p class="eyebrow">Standalone note</p>
+<h1>Manual container image build</h1>
+<p class="lede">Building and pushing the two LiveQuote container images by hand on the build server, when the Jenkins job is not the right tool — reconstructed from a real session, with the parts that should never have been typed replaced by the way they should be done instead.</p>
 </header>
 
-<section>
-<div class="sec-head">
-<p class="eyebrow">Reference</p>
-<h2>What you are working with</h2>
-</div>
+<section class="entry">
+<p><strong>Scope.</strong> This is the container path: clone a branch, assemble two build
+contexts, build <code>cmaweb</code> and <code>php-fpm</code>, push both to ECR. It is <em>not</em> the
+Elastic Beanstalk path that <code>build_ebs_zip.gdsl</code> automates — that job zips
+<code>.platform/</code>, <code>cma/</code>, <code>CMALoader/</code>, <code>dbbackup/</code>, <code>phpdocker/</code> and
+<code>docker-compose.yml</code> and uploads the archive to Artifactory. Different
+artefact, different destination.</p>
+<h2>Placeholders</h2>
+<p>Everything below uses these. Set them once; nothing further is hard-coded.</p>
 <div class="tw"><table>
-<thead><tr><th>Item</th><th>Value</th></tr></thead>
+<thead>
+<tr>
+<th>Placeholder</th>
+<th>Meaning</th>
+<th>Example</th>
+</tr>
+</thead>
 <tbody>
-<tr><td class="key">Build host</td><td><code>&lt;jenkins-host&gt;</code>, as the <code>jenkins</code> user</td></tr>
-<tr><td class="key">Working directory</td><td><code>~jenkins/liveqoute/checkmarx2.0</code></td></tr>
-<tr><td class="key">Source repo</td><td><code>git-codecommit.eu-west-2.amazonaws.com/v1/repos/&lt;codecommit-repo&gt;</code></td></tr>
-<tr><td class="key">Target registry</td><td><code>&lt;account-id&gt;.dkr.ecr.eu-central-1.amazonaws.com/livequote-repo</code></td></tr>
-<tr><td class="key">Image tags</td><td><code>cmaweb_&lt;BUILD&gt;</code> and <code>php-fpm_&lt;BUILD&gt;</code></td></tr>
+<tr>
+<td><code>&lt;jenkins-host&gt;</code></td>
+<td>the build server</td>
+<td>the box you <code>ssh</code> into</td>
+</tr>
+<tr>
+<td><code>&lt;ecr-account&gt;</code></td>
+<td>AWS account that owns the ECR registry</td>
+<td>12 digits</td>
+</tr>
+<tr>
+<td><code>&lt;cc-account&gt;</code></td>
+<td>AWS account that owns the CodeCommit repo</td>
+<td>12 digits, <strong>not the same one</strong></td>
+</tr>
+<tr>
+<td><code>&lt;you&gt;</code></td>
+<td>your CodeCommit HTTPS Git username</td>
+<td>an email address</td>
+</tr>
+<tr>
+<td><code>BUILD</code></td>
+<td>build number, used as the image tag suffix</td>
+<td><code>166</code></td>
+</tr>
+<tr>
+<td><code>BRANCH</code></td>
+<td>branch to build</td>
+<td><code>ITST0113</code></td>
+</tr>
 </tbody>
 </table></div>
-</section>
-
-<section>
-<div class="sec-head">
-<p class="eyebrow">Steps 1&#8211;3</p>
-<h2>Get a clean checkout</h2>
-</div>
-<p><strong>1. Switch to the <code>jenkins</code> user and set the variables.</strong> The
-  <code>sudo -su jenkins</code> command asks for your own password. Variables you set before switching
-  users don't carry over, so set them after.</p>
-<div class="code"><code>sudo -su jenkins
-cd ~/liveqoute/checkmarx2.0
-
+<pre><code class="language-bash">BUILD=166
 BRANCH=ITST0113
-BUILD=166
-REGISTRY=&lt;account-id&gt;.dkr.ecr.eu-central-1.amazonaws.com
-REPO=livequote-repo</code></div>
-
-<p><strong>2. Remove the old checkout.</strong></p>
-<div class="code"><code>ls -l
-rm -rf "$BRANCH"/</code></div>
-<p>Git pack files are read-only, so a plain <code>rm -r</code> stops to ask about each one. Add
-  <code>-f</code> to skip the prompts. You don't need <code>sudo</code> because <code>jenkins</code>
-  owns the directory. Only use <code>sudo rm -rf</code> if a previous run left files owned by root.</p>
-
-<p><strong>3. Clone the branch from CodeCommit.</strong></p>
-<div class="code"><code>git clone --branch "$BRANCH" \
-  https://git-codecommit.eu-west-2.amazonaws.com/v1/repos/&lt;codecommit-repo&gt; \
-  "$BRANCH"
-
-ls "$BRANCH"/
-<span class="c"># expected: cma  CMALoader  containers  containers.json  environments.json
-#           lambda-layers.json  README.md  S3</span></code></div>
-
-<div class="call warn">
-<h3>If the clone returns 403</h3>
-<p>A 403 error means CodeCommit rejected the credentials. Your SSO or email password won't work
-  here. Use one of these options:</p>
-<p><strong>A. HTTPS Git credentials.</strong> In the IAM console, open <em>Users &#8594; your user
-  &#8594; Security credentials &#8594; HTTPS Git credentials for AWS CodeCommit &#8594;
-  Generate</em>. When git prompts you, enter the generated username (in the form
-  <code>name-at-&lt;account-id&gt;</code>) and the generated password.</p>
-<p><strong>B. AWS CLI credential helper.</strong> This uses the AWS credentials in your shell, which
-  must have CodeCommit access in eu-west-2.</p>
-</div>
-<div class="code"><code><span class="c"># option B</span>
-git config --global credential.helper '!aws codecommit credential-helper $@'
-git config --global credential.UseHttpPath true
-
-<span class="c"># if git cached a bad username or password, clear it before you try again</span>
-git credential reject &lt;&lt;&lt; $'protocol=https\nhost=git-codecommit.eu-west-2.amazonaws.com'</code></div>
-</section>
-
-<section>
-<div class="sec-head">
-<p class="eyebrow">Steps 4&#8211;5</p>
-<h2>Build both images</h2>
-</div>
-<p><strong>4. Copy the application code into both build contexts.</strong> Both Dockerfiles run
-  <code>COPY ./cma/ ...</code>, so each build context needs its own copy of <code>cma/</code>.</p>
-<div class="code"><code>cd "$BRANCH"
+REPO=&lt;codecommit-repo&gt;
+ECR=&lt;ecr-account&gt;.dkr.ecr.eu-central-1.amazonaws.com
+WORK=~/livequote/checkmarx2.0
+</code></pre>
+<p>Note the two regions. CodeCommit is in <code>eu-west-2</code>; ECR is in <code>eu-central-1</code>.
+They are not a typo for each other, and a command pointed at the wrong one
+fails in a way that reads like a permissions problem.</p>
+<h2>Before you start</h2>
+<p>You need, on the build server:</p>
+<ul>
+<li><code>sudo</code> to the <code>jenkins</code> user (the Docker daemon socket and the image cache
+  belong to it)</li>
+<li>Docker running</li>
+<li>CodeCommit HTTPS Git credentials for <code>&lt;you&gt;</code></li>
+<li>AWS credentials that can <code>ecr:GetAuthorizationToken</code> and push to the
+  <code>livequote-repo</code> repository</li>
+</ul>
+<p>Read <strong>Credentials</strong> below before you obtain the last of those. How you get
+them onto the box matters more than which ones you get.</p>
+<h2>1. Become the jenkins user and clear the work area</h2>
+<pre><code class="language-bash">sudo -su jenkins
+cd ~/livequote/checkmarx2.0
+</code></pre>
+<p>Remove any previous checkout. A plain <code>rm -r</code> stops on every write-protected
+object in <code>.git/objects/pack/</code> and asks — which, on a pack directory, is
+dozens of prompts:</p>
+<pre><code class="language-bash">rm: remove write-protected regular file '.../pack-6773931d.pack'?
+</code></pre>
+<p>Those files are mode <code>444</code> because Git writes packs read-only on purpose. They
+are still yours to delete; the prompt is <code>rm</code> being careful, not a permission
+failure. Answer it once and for all:</p>
+<pre><code class="language-bash">rm -rf ITST0113/
+</code></pre>
+<p><code>-f</code> is what suppresses the prompt. You should not need <code>sudo</code> here — if you
+do, something else created the tree as another user, and that is worth
+understanding before you delete it.</p>
+<h2>2. Clone the branch</h2>
+<pre><code class="language-bash">git clone --branch &quot;$BRANCH&quot; \
+  &quot;https://git-codecommit.eu-west-2.amazonaws.com/v1/repos/$REPO&quot; &quot;$BRANCH&quot;
+</code></pre>
+<p>It will ask for a username and password. <strong>The username is not just your email
+address.</strong> When your IAM principal lives in a different account from the
+repository, CodeCommit's HTTPS Git credentials take the form:</p>
+<pre><code>&lt;you&gt;@example.com-at-&lt;cc-account&gt;
+</code></pre>
+<p>The <code>-at-&lt;account-id&gt;</code> suffix is how CodeCommit resolves which account to
+authenticate against. Without it you authenticate against the wrong directory
+and get:</p>
+<pre><code>fatal: unable to access '.../&lt;codecommit-repo&gt;/': The requested URL returned error: 403
+</code></pre>
+<p>A 403 here means <strong>authentication succeeded or failed silently and
+authorisation was refused</strong> — it is not a "repository not found". Check, in
+this order:</p>
+<ol>
+<li>The username has the <code>-at-&lt;cc-account&gt;</code> suffix.</li>
+<li>The HTTPS Git credentials are the ones generated in <strong>IAM → your user →
+   Security credentials → HTTPS Git credentials for CodeCommit</strong>, not your
+   console password and not an access key.</li>
+<li>Your principal actually has <code>codecommit:GitPull</code> on that repository ARN.</li>
+</ol>
+<p>Retrying the same command with the same inputs will produce the same 403. If
+the first attempt fails, change something before the second.</p>
+<p>The clone leaves you with:</p>
+<pre><code>cma  CMALoader  containers  containers.json  environments.json  lambda-layers.json  README.md  S3
+</code></pre>
+<h2>3. Assemble the two build contexts</h2>
+<p>Both Dockerfiles contain <code>COPY ./cma/ /application</code>, and a <code>COPY</code> source must
+live inside the build context. <code>cma/</code> sits at the repository root, so it has to
+be copied into each container directory before building:</p>
+<pre><code class="language-bash">cd &quot;$BRANCH&quot;
 cp -R cma/ ./containers/php-fpm/
 cp -R cma/ ./containers/cmaweb/
-ls -l containers</code></div>
+</code></pre>
+<p>This is the step that is easy to forget and produces a confusing error — not
+"file not found" but a build that succeeds against a stale <code>cma/</code> left behind
+from a previous run. <strong>If you are rebuilding, delete the old copies first</strong>, or
+you will ship last week's application inside this week's tag:</p>
+<pre><code class="language-bash">rm -rf ./containers/php-fpm/cma ./containers/cmaweb/cma
+</code></pre>
+<p>Each context is roughly 13 MB once <code>cma/</code> is in place. If the <code>transferring
+context</code> line in the build output reads <code>2B</code>, the copy did not happen.</p>
+<h2>4. Build the images</h2>
+<p>Two images, built separately, each from its own directory.</p>
+<pre><code class="language-bash">cd containers/cmaweb
+docker build -t &quot;livequote-repo:cmaweb_$BUILD&quot; .
+</code></pre>
+<p><code>cmaweb</code> is the web tier: <code>nginx:stable</code>, with the application at
+<code>/application</code>, the TLS key pair copied to <code>/etc/nginx/certs/</code>, and
+<code>nginx.conf</code> and <code>mime.types</code> replacing the stock configuration.</p>
+<pre><code class="language-bash">cd ../php-fpm
+docker build -t &quot;livequote-repo:php-fpm_$BUILD&quot; .
+</code></pre>
+<p><code>php-fpm</code> is the application tier: <code>phpdockerio/php:8.3-fpm</code>, plus
+<code>php8.3-mysql</code> and <code>php8.3-soap</code>, with <code>php-ini-overrides.ini</code> dropped into
+<code>conf.d/</code>.</p>
+<p>That image contains a self-check worth keeping:</p>
+<pre><code class="language-dockerfile">RUN php -m | grep -q pdo_mysql &amp;&amp; php -r 'echo &quot;PDO MySQL OK, SSL_CA constant = &quot;, PDO::MYSQL_ATTR_SSL_CA, PHP_EOL;'
+</code></pre>
+<p>It fails the build if <code>pdo_mysql</code> is missing, rather than letting the image
+ship and the application fail on its first database call. A build-time
+assertion about a runtime dependency is the cheapest test there is.</p>
+<p><strong>Use the same <code>$BUILD</code> for both images.</strong> They are deployed together by one
+task definition, and a mismatched pair is hard to spot and harder to explain.</p>
+<h2>5. Authenticate to ECR</h2>
+<pre><code class="language-bash">aws ecr get-login-password --region eu-central-1 \
+  | docker login --username AWS --password-stdin &quot;$ECR&quot;
+</code></pre>
+<p>Confirm you are pointed at the right account <em>before</em> you push, not after:</p>
+<pre><code class="language-bash">aws sts get-caller-identity
+</code></pre>
+<p>The <code>Account</code> it prints must be the ECR account. Pushing to the wrong registry
+is a slow mistake to notice, because the push succeeds.</p>
+<p>Docker will warn you:</p>
+<pre><code>WARNING! Your credentials are stored unencrypted in '/var/lib/jenkins/.docker/config.json'.
+</code></pre>
+<p>Take that literally. See <strong>Credentials</strong>. The ECR token itself is good for
+12 hours; <code>docker logout</code> ends it sooner.</p>
+<h2>6. Tag and push</h2>
+<pre><code class="language-bash">docker tag &quot;livequote-repo:cmaweb_$BUILD&quot;  &quot;$ECR/livequote-repo:cmaweb_$BUILD&quot;
+docker push &quot;$ECR/livequote-repo:cmaweb_$BUILD&quot;
 
-<p><strong>5. Build the images.</strong></p>
-<div class="code"><code>cd containers/cmaweb
-docker build -t "$REPO:cmaweb_$BUILD" .
-
-cd ../php-fpm
-docker build -t "$REPO:php-fpm_$BUILD" .</code></div>
-
-<div class="call">
-<h3>Check the build output</h3>
-<p><strong><code>cmaweb</code>:</strong> all 12 steps finish, including copying
-  <code>cert/nginx-lq.crt</code>, <code>cert/nginx-lq.key</code>, <code>nginx.conf</code> and
-  <code>mime.types</code>.</p>
-<p><strong><code>php-fpm</code>:</strong> step 6 prints <code>PDO MySQL OK, SSL_CA constant = ...</code>.</p>
-</div>
-</section>
-
-<section>
-<div class="sec-head">
-<p class="eyebrow">Steps 6&#8211;8</p>
-<h2>Log in and push</h2>
-</div>
-<p><strong>6. Get AWS credentials for the target account.</strong> Export temporary credentials for
-  account <code>&lt;account-id&gt;</code>. You can copy them from the AWS access portal under <em>Command
-  line or programmatic access</em>.</p>
-<div class="code"><code>export AWS_ACCESS_KEY_ID="&lt;from portal&gt;"
-export AWS_SECRET_ACCESS_KEY="&lt;from portal&gt;"
-export AWS_SESSION_TOKEN="&lt;from portal&gt;"
-
-aws sts get-caller-identity   <span class="c"># confirm the Account is &lt;account-id&gt;</span></code></div>
-
-<div class="call stop">
-<h3>Never paste real keys</h3>
-<p>Don't paste real keys into tickets, chat or docs. These credentials expire, but anyone who has
-  them can use them until they do.</p>
-</div>
-
-<p><strong>7. Log in to ECR.</strong></p>
-<div class="code"><code>aws ecr get-login-password --region eu-central-1 \
-  | docker login --username AWS --password-stdin "$REGISTRY"</code></div>
-<p>The response should be <code>Login Succeeded</code>. You'll also see a warning that the
-  credentials are stored unencrypted in <code>/var/lib/jenkins/.docker/config.json</code>. The warning
-  is expected. The ECR token expires after 12 hours. To remove it sooner, log out when you finish
-  (step 10).</p>
-
-<p><strong>8. Tag and push.</strong></p>
-<div class="code"><code>docker tag  "$REPO:cmaweb_$BUILD"  "$REGISTRY/$REPO:cmaweb_$BUILD"
-docker push "$REGISTRY/$REPO:cmaweb_$BUILD"
-
-docker tag  "$REPO:php-fpm_$BUILD" "$REGISTRY/$REPO:php-fpm_$BUILD"
-docker push "$REGISTRY/$REPO:php-fpm_$BUILD"</code></div>
-<p>Each push ends with a line like <code>cmaweb_166: digest: sha256:... size: ...</code>. Record both
-  digests in the change ticket.</p>
-</section>
-
-<section>
-<div class="sec-head">
-<p class="eyebrow">Steps 9&#8211;10</p>
-<h2>Verify and clean up</h2>
-</div>
-<p><strong>9. Verify the images in ECR.</strong></p>
-<div class="code"><code>aws ecr describe-images --region eu-central-1 --repository-name "$REPO" \
-  --image-ids imageTag="cmaweb_$BUILD" imageTag="php-fpm_$BUILD" \
-  --query 'imageDetails[].[imageTags[0],imageDigest,imagePushedAt]' --output table</code></div>
-
-<p><strong>10. Clean up.</strong></p>
-<div class="code"><code>docker logout "$REGISTRY"
+docker tag &quot;livequote-repo:php-fpm_$BUILD&quot; &quot;$ECR/livequote-repo:php-fpm_$BUILD&quot;
+docker push &quot;$ECR/livequote-repo:php-fpm_$BUILD&quot;
+</code></pre>
+<p>Both images go to the <strong>same</strong> ECR repository, <code>livequote-repo</code>, distinguished
+only by tag prefix. <code>Layer already exists</code> lines are normal and good — the base
+layers are shared.</p>
+<p>Each push ends with a line like <code>cmaweb_166: digest: sha256:... size: ...</code>.
+Record both digests in the change ticket. The tag is what you type; the digest
+is what actually ran, and only one of the two is immutable.</p>
+<h2>7. Verify</h2>
+<pre><code class="language-bash">aws ecr describe-images --region eu-central-1 \
+  --repository-name livequote-repo \
+  --image-ids imageTag=&quot;cmaweb_$BUILD&quot; imageTag=&quot;php-fpm_$BUILD&quot; \
+  --query 'imageDetails[].{tag:imageTags[0],digest:imageDigest,pushed:imagePushedAt}' \
+  --output table
+</code></pre>
+<p>Two rows, both pushed in the last few minutes, and the digests matching what
+<code>docker push</code> printed.</p>
+<h2>Credentials</h2>
+<p>The session this was reconstructed from did this:</p>
+<pre><code class="language-bash">export AWS_ACCESS_KEY_ID=&quot;ASIA...&quot;
+export AWS_SECRET_ACCESS_KEY=&quot;...&quot;
+export AWS_SESSION_TOKEN=&quot;IQoJ...&quot;
+</code></pre>
+<p>Do not do that. Three separate things go wrong at once:</p>
+<ol>
+<li><strong>Shell history.</strong> The exports land in <code>~/.bash_history</code> for the <code>jenkins</code>
+   user. That is a <em>shared</em> account — everyone who can <code>sudo -su jenkins</code> can
+   read them.</li>
+<li><strong>Docker's config file.</strong> <code>docker login</code> writes the registry token to
+   <code>/var/lib/jenkins/.docker/config.json</code> in plain base64, and says so. It
+   persists after your session ends.</li>
+<li><strong>Scrollback.</strong> Terminal output gets pasted into tickets, chat and
+   documents. A secret that has been on a screen has been copied.</li>
+</ol>
+<p>Use instead, in order of preference:</p>
+<ul>
+<li><strong>An instance role on the build server.</strong> No key material anywhere; the SDK
+  picks the credentials up from the instance metadata service, and ECR login
+  works with no exports at all. This is the right answer for a build host.</li>
+<li><strong><code>aws sso login --profile &lt;profile&gt;</code></strong>, then <code>AWS_PROFILE=&lt;profile&gt;</code> for the
+  commands. The tokens live in <code>~/.aws/sso/cache/</code> with a short lifetime and
+  never pass through your shell history.</li>
+<li><strong>A named profile in <code>~/.aws/credentials</code></strong>, if the first two are not
+  available.</li>
+</ul>
+<p>If credentials ever do reach a shell or a terminal buffer, treat them as
+compromised: revoke the session, rotate the principal, and remove the history
+entry. Temporary credentials expiring on their own is not a substitute — the
+window is hours, and that is long enough.</p>
+<h2>8. Clean up</h2>
+<pre><code class="language-bash">docker logout &quot;$ECR&quot;
 unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-exit   <span class="c"># leave the jenkins shell</span></code></div>
+exit                      # leave the jenkins shell
+</code></pre>
+<p>Then update the image tags in <code>containers/taskdef-livequote-{dev,preprod,prod}.json</code>
+as <code>containers/README.md</code> describes, and deploy through the normal route.</p>
+<h2>What this transcript does not explain</h2>
+<p>Honesty about the limits of a reconstruction:</p>
+<ul>
+<li>Four consecutive clone attempts returned 403, and the directory listing
+  immediately afterwards showed a populated checkout. The transcript does not
+  show which attempt succeeded, so the exact working username form is <strong>not</strong>
+  confirmed by it. The <code>-at-&lt;account-id&gt;</code> rule above comes from CodeCommit's
+  documented behaviour, not from this session. Verify it on your first run.</li>
+<li>The <code>containers/</code> directory also holds <code>README.md</code> and three task
+  definitions. Whatever those say takes precedence over this page; they sit
+  next to the code and this does not.</li>
+</ul>
+<h2>Things worth fixing</h2>
+<p>Noticed while reading the build output, in rough order of how much they matter.</p>
+<p><strong><code>chmod -R 667</code> on the application tree.</strong> Both Dockerfiles do a variant of:</p>
+<pre><code class="language-dockerfile">RUN mkdir -m 667 -p /application
+RUN chmod -R 667 /application
+</code></pre>
+<p>Mode <code>667</code> on a <em>directory</em> is <code>rw-</code>, <code>rw-</code>, <code>rwx</code>. The owner and group cannot
+traverse it — no execute bit — and everyone else can traverse <strong>and write</strong> to
+it. The containers work only because their runtime user (<code>nginx</code>,
+<code>www-data</code>) falls into the "other" class and picks up the <code>7</code>. So the
+application directory is world-writable inside the container, and it is
+load-bearing. <code>755</code> for directories and <code>644</code> for files is almost certainly
+what was meant. The same applies to:</p>
+<pre><code class="language-dockerfile">RUN chmod -R 667 /application/public/cert/temp.pem
+</code></pre>
+<p>which makes a certificate file world-writable.</p>
+<p><strong>The TLS key is baked into the image.</strong> <code>cert/nginx-lq.key</code> is copied in at
+build time, so it lives in a layer, is visible to anyone who can pull the
+image, and cannot be rotated without a rebuild. A secret belongs in Secrets
+Manager or an SSM parameter, mounted at run time by the task definition.</p>
+<p><strong><code>cma/</code> is duplicated into both contexts by hand.</strong> Two copies, no check that
+they match, and a stale copy builds silently. A <code>.dockerignore</code> plus a single
+shared context, or a small <code>make</code> target that does the copy and the build
+together, removes a whole class of "why is the old code in the new image"
+incidents.</p>
+<p><strong>Nothing pins the base images.</strong> <code>nginx:stable</code> and <code>phpdockerio/php:8.3-fpm</code>
+are moving tags. The build output records the digest that was actually
+resolved — pin to it, so that rebuilding the same <code>$BUILD</code> produces the same
+image.</p>
+<p><strong>No <code>--provenance</code> or scan step.</strong> The Jenkins job runs SonarQube over the
+source before archiving. The manual path skips it, so an image built this way
+has had less checking than one built by the job. That is the real cost of the
+manual route, and the reason to use it only when you have to.</p>
 </section>
 
 <footer>
-<p>To deploy the new images, update the image tags in
-  <code>containers/taskdef-livequote-{dev,preprod,prod}.json</code>.</p>
+<p class="note">Markdown source: <a href="livequote-manual-image-build.md">livequote-manual-image-build.md</a>.</p>
+<p>A standalone note. It is not part of the aws-sre reading record and nothing links to it.</p>
 </footer>
 </div>
 </body>
