@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>LiveQuote Image Build</title>
+<link rel="icon" href="assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="assets/fonts/fonts.css">
+<link rel="stylesheet" href="assets/css/lesson.css">
+<link rel="stylesheet" href="assets/css/pages/00-the-whole-machine.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Runbook &#183; Jenkins host &#183; CodeCommit &#8594; Docker &#8594; ECR</p>
+<h1>LiveQuote: Build and Push Images by Hand</h1>
+<p class="lede">How to rebuild the LiveQuote <code>cmaweb</code> (nginx) and <code>php-fpm</code> images
+  from a CodeCommit branch on the Jenkins host and push them to Amazon ECR. The example uses branch
+  <code>ITST0113</code> and build <code>166</code>. Change both to match your release.</p>
+<div class="facts">
+<span class="fact">host &lt;jenkins-host&gt;</span>
+<span class="fact">user jenkins</span>
+<span class="fact">source eu-west-2</span>
+<span class="fact">registry eu-central-1</span>
+<span class="fact">2 images</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Reference</p>
+<h2>What you are working with</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Item</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td class="key">Build host</td><td><code>&lt;jenkins-host&gt;</code>, as the <code>jenkins</code> user</td></tr>
+<tr><td class="key">Working directory</td><td><code>~jenkins/liveqoute/checkmarx2.0</code></td></tr>
+<tr><td class="key">Source repo</td><td><code>git-codecommit.eu-west-2.amazonaws.com/v1/repos/&lt;codecommit-repo&gt;</code></td></tr>
+<tr><td class="key">Target registry</td><td><code>&lt;account-id&gt;.dkr.ecr.eu-central-1.amazonaws.com/livequote-repo</code></td></tr>
+<tr><td class="key">Image tags</td><td><code>cmaweb_&lt;BUILD&gt;</code> and <code>php-fpm_&lt;BUILD&gt;</code></td></tr>
+</tbody>
+</table></div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Steps 1&#8211;3</p>
+<h2>Get a clean checkout</h2>
+</div>
+<p><strong>1. Switch to the <code>jenkins</code> user and set the variables.</strong> The
+  <code>sudo -su jenkins</code> command asks for your own password. Variables you set before switching
+  users don't carry over, so set them after.</p>
+<div class="code"><code>sudo -su jenkins
+cd ~/liveqoute/checkmarx2.0
+
+BRANCH=ITST0113
+BUILD=166
+REGISTRY=&lt;account-id&gt;.dkr.ecr.eu-central-1.amazonaws.com
+REPO=livequote-repo</code></div>
+
+<p><strong>2. Remove the old checkout.</strong></p>
+<div class="code"><code>ls -l
+rm -rf "$BRANCH"/</code></div>
+<p>Git pack files are read-only, so a plain <code>rm -r</code> stops to ask about each one. Add
+  <code>-f</code> to skip the prompts. You don't need <code>sudo</code> because <code>jenkins</code>
+  owns the directory. Only use <code>sudo rm -rf</code> if a previous run left files owned by root.</p>
+
+<p><strong>3. Clone the branch from CodeCommit.</strong></p>
+<div class="code"><code>git clone --branch "$BRANCH" \
+  https://git-codecommit.eu-west-2.amazonaws.com/v1/repos/&lt;codecommit-repo&gt; \
+  "$BRANCH"
+
+ls "$BRANCH"/
+<span class="c"># expected: cma  CMALoader  containers  containers.json  environments.json
+#           lambda-layers.json  README.md  S3</span></code></div>
+
+<div class="call warn">
+<h3>If the clone returns 403</h3>
+<p>A 403 error means CodeCommit rejected the credentials. Your SSO or email password won't work
+  here. Use one of these options:</p>
+<p><strong>A. HTTPS Git credentials.</strong> In the IAM console, open <em>Users &#8594; your user
+  &#8594; Security credentials &#8594; HTTPS Git credentials for AWS CodeCommit &#8594;
+  Generate</em>. When git prompts you, enter the generated username (in the form
+  <code>name-at-&lt;account-id&gt;</code>) and the generated password.</p>
+<p><strong>B. AWS CLI credential helper.</strong> This uses the AWS credentials in your shell, which
+  must have CodeCommit access in eu-west-2.</p>
+</div>
+<div class="code"><code><span class="c"># option B</span>
+git config --global credential.helper '!aws codecommit credential-helper $@'
+git config --global credential.UseHttpPath true
+
+<span class="c"># if git cached a bad username or password, clear it before you try again</span>
+git credential reject &lt;&lt;&lt; $'protocol=https\nhost=git-codecommit.eu-west-2.amazonaws.com'</code></div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Steps 4&#8211;5</p>
+<h2>Build both images</h2>
+</div>
+<p><strong>4. Copy the application code into both build contexts.</strong> Both Dockerfiles run
+  <code>COPY ./cma/ ...</code>, so each build context needs its own copy of <code>cma/</code>.</p>
+<div class="code"><code>cd "$BRANCH"
+cp -R cma/ ./containers/php-fpm/
+cp -R cma/ ./containers/cmaweb/
+ls -l containers</code></div>
+
+<p><strong>5. Build the images.</strong></p>
+<div class="code"><code>cd containers/cmaweb
+docker build -t "$REPO:cmaweb_$BUILD" .
+
+cd ../php-fpm
+docker build -t "$REPO:php-fpm_$BUILD" .</code></div>
+
+<div class="call">
+<h3>Check the build output</h3>
+<p><strong><code>cmaweb</code>:</strong> all 12 steps finish, including copying
+  <code>cert/nginx-lq.crt</code>, <code>cert/nginx-lq.key</code>, <code>nginx.conf</code> and
+  <code>mime.types</code>.</p>
+<p><strong><code>php-fpm</code>:</strong> step 6 prints <code>PDO MySQL OK, SSL_CA constant = ...</code>.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Steps 6&#8211;8</p>
+<h2>Log in and push</h2>
+</div>
+<p><strong>6. Get AWS credentials for the target account.</strong> Export temporary credentials for
+  account <code>&lt;account-id&gt;</code>. You can copy them from the AWS access portal under <em>Command
+  line or programmatic access</em>.</p>
+<div class="code"><code>export AWS_ACCESS_KEY_ID="&lt;from portal&gt;"
+export AWS_SECRET_ACCESS_KEY="&lt;from portal&gt;"
+export AWS_SESSION_TOKEN="&lt;from portal&gt;"
+
+aws sts get-caller-identity   <span class="c"># confirm the Account is &lt;account-id&gt;</span></code></div>
+
+<div class="call stop">
+<h3>Never paste real keys</h3>
+<p>Don't paste real keys into tickets, chat or docs. These credentials expire, but anyone who has
+  them can use them until they do.</p>
+</div>
+
+<p><strong>7. Log in to ECR.</strong></p>
+<div class="code"><code>aws ecr get-login-password --region eu-central-1 \
+  | docker login --username AWS --password-stdin "$REGISTRY"</code></div>
+<p>The response should be <code>Login Succeeded</code>. You'll also see a warning that the
+  credentials are stored unencrypted in <code>/var/lib/jenkins/.docker/config.json</code>. The warning
+  is expected. The ECR token expires after 12 hours. To remove it sooner, log out when you finish
+  (step 10).</p>
+
+<p><strong>8. Tag and push.</strong></p>
+<div class="code"><code>docker tag  "$REPO:cmaweb_$BUILD"  "$REGISTRY/$REPO:cmaweb_$BUILD"
+docker push "$REGISTRY/$REPO:cmaweb_$BUILD"
+
+docker tag  "$REPO:php-fpm_$BUILD" "$REGISTRY/$REPO:php-fpm_$BUILD"
+docker push "$REGISTRY/$REPO:php-fpm_$BUILD"</code></div>
+<p>Each push ends with a line like <code>cmaweb_166: digest: sha256:... size: ...</code>. Record both
+  digests in the change ticket.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Steps 9&#8211;10</p>
+<h2>Verify and clean up</h2>
+</div>
+<p><strong>9. Verify the images in ECR.</strong></p>
+<div class="code"><code>aws ecr describe-images --region eu-central-1 --repository-name "$REPO" \
+  --image-ids imageTag="cmaweb_$BUILD" imageTag="php-fpm_$BUILD" \
+  --query 'imageDetails[].[imageTags[0],imageDigest,imagePushedAt]' --output table</code></div>
+
+<p><strong>10. Clean up.</strong></p>
+<div class="code"><code>docker logout "$REGISTRY"
+unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+exit   <span class="c"># leave the jenkins shell</span></code></div>
+</section>
+
+<footer>
+<p>To deploy the new images, update the image tags in
+  <code>containers/taskdef-livequote-{dev,preprod,prod}.json</code>.</p>
+</footer>
+</div>
+</body>
+</html>
