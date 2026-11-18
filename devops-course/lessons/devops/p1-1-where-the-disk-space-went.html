@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Where the Disk Space Went</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/p1-1-where-the-disk-space-went.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Phase 1 · Lesson 1.1 · AWS + DevOps course</p>
+<h1>Where the Disk Space Went</h1>
+<p class="lede">A disk alarm fires on a Mule server, someone deletes a 20 GB log, and
+  <code>df</code> still says 100%. <code>du</code> says the directory is nearly empty. Both are
+  telling the truth. This lesson is about the layer under files, the one that explains it:
+  processes, file descriptors and inodes. Then it uses that layer to explain log rotation, a
+  Jenkins job that hangs after it has finished, and "Too many open files".</p>
+<div class="facts">
+<span class="fact">~3 hours</span>
+<span class="fact">week 3</span>
+<span class="fact">laptop only, no AWS</span>
+<span class="fact">Ubuntu 26.04 · lsof 4.99.4 · logrotate 3.22.0</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The incident</p>
+<h2>Deleted, and still using 500 MB</h2>
+</div>
+<p>Here is the whole incident in eight lines, shrunk to 500 MB so it fits on a laptop. A
+  background process opens <code>app.log</code>, writes 500 MB into it, and keeps it open, the way
+  a running Java service keeps its log open. Then the file is deleted:</p>
+<div class="code"><code>$ df -BM --output=used .
+ Used
+ 380M
+$ ( exec 3&gt;app.log; head -c 500M /dev/zero &gt;&amp;3; sleep 600 ) &amp;
+$ ls -l app.log
+-rw-rw-r-- 1 al al 524288000 Nov  4 16:28 app.log
+$ df -BM --output=used .
+ Used
+ 880M                                   <span class="c"># +500 MB, as expected</span>
+
+$ rm app.log
+$ ls app.log
+ls: cannot access 'app.log': No such file or directory
+$ du -sh .
+0       .                               <span class="c"># du: nothing here</span>
+$ df -BM --output=used .
+ Used
+ <span class="r">880M</span>                                   <span class="c"># df: the 500 MB is still used</span></code></div>
+<p><code>du</code> walks the directory tree and adds up the files it can <em>find by name</em>.
+  <code>df</code> asks the filesystem how many blocks are <em>allocated</em>. After the
+  <code>rm</code> those two questions have different answers, because <code>rm</code> did not free
+  anything. To see why, you need three things that sit underneath a file name.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The mechanism</p>
+<h2>A name, an inode, and a descriptor</h2>
+</div>
+<div class="ladder">
+<div class="rung"><span class="s">1</span><p><span class="who">The inode is the file</span>The data,
+  its size, its owner and its permissions live in an <strong>inode</strong>, a numbered record on
+  the filesystem. The inode has no name. It does keep a <strong>link count</strong>: how many
+  names point at it.</p></div>
+<div class="rung"><span class="s">2</span><p><span class="who">A name is a directory entry</span>A
+  directory is a list of <code>name → inode number</code>. <code>rm</code> calls
+  <code>unlink()</code>, which removes one entry and lowers the link count by one. That is all it
+  does. It is called unlink, not delete, for that reason.</p></div>
+<div class="rung"><span class="s">3</span><p><span class="who">A descriptor is an open handle</span>When
+  a process opens a file, the kernel gives it a small number, a <strong>file descriptor</strong>,
+  that points straight at the inode, not at the name. The process reads and writes through that
+  number from then on.</p></div>
+</div>
+<p>The kernel frees an inode's blocks only when <strong>both</strong> counts reach zero: no names
+  left, and no process holding it open. After <code>rm</code>, the link count was 0 but one
+  process still held the file open, so the 500 MB stayed allocated. <code>du</code> can't see it,
+  because it has no name. <code>df</code> still counts it, because the blocks are still in
+  use.</p>
+<div class="call">
+<h3>The same rule is why <code>rm</code> on a running binary is safe</h3>
+<p>You can delete or replace a jar while the JVM is running it. The running process holds the old
+  inode, the new file gets a new inode, and the old one is freed when the process exits. The
+  deleted log is the same rule working against you.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Seeing it</p>
+<h2>Every process lists its open files in <code>/proc</code></h2>
+</div>
+<p>For every running process, Linux shows its descriptor table as a directory of symlinks:
+  <code>/proc/&lt;PID&gt;/fd</code>. Each link is named after the descriptor number and points
+  at what it has open. The process from the incident:</p>
+<div class="code"><code>$ ls -l /proc/2049835/fd
+lr-x------ 1 al al 64 Nov  4 16:28 0 -&gt; /dev/null
+l-wx------ 1 al al 64 Nov  4 16:28 1 -&gt; /…/tasks/bbwiwba0w.output
+l-wx------ 1 al al 64 Nov  4 16:28 2 -&gt; /…/tasks/bbwiwba0w.output
+l-wx------ 1 al al 64 Nov  4 16:28 3 -&gt; /…/app.log <span class="r">(deleted)</span></code></div>
+<p>0, 1 and 2 are stdin, stdout and stderr, which every process starts with. Here 1 and 2 point at a file because a script ran this; in your terminal they point at <code>/dev/pts/N</code>. 3 is the file the
+  subshell opened with <code>exec 3&gt;app.log</code>. The kernel marks it
+  <code>(deleted)</code>. To search the whole machine instead of one process, ask
+  <code>lsof</code> for open files whose link count is below 1:</p>
+<div class="code"><code>$ lsof +L1
+COMMAND     PID USER   FD   TYPE DEVICE  SIZE/OFF NLINK   NODE NAME
+sleep   2049835   al   3w   REG   0,50 524288000     0 121601 /…/app.log (deleted)</code></div>
+<p>Read it left to right: the <code>sleep</code> process, PID 2049835, holds descriptor
+  <code>3</code> open for writing (<code>w</code>), on a regular file of 524,288,000 bytes, with
+  <code>NLINK 0</code>. That one line is the answer to the disk alarm. On a server, run it with
+  <code>sudo</code>, or you only see your own processes.</p>
+<div class="call">
+<h3>Why it says <code>sleep</code> and not <code>bash</code></h3>
+<p>The subshell opened descriptor 3, then started <code>sleep</code>. A child process
+  <strong>inherits a copy of its parent's descriptors</strong>. <code>sleep</code> never opened
+  <code>app.log</code> and doesn't know it has it, but as long as it runs, the file stays
+  allocated. Inheritance matters again below, when Jenkins waits for a job.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Fixing it</p>
+<h2>Three ways to get the space back</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Fix</th><th>What it does</th><th>When</th></tr></thead>
+<tbody>
+<tr><td class="key">Restart the process</td><td>The process exits, its descriptors close, the
+  inode's open count reaches 0, and the kernel frees the blocks.</td><td>The normal fix, when a
+  restart is allowed.</td></tr>
+<tr><td class="key">Tell it to reopen its log</td><td>Many daemons close and reopen their log
+  file on a signal, usually <code>SIGHUP</code> (nginx uses <code>USR1</code>). The old inode is
+  released, and a new <code>app.log</code> is created.</td><td>When the program supports
+  it.</td></tr>
+<tr><td class="key">Truncate through <code>/proc</code></td><td>Opening
+  <code>/proc/PID/fd/3</code> opens the deleted inode itself. Truncating it to zero frees the
+  blocks while the process keeps running.</td><td>Production can't restart now. Copy the file out
+  first if you might need it.</td></tr>
+</tbody></table></div>
+<p>The third fix, run against a Python process holding a deleted 500 MB log:</p>
+<div class="code"><code>$ df -BM --output=used . | tail -1
+ 880M
+$ stat -L -c 'links=%h size=%s' /proc/$P/fd/3
+links=0 size=524288000
+$ head -c 20 /proc/$P/fd/3              <span class="c"># the data is still readable</span>
+xxxxxxxxxxxxxxxxxxxx
+$ : &gt; /proc/$P/fd/3                     <span class="c"># truncate it to 0 bytes</span>
+$ stat -L -c 'links=%h size=%s' /proc/$P/fd/3
+links=0 size=0
+$ df -BM --output=used . | tail -1
+ <span class="g">380M</span></code></div>
+<p class="note"><code>: &gt; file</code> means "run the do-nothing command <code>:</code> with its
+  output redirected to <code>file</code>". The redirect opens the file with
+  <code>O_TRUNC</code>, which cuts it to zero length. <code>cp /proc/$P/fd/3 saved.log</code>
+  before that line would have rescued the contents.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Log rotation</p>
+<h2>Four ways to rotate a log, and what each does to the open file</h2>
+</div>
+<p>Rotation is the incident on a schedule: a program has a log open, and something else wants to
+  move or empty it. Whether rotation works depends on what happens to the writer's
+  descriptor. Each row below is a real run against a Python writer that appends a 1 MB line
+  every 0.2 seconds:</p>
+<div class="tw"><table>
+<thead><tr><th>Method</th><th>What happened</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td class="key"><code>mv app.log app.log.1</code></td><td><code>mv</code> renames the
+  entry; the inode does not change. The writer keeps writing into <code>app.log.1</code>, and no
+  new <code>app.log</code> appears.</td><td><span class="chip exp">broken</span></td></tr>
+<tr><td class="key"><code>copytruncate</code>, writer opened with <code>"w"</code></td><td>The
+  writer remembers its offset, 15 MB. After the truncate it writes at offset 15 MB again, so the
+  start of the file is a hole full of NUL bytes. <code>ls -l</code> says 15 MB,
+  <code>du</code> says 4.8 MB.</td><td><span class="chip exp">broken</span></td></tr>
+<tr><td class="key"><code>copytruncate</code>, writer opened with <code>"a"</code></td><td>Append
+  mode (<code>O_APPEND</code>) moves to the current end before every write, so it continues at 0.
+  Anything written between the copy and the truncate is lost.</td><td><span class="chip imp">works,
+  loses lines</span></td></tr>
+<tr><td class="key"><code>create</code> + a reopen signal</td><td><code>mv</code>, create a fresh
+  <code>app.log</code>, then <code>postrotate</code> sends <code>SIGHUP</code>. The writer closes
+  the old descriptor and opens the new name.</td><td><span class="chip ok">correct</span></td></tr>
+</tbody></table></div>
+<p>The broken <code>copytruncate</code>, seen from outside:</p>
+<div class="code"><code>$ ls -l app.log
+-rw-rw-r-- 1 al al <span class="r">15000126</span> Nov  4 16:29 app.log
+$ du -k app.log
+<span class="r">4888</span>    app.log
+$ head -c 40 app.log | od -c | head -2
+0000000  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0
+*</code></div>
+<p>A file whose <code>ls -l</code> size is bigger than its <code>du</code> size is
+  <strong>sparse</strong>: the filesystem stored only the blocks that were written. Grep, a
+  log shipper or an editor reads the hole as NULs. When someone says the log "starts with
+  garbage after rotation", this is the cause.</p>
+<p>The correct version, as a real <code>logrotate</code> config and run (<code>-f</code>
+  forces a rotation now, <code>-s</code> keeps logrotate's state file in the lab directory
+  so it runs without root):</p>
+<div class="code"><code>/…/app.log {
+    rotate 3
+    create
+    postrotate
+        kill -HUP $(cat /…/app.pid)
+    endscript
+}
+
+$ logrotate -v -f -s rot.state rot.conf
+renaming /…/app.log to /…/app.log.1
+creating new /…/app.log mode = 0664 uid = 1000 gid = 1000
+running postrotate script
+$ wc -l app.log app.log.1
+  5 app.log                             <span class="c"># new lines go to the new file</span>
+ 11 app.log.1
+$ ls -l /proc/$(cat app.pid)/fd/3
+… 3 -&gt; /…/app.log           <span class="g"># the writer reopened the new name</span></code></div>
+<div class="call warn">
+<h3>Java services can't reopen on a signal</h3>
+<p>The JVM has no built-in "reopen my log on <code>SIGHUP</code>". For Mule, Spring Boot and
+  Jenkins itself, let the logging library rotate its own file (log4j2's
+  <code>RollingFileAppender</code>, Logback's <code>RollingFileAppender</code>) and don't point
+  logrotate at that file at all. If an external tool must rotate a Java log, the only option is
+  <code>copytruncate</code>. That's safe only if the appender writes in append mode, and it
+  still loses the lines written between the copy and the truncate.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Inheritance</p>
+<h2>Why a Jenkins job waits for a process it didn't wait for</h2>
+</div>
+<p>A Jenkins shell step reads its child's stdout through a pipe, and the step finishes when that
+  pipe reaches end-of-file. A pipe reaches EOF only when <strong>every</strong> process holding
+  its write end has closed it. If the step starts a server in the background, the server inherits
+  descriptors 1 and 2, the write end of that pipe, and keeps them open:</p>
+<div class="code"><code>nohup java -jar app.jar &amp;                          <span class="c"># inherits the step's stdout pipe</span>
+nohup java -jar app.jar &gt; app.out 2&gt;&amp;1 &lt; /dev/null &amp;  <span class="c"># holds none of the step's descriptors</span></code></div>
+<p>With the first line the step hangs, or Jenkins prints <code>Process leaked file
+  descriptors</code>. <code>nohup</code> doesn't help, because it only ignores
+  <code>SIGHUP</code>; it doesn't close anything. The second line points all three descriptors
+  somewhere else, so nothing ties the server to the step's pipe. In practice, a long-lived
+  server belongs in a systemd unit, not in a build step. That's Lesson 1.3.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Limits</p>
+<h2>"Too many open files" is a per-process number</h2>
+</div>
+<p>Each process has a maximum number of descriptors, <code>RLIMIT_NOFILE</code>. Opening one more
+  than that fails with <code>EMFILE</code>, errno 24:</p>
+<div class="code"><code>$ (ulimit -n 16; python3 -c '
+fs=[]
+try:
+    while True: fs.append(open("/dev/null"))
+except OSError as e: print(len(fs), "opened;", e)')
+13 opened; <span class="r">[Errno 24] Too many open files: '/dev/null'</span></code></div>
+<p>13, not 16, because descriptors 0, 1 and 2 were already taken. Sockets count too: every HTTP
+  connection a Mule app holds uses a descriptor. The limit is set when a process starts and
+  inherited by its children, so <strong>your shell's limit says nothing about the
+  service's</strong>. Read the service's own limit and current count:</p>
+<div class="code"><code>$ grep 'open files' /proc/$PID/limits
+Max open files            524288               524288               files
+$ ls /proc/$PID/fd | wc -l                <span class="c"># in use right now; run it twice, a minute apart</span>
+$ systemctl show -p LimitNOFILE ssh      <span class="c"># what systemd will give the service</span>
+LimitNOFILE=524288</code></div>
+<p class="note">If the count keeps climbing under steady load, raising the limit only delays the
+  crash. The application is leaking descriptors: connections or files it opens and never
+  closes. <code>ls -l /proc/$PID/fd</code> shows what they point at.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Build it</p>
+<h2>Fill a disk with a file that isn't there</h2>
+</div>
+<p>Everything runs on your laptop, as your own user. Part 2 writes 500 MB to your home disk and
+  frees it again. Work in <code>devops-course/labs/p1-1/</code>.</p>
+
+<h3>Part 1: your shell's descriptors</h3>
+<div class="code"><code>mkdir -p ~/IdeaProjects/devops-course/labs/p1-1 &amp;&amp; cd $_
+ls -l /proc/$$/fd
+exec 3&gt;notes.txt
+echo hello &gt;&amp;3
+ls -l /proc/$$/fd
+cat notes.txt
+exec 3&gt;&amp;-
+ls -l /proc/$$/fd</code></div>
+<p><code>$$</code> is your shell's own PID. What are 0, 1 and 2 pointing at in a terminal? What
+  appeared after <code>exec 3&gt;notes.txt</code>, and what did <code>exec 3&gt;&amp;-</code>
+  do?</p>
+
+<h3>Part 2: the incident</h3>
+<div class="code"><code>cd ~/IdeaProjects/devops-course/labs/p1-1
+df -BM --output=used .
+( exec 3&gt;app.log; head -c 500M /dev/zero &gt;&amp;3; sleep 600 ) &amp;
+sleep 3; ls -l app.log; df -BM --output=used .
+rm app.log
+du -sh .; df -BM --output=used .
+lsof +L1</code></div>
+<p>Predict before you run it: after the <code>rm</code>, what will <code>du</code> say and what
+  will <code>df</code> say? Then from the <code>lsof</code> line, write down the PID, the
+  descriptor number and the command name.</p>
+
+<h3>Part 3: get the space back without a restart</h3>
+<div class="code"><code>P=$(lsof -t +L1 -a -c sleep)            <span class="c"># -t prints only the PID</span>
+ls -l /proc/$P/fd
+cp /proc/$P/fd/3 rescued.log; ls -l rescued.log; rm rescued.log
+: &gt; /proc/$P/fd/3
+df -BM --output=used .
+kill $P</code></div>
+<p>Which line gave the 500 MB back: the <code>: &gt;</code>, or the <code>kill</code>? How do you
+  know?</p>
+
+<h3>Part 4: rotation done wrong, then right</h3>
+<p>This block writes two writers: <code>writer.py</code> (no signal handling) and
+  <code>writer2.py</code> (reopens on <code>SIGHUP</code>). Paste it whole:</p>
+<div class="code"><code>cat &gt; writer.py &lt;&lt;'EOF'
+import sys, time
+f = open(sys.argv[1], sys.argv[2])          # "w" or "a"
+n = 0
+while True:
+    n += 1
+    f.write(f"line {n}\n" + "x" * 1_000_000 + "\n"); f.flush()
+    time.sleep(0.2)
+EOF
+cat &gt; writer2.py &lt;&lt;'EOF'
+import signal, sys, time
+path = sys.argv[1]
+f = open(path, "a")
+def reopen(sig, frame):
+    global f
+    f.close(); f = open(path, "a")
+signal.signal(signal.SIGHUP, reopen)
+n = 0
+while True:
+    n += 1
+    f.write(f"line {n}\n"); f.flush()
+    time.sleep(0.2)
+EOF
+ls</code></div>
+<ol class="todo">
+<li><strong>mv:</strong> <code>python3 writer.py app.log w &amp; P=$!</code>, wait two seconds,
+  <code>mv app.log app.log.1</code>, wait two more, then <code>ls -l app.log*</code> and
+  <code>ls -l /proc/$P/fd/3</code>. Then <code>kill $P; rm -f app.log*</code>.</li>
+<li><strong>copytruncate, "w":</strong> start it again with <code>w</code>, then
+  <code>cp app.log app.log.1; : &gt; app.log; sleep 1</code>, then <code>ls -l app.log</code>,
+  <code>du -k app.log</code> and <code>head -c 40 app.log | od -c</code>. Kill and clean up.</li>
+<li><strong>copytruncate, "a":</strong> the same with <code>a</code>. Do the sizes agree now?</li>
+<li><strong>create + HUP:</strong> run the block below, then <code>wc -l app.log
+  app.log.1</code> and <code>ls -l /proc/$(cat app.pid)/fd/3</code>.</li>
+</ol>
+<div class="code"><code>python3 writer2.py app.log &amp; echo $! &gt; app.pid
+cat &gt; rot.conf &lt;&lt;EOF
+$PWD/app.log {
+    rotate 3
+    create
+    postrotate
+        kill -HUP \$(cat $PWD/app.pid)
+    endscript
+}
+EOF
+sleep 2; logrotate -v -f -s rot.state rot.conf</code></div>
+<p class="note">This heredoc uses <code>EOF</code> without quotes, on purpose: the shell fills in
+  <code>$PWD</code> now, because logrotate needs a full path. The <code>\$</code> keeps
+  <code>$(cat …)</code> for logrotate to run later. Finish with <code>kill $(cat app.pid)</code>.</p>
+
+<h3>Part 5: hit the limit</h3>
+<p>Run the <code>ulimit -n 16</code> block from "Limits" above. Then find the PID of something
+  long-running on your laptop (<code>pgrep -o java</code> if IntelliJ is open) and read its
+  <code>/proc/PID/limits</code> and <code>ls /proc/PID/fd | wc -l</code>.</p>
+
+<h3>Part 6: your servers</h3>
+<p>From memory, or from a Jenkins agent and only looking at it: what rotates the Mule logs, the
+  app's log4j2 or logrotate? Is there a file in <code>/etc/logrotate.d/</code> for them, and does
+  it say <code>copytruncate</code>? Have you ever cleared disk space by deleting a log, and did
+  <code>df</code> go down? That is your interview story for this lesson. Leave out hostnames and
+  anything that looks like a password.</p>
+<p><strong>Done when:</strong> you can explain, without notes, why <code>df</code> and
+  <code>du</code> disagreed in Part 2, and which of Part 4's four methods you would use for a
+  Mule log and why.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check</p>
+<h2>Five questions</h2>
+</div>
+<p>Out loud first, and end each one with "because…" and the consequence.</p>
+<details><summary>A Jenkins agent alerts at 100% disk. <code>du -sh /*</code> adds up to 40 GB on a 100 GB disk. What's using the other 60, how do you find it, and what are two ways to fix it?</summary><div class="answer"><p><strong>Files that are deleted but still open.</strong> <code>du</code> counts names it can find; <code>df</code> counts allocated blocks. A file with no name but an open descriptor has blocks and no name. Find it with <code>sudo lsof +L1</code>: the PID, the descriptor and the size are on the same line. Fix by restarting or signalling the process so it closes the descriptor, or, if it can't be restarted now, by truncating it through <code>/proc/PID/fd/N</code>. The real fix is whatever deleted a log a process still had open, usually a cleanup script or a hand <code>rm</code>.</p></div></details>
+<details><summary>logrotate is configured with plain <code>rotate 7</code>, no <code>create</code> options and no <code>postrotate</code>. After rotation, <code>app.log</code> is missing and <code>app.log.1</code> keeps growing. Why?</summary><div class="answer"><p><strong>A rename doesn't touch the open descriptor.</strong> <code>mv</code> changes a directory entry; the inode, and the process's descriptor pointing at it, stay the same. The process keeps writing into the same inode, which is now called <code>app.log.1</code>. It needs to be told to reopen its log by name: <code>create</code> plus a <code>postrotate</code> signal, or the application's own rotation.</p></div></details>
+<details><summary>After switching to <code>copytruncate</code>, <code>ls -l app.log</code> says 2 GB, <code>du</code> says 10 MB, and the file starts with NUL bytes. What happened?</summary><div class="answer"><p><strong>The writer did not open the file in append mode.</strong> Its descriptor remembers its offset, say 2 GB. After the truncate, the next write goes to offset 2 GB, so the start of the file is a hole. The filesystem stores holes as nothing, which is why <code>du</code> is small, and reads them back as NULs. Make the appender write with <code>O_APPEND</code> (log4j2 <code>append="true"</code>), or stop rotating it from outside and use the library's rolling appender.</p></div></details>
+<details><summary>A Jenkins step runs <code>nohup ./start-server.sh &amp;</code>. The server starts, but the step never finishes. Why, and what is the one-line fix?</summary><div class="answer"><p><strong>The server inherited the step's stdout and stderr.</strong> Jenkins reads them through a pipe and waits for EOF, which comes only when every process holding the write end has closed it. <code>nohup</code> ignores <code>SIGHUP</code>; it closes nothing. Fix: <code>nohup ./start-server.sh &gt; server.out 2&gt;&amp;1 &lt; /dev/null &amp;</code>. Better: run the server as a systemd unit, so the build never owns it.</p></div></details>
+<details><summary>A Java service logs <code>Too many open files</code>. In your SSH session <code>ulimit -n</code> says 524288. Is the limit the problem?</summary><div class="answer"><p><strong>Your shell's limit is not the service's.</strong> Limits are per process, set at start and inherited from whatever started it: systemd, an init script, a Jenkins agent. Read <code>/proc/PID/limits</code> for the real number, and <code>ls /proc/PID/fd | wc -l</code> twice, a minute apart. If the count is near the limit and still rising under steady load, it's a descriptor leak, and raising <code>LimitNOFILE</code> only delays the crash. <code>ls -l /proc/PID/fd</code> shows whether the leak is sockets or files.</p></div></details>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Interchange</p>
+<h2>Failure 1 of 8</h2>
+</div>
+<p>This lesson is the first of the project's eight deliberate failures. When
+  <code>ingest</code> runs on a VM in Phase 3, you will fill its disk with a log it still holds
+  open, watch the alarm, find the cause with <code>lsof +L1</code>, and write the postmortem in
+  <code>docs/postmortems/</code>. On EKS in Phase 5 the same failure looks different: a container
+  writing to stdout, and a node's disk filling with container logs that the kubelet rotates. The
+  mechanism is the same.</p>
+</section>
+
+<footer>
+<p>Sources: Linux man pages <code>unlink(2)</code>, <code>open(2)</code> (<code>O_APPEND</code>,
+  <code>O_TRUNC</code>), <code>proc(5)</code> (<code>/proc/PID/fd</code>,
+  <code>/proc/PID/limits</code>), <code>getrlimit(2)</code>, <code>pipe(7)</code>;
+  <code>lsof(8)</code> for <code>+L1</code>; <code>logrotate(8)</code> for <code>create</code>,
+  <code>copytruncate</code> and <code>postrotate</code>; <code>systemd.exec(5)</code> for
+  <code>LimitNOFILE</code>; the Jenkins documentation on "Spawning processes from build". Every
+  output on this page comes from a real run on Ubuntu 26.04 with lsof 4.99.4, logrotate 3.22.0
+  and Python 3.14.4, checked 4 November 2026. Paths are shortened with <code>…</code>.</p>
+<p>Next: Lesson 1.2, memory: RSS against page cache, why <code>free</code> looks alarming and is
+  fine, and the OOM killer.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

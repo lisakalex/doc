@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Missing Claim</title>
+<link rel="icon" href="../../assets/img/favicon-module-2.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/24-the-missing-claim.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Module 02 · Lesson 2.4 · AWS + DevOps course</p>
+<h1>The Missing Claim</h1>
+<p class="lede">Your repository contains two OIDC trust policies. One is written the way AWS documents it.
+    The other is missing a condition. Both sit in <code>terraform/</code>, and by the end of this page you
+    should be able to say which one, and what an attacker does with the gap.</p>
+<p class="note">This is also the full answer to the question you kept pushing on in 2.2 —
+    <em>how do you get access without a key?</em> — taken down to the wire.</p>
+</header>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The problem</p>
+<h2>A pod has no access key. It has a signed statement.</h2>
+</div>
+<p>A container in Kubernetes needs to write to S3. The old answer was to bake an <code>AKIA</code> key
+    into an environment variable or a secret, and then own that secret forever. The modern answer removes the
+    secret entirely, and the mechanism is worth learning exactly, because <strong>every federated login in
+    AWS works this way</strong>: GitHub Actions, GitLab, CircleCI, Okta, Google, EKS. Same machinery,
+    different issuer.</p>
+<p>The cluster mints a short-lived <strong>JWT</strong> — a small JSON document signed with the
+    cluster's private key — and mounts it into the pod as a file. That file is not an AWS credential.
+    It is a <strong>statement about who this pod is</strong>, signed by something AWS has been told to
+    trust.</p>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="A pod exchanges a cluster-signed JWT at AWS STS, which verifies the signature against the cluster's published public keys and returns temporary credentials." role="img" viewbox="0 0 900 320">
+<defs>
+<marker id="a" markerheight="7" markerwidth="7" orient="auto-start-reverse" refx="9" refy="5" viewbox="0 0 10 10">
+<path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+</marker>
+</defs>
+<g fill="none" stroke="currentColor" stroke-width="1.4">
+<rect height="46" opacity=".55" rx="5" width="170" x="30" y="16"></rect>
+<rect height="92" rx="5" width="170" x="30" y="104"></rect>
+<rect height="92" rx="5" width="176" x="372" y="104"></rect>
+<rect height="92" rx="5" width="180" x="690" y="104"></rect>
+</g>
+<g fill="currentColor" font-family="IBM Plex Sans, sans-serif">
+<text font-size="12.5" opacity=".7" text-anchor="middle" x="115" y="45">kubelet</text>
+<text font-size="13.5" font-weight="600" text-anchor="middle" x="115" y="139">Pod</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="115" y="160">prima-app-sa</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="115" y="178">no AWS key on disk</text>
+<text font-size="13.5" font-weight="600" text-anchor="middle" x="460" y="139">AWS STS</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="460" y="160">checks the signature,</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="460" y="178">then the trust policy</text>
+<text font-size="13.5" font-weight="600" text-anchor="middle" x="780" y="139">EKS OIDC issuer</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="780" y="160">public keys, served on</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="780" y="178">the open internet</text>
+</g>
+<g fill="none" marker-end="url(#a)" stroke="currentColor" stroke-width="1.4">
+<line x1="115" x2="115" y1="62" y2="98"></line>
+<line x1="200" x2="366" y1="130" y2="130"></line>
+<line x1="548" x2="684" y1="130" y2="130"></line>
+<line x1="684" x2="554" y1="170" y2="170"></line>
+<path d="M460,196 V266 H115 V202"></path>
+</g>
+<g fill="currentColor" font-family="IBM Plex Mono, monospace" font-size="11" opacity=".82">
+<text x="128" y="86">signs + mounts the JWT</text>
+<text text-anchor="middle" x="283" y="121">1. here is my signed JWT</text>
+<text text-anchor="middle" x="616" y="121">2. GET /keys</text>
+<text text-anchor="middle" x="619" y="188">3. public key</text>
+<text text-anchor="middle" x="288" y="286">4. ASIA credentials, valid ~1 hour</text>
+</g>
+</svg>
+</div>
+<figcaption>Nothing secret ever leaves the cluster. The pod sends a signed statement; STS fetches the
+      matching <strong>public</strong> key over ordinary HTTPS and checks the signature. This is asymmetric
+      — unlike your <code>AKIA</code> key, where AWS holds a copy of the secret itself.</figcaption>
+</figure>
+<div class="call">
+<h3>The answer to "access without a key"</h3>
+<p>The pod holds no shared secret. It holds a document that <em>only the cluster could have signed</em>,
+      and AWS verifies that with a public key anyone in the world may download. That is the entire trick
+      — and it is why the file inside the pod expires in minutes and is useless outside this
+      exchange.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">What is in the token</p>
+<h2>Four claims, and two of them are the security boundary</h2>
+</div>
+<p>Decoded, the JWT the kubelet mounts looks roughly like this:</p>
+<div class="code"><span class="c">{</span>
+<span class="k">"iss"</span>: <span class="g">"https://oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"</span>,   <span class="c">// who signed it</span>
+<span class="k">"sub"</span>: <span class="g">"system:serviceaccount:default:prima-app-sa"</span>,        <span class="c">// who it is about</span>
+<span class="k">"aud"</span>: <span class="w">"sts.amazonaws.com"</span>,                                 <span class="c">// who it is FOR</span>
+<span class="k">"exp"</span>: <span class="g">1757068800</span> <span class="c">// dies in minutes</span>
+<span class="c">}</span></div>
+<div class="tw">
+<table class="claims">
+<thead><tr><th>Claim</th><th>What it means</th><th>Checked by</th></tr></thead>
+<tbody>
+<tr><td class="key">iss</td><td>Which issuer signed this, and therefore which public keys STS goes and fetches.</td><td>The <code>Federated</code> principal</td></tr>
+<tr><td class="key">sub</td><td><strong>Subject</strong> — which ServiceAccount, in which namespace. The identity.</td><td>A <code>Condition</code> you write</td></tr>
+<tr><td class="key">aud</td><td><strong>Audience</strong> — which service this token was minted to be shown to.</td><td>A <code>Condition</code> you write</td></tr>
+<tr><td class="key">exp</td><td>Expiry. Minutes, not hours.</td><td>STS, automatically</td></tr>
+</tbody>
+</table>
+</div>
+<div class="call">
+<h3><code>sub</code> and <code>aud</code> answer different questions</h3>
+<p><code>sub</code> is the photo on a badge — it proves <em>who you are</em>. <code>aud</code> is
+      the building name printed on it — <em>which door this badge was issued for</em>. A real badge,
+      with your real face, issued for a different building, should not open this one.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Your code · find the difference</p>
+<h2>Two trust policies from this repository</h2>
+</div>
+<p>Both grant <code>sts:AssumeRoleWithWebIdentity</code>. Both name a <code>Federated</code> principal.
+    Both constrain <code>sub</code>. Read the two <code>Condition</code> blocks against each other before you
+    open the answer.</p>
+<div class="pair">
+<div class="pane">
+<div class="hdr"><h3>iam-github-oidc.tf</h3><span class="chip ok">complete</span></div>
+<div class="code"><span class="k">Condition</span> = {
+  StringEquals = {
+    <span class="hl">"...githubusercontent.com:aud" =
+      "sts.amazonaws.com"</span>
+  }
+  StringLike = {
+    "...githubusercontent.com:sub" = [
+      "repo:owner@ID/aws-sre@ID:
+         ref:refs/heads/main",
+      "repo:owner@ID/aws-sre@ID:
+         environment:production",
+    ]
+  }
+}</div>
+</div>
+<div class="pane">
+<div class="hdr"><h3>main.tf · app_role</h3><span class="chip exp">incomplete</span></div>
+<div class="code"><span class="k">Condition</span> = {
+  StringEquals = {
+    "${eks_oidc}:sub" =
+      "system:serviceaccount:default:prima-app-sa"
+  }
+}
+
+<span class="gap">   // nothing here reads :aud</span></div>
+</div>
+</div>
+<details>
+<summary>What is missing — and does it actually matter?</summary>
+<div class="answer">
+<p><strong>The IRSA role never checks <code>aud</code>.</strong> It verifies which ServiceAccount the
+        token is about, and not which service the token was minted for.</p>
+<p>Be precise about the risk, because the sloppy version of this answer is wrong in an interview. It
+        is <em>not</em> "any workload can assume the role" — the <code>sub</code> condition still pins
+        it to <code>prima-app-sa</code> in the <code>default</code> namespace. The real exposure is
+        <strong>audience confusion</strong>.</p>
+<p>Kubernetes lets that same ServiceAccount mint tokens for <em>other</em> audiences through the
+        TokenRequest API — a service mesh, a vault, an internal API, an outbound webhook. Those tokens
+        carry the <em>same</em> <code>sub</code> and a different <code>aud</code>. Any service you hand one to
+        is now holding something AWS will accept as proof of being your application.</p>
+</div>
+</details>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="One service account mints two tokens with different audiences. The aud condition blocks the replayed token, and without that condition the replay reaches STS and succeeds." role="img" viewbox="0 0 900 316">
+<defs>
+<marker id="b" markerheight="7" markerwidth="7" orient="auto-start-reverse" refx="9" refy="5" viewbox="0 0 10 10">
+<path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+</marker>
+</defs>
+<line stroke="var(--accent)" stroke-dasharray="5 4" stroke-width="1.5" x1="612" x2="612" y1="42" y2="298"></line>
+<text fill="var(--accent)" font-family="IBM Plex Mono, monospace" font-size="11.5" text-anchor="middle" x="612" y="30">trust policy: is :aud checked?</text>
+<g fill="none" stroke="currentColor" stroke-width="1.4">
+<rect height="82" rx="5" width="176" x="24" y="112"></rect>
+<rect height="82" rx="5" width="176" x="700" y="112"></rect>
+<rect height="62" opacity=".7" rx="5" width="216" x="296" y="224"></rect>
+</g>
+<g fill="currentColor" font-family="IBM Plex Sans, sans-serif">
+<text font-size="13.5" font-weight="600" text-anchor="middle" x="112" y="144">Pod</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="112" y="165">prima-app-sa mints</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="112" y="183">both of these tokens</text>
+<text font-size="13.5" font-weight="600" text-anchor="middle" x="788" y="148">AWS STS</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="788" y="169">issues ASIA credentials</text>
+<text font-size="12" text-anchor="middle" x="404" y="250">any service you send a</text>
+<text font-size="12" text-anchor="middle" x="404" y="270">token to (mesh, webhook)</text>
+</g>
+<g color="var(--good)">
+<line fill="none" marker-end="url(#b)" stroke="var(--good)" stroke-width="1.6" x1="200" x2="694" y1="140" y2="140"></line>
+</g>
+<g fill="none" marker-end="url(#b)" stroke="currentColor" stroke-width="1.4">
+<path d="M96,194 V255 H290"></path>
+</g>
+<line stroke="var(--stop)" stroke-width="1.6" x1="512" x2="600" y1="255" y2="255"></line>
+<g stroke="var(--stop)" stroke-width="2.2">
+<line x1="605" x2="619" y1="248" y2="262"></line>
+<line x1="619" x2="605" y1="248" y2="262"></line>
+</g>
+<g color="var(--warn)">
+<path d="M626,255 H788 V202" fill="none" marker-end="url(#b)" stroke="var(--warn)" stroke-dasharray="5 4" stroke-width="1.5"></path>
+</g>
+<g font-family="IBM Plex Mono, monospace" font-size="11">
+<text fill="var(--good)" text-anchor="middle" x="400" y="130">aud = sts.amazonaws.com</text>
+<text fill="currentColor" opacity=".8" x="118" y="247">aud = vault, same sub</text>
+<text fill="var(--stop)" text-anchor="middle" x="556" y="245">replay</text>
+<text fill="var(--warn)" text-anchor="middle" x="748" y="292">succeeds if :aud is unchecked</text>
+</g>
+</svg>
+</div>
+<figcaption>Both tokens are genuine, and both carry the same <code>sub</code>. The only thing separating
+      them is the audience claim — so the only thing that can stop the replay is a condition that reads
+      it.</figcaption>
+</figure>
+<div class="call warn">
+<h3>The honest caveat: a second gate you cannot see from here</h3>
+<p>When an OIDC provider is registered in IAM it carries a <code>client_id_list</code>, and STS rejects
+      tokens whose audience is not on it. The GitHub provider in this repo sets it to
+      <code>["sts.amazonaws.com"]</code> — line 7 of <code>iam-github-oidc.tf</code>. But the
+      <strong>EKS provider is not defined in this repository at all</strong>: <code>eks_oidc</code> is only a
+      string variable, so that provider was registered somewhere you cannot review. You have no way to prove
+      its audience list is narrow. The trust-policy condition is the gate you own, in the file you control,
+      and it is the one a reviewer will look for.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The fix</p>
+<h2>One condition, one line</h2>
+</div>
+<div class="code">Condition = {
+  StringEquals = {
+    <span class="k">"${var.eks_oidc}:aud" = "sts.amazonaws.com"</span>
+    "${var.eks_oidc}:sub" = "system:serviceaccount:default:prima-app-sa"
+  }
+}</div>
+<p>Both keys go inside the same <code>StringEquals</code> block, and multiple condition keys in one block
+    are <strong>ANDed</strong> — every one must hold. Worth carrying past this lesson: condition keys
+    are AND, but multiple <em>values</em> listed for a single key are OR. That is exactly why the GitHub
+    policy can accept two different <code>sub</code> formats while still requiring the audience.</p>
+<div class="call stop">
+<h3>The version that is genuinely catastrophic</h3>
+<p>Notice what the app role gets <em>right</em>: <code>sub</code> is matched with
+      <code>StringEquals</code> against an exact string. The failure you will meet in real codebases is
+      <code>StringLike</code> with a wildcard — <code>"system:serviceaccount:*"</code> — which
+      hands the role to every pod in every namespace of the cluster, including anything an attacker manages
+      to deploy. A wildcard inside a trust policy deserves a hard stop in code review, every time.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Transferable</p>
+<h2>Reading any trust policy in about a minute</h2>
+</div>
+<ul>
+<li><strong>Who is the <code>Principal</code>?</strong> An account, a service, or a
+      <code>Federated</code> provider. If it is <code>"*"</code>, stop reading and fix it.</li>
+<li><strong>Which action?</strong> <code>sts:AssumeRole</code> means the caller already holds AWS
+      credentials. <code>sts:AssumeRoleWithWebIdentity</code> means an outside identity provider is involved
+      — so the conditions are carrying all the weight.</li>
+<li><strong>Is there a <code>Condition</code> at all?</strong> A federated trust policy with no
+      conditions trusts <em>every</em> identity that provider can issue. For GitHub, that means every
+      repository on GitHub.</li>
+<li><strong>Does it constrain both who and for-what?</strong> <code>sub</code> and <code>aud</code>.
+      A missing <code>sub</code> is a catastrophe; a missing <code>aud</code> is a gap.</li>
+<li><strong>Any wildcards?</strong> <code>StringLike</code> with a <code>*</code> in the middle of a
+      <code>sub</code> is where breaches come from.</li>
+</ul>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check yourself</p>
+<h2>Three questions</h2>
+</div>
+<details>
+<summary>A colleague says "the <code>aud</code> condition is pointless, the OIDC provider already restricts the audience." Are they right?</summary>
+<div class="answer"><p>Partly — and the interesting half of the answer is not about correctness. Think about who owns each of the two gates, and which one you can actually see from this repository.</p></div>
+</details>
+<details>
+<summary>Why is a stolen JWT less dangerous than a stolen <code>AKIA</code> key, even though both can be turned into AWS credentials?</summary>
+<div class="answer"><p>Look at the <code>exp</code> claim first, then at what else has to be true for the exchange to work at all.</p></div>
+</details>
+<details>
+<summary>The GitHub role pins <code>sub</code> using numeric IDs rather than plain names. What attack do those numbers stop?</summary>
+<div class="answer"><p>Names on GitHub are not permanent. Ask what happens to a trust policy written against a name after the account holding that name goes away.</p></div>
+</details>
+</section>
+<footer>
+<p>Module 02, Lesson 2.4 · syllabus, progress log and full revision Q&amp;A in <code>docs/AWS_COURSE.md</code></p>
+<p>Next: <strong>2.5</strong> — MFA-gating your own day-to-day credentials, so that a stolen
+    <code>~/.aws/credentials</code> is worth nothing. That closes Module 2.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

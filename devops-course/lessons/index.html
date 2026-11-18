@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Course Map</title>
+<link rel="icon" href="../assets/img/favicon-index.svg">
+<link rel="stylesheet" href="../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../assets/css/lesson.css">
+<link rel="stylesheet" href="../assets/css/pages/index.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Contents · AWS + DevOps course</p>
+<h1>Course Map</h1>
+<p class="lede">The current course first: curriculum v4 and the Interchange project it is built around.
+      Below it, the reference sheets, the reading notes, and the sixteen lessons of the original AWS
+      course, modules 1–5, which phase 3 builds on.</p>
+<div class="facts">
+<span class="fact">v4 · phase 0 in progress</span>
+<span class="fact">16 AWS lessons, modules 1–5</span>
+<span class="fact">local copies in lessons/</span>
+</div>
+</header>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Curriculum v4 · the course you are on</p>
+<h2>DevOps course</h2>
+</div>
+<div class="lessons">
+<a class="lrow" href="devops/00-course-progress.html">
+<span class="no">NOW</span>
+<span class="body">
+<span class="t">Course Progress</span>
+<span class="d">Every lesson across its seven stages (Lesson, Lab, At work, Build, Questions, Interview, Review), what is happening now, and the Interchange Phase 1 builds.</span>
+<span class="k">Updated after every change. Start each session here.</span>
+<span class="f">devops/00-course-progress.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/00-study-calendar.html">
+<span class="no">CAL</span>
+<span class="body">
+<span class="t">Study Calendar</span>
+<span class="d">The 24 weeks from 12 October 2026 to 28 March 2027, month by month and week by week: what to learn, what to build on Interchange, and which deliberate failure lands when.</span>
+<span class="k">Open it to see which week you are in. It works that out from today's date.</span>
+<span class="f">devops/00-study-calendar.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/00-the-recut.html">
+<span class="no">PLAN</span>
+<span class="body">
+<span class="t">The Plan, Re-Cut</span>
+<span class="d">Curriculum v4: the same 24 weeks reordered around a placement result. Containers move to phase 2 as the critical path, Terraform shortens because Ansible already taught the model, and CI/CD becomes a translation exercise rather than a module.</span>
+<span class="k">Supersedes the market-derived curriculum. Same scope, different order, and the project runs from week 3 as the spine rather than a finale.</span>
+<span class="f">devops/00-the-recut.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/00-placement.html">
+<span class="no">TEST</span>
+<span class="body">
+<span class="t">Where You Actually Are</span>
+<span class="d">Eight questions about what you have run and thirty-two about what you can debug, across Linux, AWS, Terraform, Kubernetes, delivery, observability, scripting and state. It marks itself and says which modules to skip.</span>
+<span class="k">Mark 0 when reading the answer is the first time the mechanism made sense. Recognition is not recall.</span>
+<span class="f">devops/00-placement.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/00-interchange-brief.html">
+<span class="no">BUILD</span>
+<span class="body">
+<span class="t">The Interchange Project</span>
+<span class="d">The portfolio project: an Apache Camel integration platform on EKS, provisioned by Terraform and deployed by GitHub Actions. Four services, one queue, one database, and eight failures caused on purpose.</span>
+<span class="k">Each deliberate failure is a placement question answered wrongly, turned into an incident on a system you built. Eight postmortems is the differentiator; nothing else on the list is close.</span>
+<span class="f">devops/00-interchange-brief.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/00-the-whole-machine.html">
+<span class="no">MAP</span>
+<span class="body">
+<span class="t">The Whole Machine</span>
+<span class="d">A guided read of the aws-sre specimen: ten Terraform files, nine Kubernetes objects, and the three wires that join them. Terraform's four ideas, Kubernetes' three, and one request traced through every object.</span>
+<span class="k">There is no cluster in that repository, by design — so running it costs pennies, not the $73 a month an EKS control plane does. Orientation for phases 4 and 5, readable now.</span>
+<span class="f">devops/00-the-whole-machine.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/p0-1-build-once-deploy-many.html">
+<span class="no">0.1</span>
+<span class="body">
+<span class="t">Build Once, Deploy Many</span>
+<span class="d">Artifact promotion, named. The failure it prevents stated precisely, and the three places a Maven-and-container pipeline leaks it: irreproducible builds, configuration baked into the artifact, and mutable image tags.</span>
+<span class="k">Same code is not the same artifact. And the artifact rolls back — the database does not, which is what expand-and-contract is for.</span>
+<span class="f">devops/p0-1-build-once-deploy-many.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/p0-1a-same-commit-different-bytes.html">
+<span class="no">0.1a</span>
+<span class="body">
+<span class="t">Same Commit, Different Bytes</span>
+<span class="d">Deep dive on Lesson 0.1's one sentence: a dependency resolved differently, a different JDK patch on the agent, a plugin that pulled a newer version, a generated file with a different timestamp. Each with the mechanism and the fix.</span>
+<span class="k">Three change behaviour, one changes only bytes, and a hash cannot tell you which. Promotion ships what you tested; reproducibility proves it.</span>
+<span class="f">devops/p0-1a-same-commit-different-bytes.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/p0-2-jenkins-to-github-actions.html">
+<span class="no">0.2</span>
+<span class="body">
+<span class="t">Jenkins to GitHub Actions</span>
+<span class="d">The renaming table across Jenkins, GitHub Actions and GitLab CI; a Jenkinsfile shaped like yours translated line by line; and the four places the mechanism differs. Builds Interchange's first workflow.</span>
+<span class="k">Every job is a fresh machine, so splitting a stage into a job can rebuild your artifact. And an action is someone else's code: pin it by SHA, like an image by digest.</span>
+<span class="f">devops/p0-2-jenkins-to-github-actions.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/p0-3-pipeline-secrets-and-oidc.html">
+<span class="no">0.3</span>
+<span class="body">
+<span class="t">Pipeline Secrets and OIDC</span>
+<span class="d">Jenkins credentials, GitHub secrets, Parameter Store and Secrets Manager against five questions; secret zero; OIDC federation step by step, the trust policy that makes or breaks it, and path filters for the monorepo.</span>
+<span class="k">Moving secrets into a better vault does not remove the key that opens it. OIDC does: GitHub signs who the job is, AWS checks the signature and the sub claim, and the credentials die within the hour.</span>
+<span class="f">devops/p0-3-pipeline-secrets-and-oidc.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/p0-4-ansible-idempotency-named.html">
+<span class="no">0.4</span>
+<span class="body">
+<span class="t">Ansible Idempotency, Named</span>
+<span class="d">Idempotent as two promises, safe to re-run and honest about it; what a module checks that a shell line cannot; the four fixes in order (module, creates, changed_when, check-then-act); why --check under-reports; a two-run lab on your laptop.</span>
+<span class="k">The second run must end in changed=0. A shell task always reports changed, so it fires handlers on every run and hides real drift in the noise.</span>
+<span class="f">devops/p0-4-ansible-idempotency-named.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/p0-5-python-that-survives.html">
+<span class="no">0.5</span>
+<span class="body">
+<span class="t">Python That Survives Leaving Your Laptop</span>
+<span class="d">What import searches and why a script works on the laptop by accident; a venv as a directory; three failures reproduced on three Pythons; transitive drift replayed with --exclude-newer; pyproject against uv.lock; the wheel, and why it does not carry the lock.</span>
+<span class="k">Ship the wheel and the hashed lock together, install with --require-hashes and --no-deps, and nothing is resolved on the server.</span>
+<span class="f">devops/p0-5-python-that-survives.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/p1-1-where-the-disk-space-went.html">
+<span class="no">1.1</span>
+<span class="body">
+<span class="t">Where the Disk Space Went</span>
+<span class="d">Why df and du disagree after rm; inodes, link counts and file descriptors; /proc/PID/fd and lsof +L1; four ways to rotate a log and what each does to the open file; descriptor inheritance and the Jenkins step that never ends; Too many open files.</span>
+<span class="k">rm removes a name, not a file. The blocks are freed only when no name and no open descriptor is left, so a log rotation is only as good as the writer's reopen.</span>
+<span class="f">devops/p1-1-where-the-disk-space-went.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/p1-2-where-the-memory-went.html">
+<span class="no">1.2</span>
+<span class="body">
+<span class="t">Where the Memory Went</span>
+<span class="d">What free, buff/cache and available count; the page cache, measured; tmpfs as memory that can't be dropped; VSZ against RSS and overcommit; reclaim, swap and the OOM killer's choice; cgroup limits and exit code 137; how a JVM sizes its heap and the two ways it dies.</span>
+<span class="k">Alert on available, not free. A process killed by its cgroup gets SIGKILL and leaves no stack trace, only exit 137 and a line in the kernel log.</span>
+<span class="f">devops/p1-2-where-the-memory-went.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/p1-3-the-job-nobody-saw-fail.html">
+<span class="no">1.3</span>
+<span class="body">
+<span class="t">The Job Nobody Saw Fail</span>
+<span class="d">Why a cron job fails silently: its bare PATH and its output mailed to nowhere; systemd as every service's parent; a Java unit file line by line; Restart= and the start limit; systemd's own $ and % expansion; Environment=; journalctl; timers, Persistent=true and OnFailure=; drop-ins instead of editing a vendor's unit.</span>
+<span class="k">A timer job is an ordinary service: its environment is written in the unit, its output is in the journal, a missed run is caught up, and a failure can start an alert.</span>
+<span class="f">devops/p1-3-the-job-nobody-saw-fail.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/p1-4-running-but-unreachable.html">
+<span class="no">1.4</span>
+<span class="body">
+<span class="t">Running but Unreachable</span>
+<span class="d">One request in five steps: DNS, the route, the TCP connection, TLS, HTTP. Interfaces and ip route; bind to 127.0.0.1 against 0.0.0.0 and ss -ltnp; the container localhost trap; refused against timed out; nsswitch, /etc/hosts and why dig disagrees; the five-second resolver timeout; curl's timing breakdown; certificate checks and Java's own cacerts.</span>
+<span class="k">Find which step failed before fixing anything: refused means nobody is listening, timed out means something dropped it, and every call taking 5 seconds means DNS.</span>
+<span class="f">devops/p1-4-running-but-unreachable.html</span>
+</span>
+</a>
+<a class="lrow" href="devops/p1-5-the-file-root-left-behind.html">
+<span class="no">1.5</span>
+<span class="body">
+<span class="t">The File Root Left Behind</span>
+<span class="d">How the kernel decides who may open a file: UIDs, groups and the owner, group, other check; directory bits and why deleting depends on the directory; namei; umask; groups read at login and the -a in usermod -aG; setuid, setgid and the sticky bit; root-owned files left by a manual run; Ansible's unquoted mode; User=, LogsDirectory= and UMask= in a system unit.</span>
+<span class="k">The first matching row of the mode decides, owner before group before other. A file belongs to whoever created it, so one manual run as root can silence a service's log.</span>
+<span class="f">devops/p1-5-the-file-root-left-behind.html</span>
+</span>
+</a>
+</div>
+<div class="call">
+<h3>Next</h3>
+<p>Lesson 1.5 — the file root left behind: users, groups and permissions, then Build 5, <code>reference</code> as its own user. Lesson 1.4's interview answer and review are still open.</p>
+<p><a href="#road-ahead">See every lesson in the plan, all 37 →</a></p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Read these whenever you are stuck on a word</p>
+<h2>Reference sheets</h2>
+</div>
+<div class="lessons">
+<a class="lrow" href="reference/00-alphabet-soup.html">
+<span class="no">REF</span>
+<span class="body">
+<span class="t">Alphabet Soup</span>
+<span class="d">Every AWS abbreviation this course uses, expanded, with the one thing about each that matters. Taught ones marked in green.</span>
+<span class="f">reference/00-alphabet-soup.html</span>
+</span>
+</a>
+<a class="lrow" href="reference/00-say-again.html">
+<span class="no">REF</span>
+<span class="body">
+<span class="t">Say Again?</span>
+<span class="d">The English an interviewer actually uses — idioms, hedges and engineering slang, in plain words.</span>
+<span class="f">reference/00-say-again.html</span>
+</span>
+</a>
+<a class="lrow" href="reference/00-where-the-mock-lies.html">
+<span class="no">REF</span>
+<span class="body">
+<span class="t">Where the Mock Lies</span>
+<span class="d">Run the hands-on work with no AWS account: the real CLI against a local fake seeded from your Terraform — plus the measured list of the four places it succeeds where AWS would refuse.</span>
+<span class="k">A mock that refuses the wrong things teaches you the wrong things. Know which half is real.</span>
+<span class="f">reference/00-where-the-mock-lies.html</span>
+</span>
+</a>
+<a class="lrow" href="reference/00-job-survey.html">
+<span class="no">DATA</span>
+<span class="body">
+<span class="t">Nine in Ten, Checked</span>
+<span class="d">Three surveys, three populations: 147 postings from key-free APIs, then 662 UK adverts via Adzuna, then 162 written by direct employers through their own hiring systems. The first was ~1% of the market and said so too confidently.</span>
+<span class="k">Terraform 70% of UK adverts, ahead of every cloud. AWS, Terraform and Kubernetes together in 37%. Jenkins 29.5% on the aggregator and 4.9% at product companies — two markets, not two samples.</span>
+<span class="f">reference/00-job-survey.html</span>
+</span>
+</a>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Books read against the course</p>
+<h2>Reading notes</h2>
+</div>
+<div class="lessons">
+<a class="lrow" href="reading/reading-01-brikman-secrets.html">
+<span class="no">RN 1</span>
+<span class="body">
+<span class="t">The Example Is Not the Advice</span>
+<span class="d">The KMS section of <em>Terraform: Up &amp; Running</em> 3e, chapter 6 — what it gets right, and the three simplifications that matter: a key policy that locks you out, the 4 KB ceiling on direct encryption, and the secret that lands in state.</span>
+<span class="k">A worked example in a book is simplified exactly where the security lives.</span>
+<span class="f">reading/reading-01-brikman-secrets.html</span>
+</span>
+</a>
+<a class="lrow" href="reading/reading-02-terraform-lock-table.html">
+<span class="no">RN 2</span>
+<span class="body">
+<span class="t">The Table Nobody Designed</span>
+<span class="d">Four books create the same DynamoDB table for Terraform state locking — the best-designed table in any of them. What the mechanism actually is, what two books get wrong about it, and why Terraform 1.11 deprecated it.</span>
+<span class="k">The lock is the item's existence, not a flag; and a distributed lock is compare-and-set on a store everyone can see.</span>
+<span class="f">reading/reading-02-terraform-lock-table.html</span>
+</span>
+</a>
+<a class="lrow" href="reading/reading-03-dopc02-domain-1.html">
+<span class="no">R3</span>
+<span class="body">
+<span class="t">The Toolchain That Shrank</span>
+<span class="d">Domain 1 of the DOP-C02 video course read against current AWS docs: four claims that expired, three features that arrived after the recording, and the CodeDeploy lifecycle that has not moved at all.</span>
+<span class="k">CodeStar is shut down, CodeGuru Reviewer is frozen, and CodeCommit is missing from the exam guide.</span>
+<span class="f">reading/reading-03-dopc02-domain-1.html</span>
+</span>
+</a>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Module 01 · <span class="chip ok">complete</span></p>
+<div class="mhead"><h2>The AWS mental model</h2></div>
+</div>
+<div class="lessons">
+<a class="lrow" href="aws/01-aws-mental-model.html">
+<span class="no">1</span>
+<span class="body">
+<span class="t">The AWS Mental Model</span>
+<span class="d">One signed API, three coordinates — account, region, availability zone — and the exceptions that catch people out. Verified against your live account, not quoted from documentation.</span>
+<span class="k">AWS is one signed HTTPS API; the console, CLI and Terraform are three clients of it.</span>
+<span class="f">aws/01-aws-mental-model.html</span>
+</span>
+</a>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Module 02 · <span class="chip ok">complete</span></p>
+<div class="mhead"><h2>IAM — identity and access</h2></div>
+</div>
+<div class="lessons">
+<a class="lrow" href="aws/21-identity-is-not-credential.html">
+<span class="no">2.1</span>
+<span class="body">
+<span class="t">Identity Is Not Credential</span>
+<span class="d">Users, roles, and the two policies that decide who may become what — read against a live audit of your own account.</span>
+<span class="k">A role is an identity you become; a credential is a thing you hold.</span>
+<span class="f">aws/21-identity-is-not-credential.html</span>
+</span>
+</a>
+<a class="lrow" href="aws/22-how-role-assumption-works.html">
+<span class="no">2.2</span>
+<span class="body">
+<span class="t">How Role Assumption Works</span>
+<span class="d">Two permission checks, at two different moments, against two different policies.</span>
+<span class="k">Assuming a role replaces your permissions; it does not add to them.</span>
+<span class="f">aws/22-how-role-assumption-works.html</span>
+</span>
+</a>
+<a class="lrow" href="aws/23-explicit-deny-wins.html">
+<span class="no">2.3</span>
+<span class="body">
+<span class="t">Explicit Deny Wins</span>
+<span class="d">How AWS decides yes or no — three rules in a fixed order, and the most common wasted afternoon in AWS.</span>
+<span class="k">Explicit Deny beats Allow beats implicit deny.</span>
+<span class="f">aws/23-explicit-deny-wins.html</span>
+</span>
+</a>
+<a class="lrow" href="aws/24-the-missing-claim.html">
+<span class="no">2.4</span>
+<span class="body">
+<span class="t">The Missing Claim</span>
+<span class="d">Two OIDC trust policies in your own <code>terraform/</code>. One is written the way AWS documents it; the other is missing a condition.</span>
+<span class="k">A trust policy without a <code>sub</code> condition trusts the whole provider, not your repository.</span>
+<span class="f">aws/24-the-missing-claim.html</span>
+</span>
+</a>
+<a class="lrow" href="aws/25-the-key-that-only-knocks.html">
+<span class="no">2.5</span>
+<span class="body">
+<span class="t">The Key That Only Knocks</span>
+<span class="d">The hands-on that reduced the readable key on your laptop to a single, MFA-gated capability.</span>
+<span class="k">The static key can only knock on a door that does not open without MFA.</span>
+<span class="f">aws/25-the-key-that-only-knocks.html</span>
+</span>
+</a>
+<a class="lrow" href="aws/26-the-best-secret-is-none.html">
+<span class="no">2.6</span>
+<span class="body">
+<span class="t">The Best Secret Is None</span>
+<span class="d">Secrets Manager, Parameter Store, and the ranking that puts both below having no secret at all. Added after the module closed, from your own question.</span>
+<span class="k">Where you run something determines which secret-management options exist at all.</span>
+<span class="f">aws/26-the-best-secret-is-none.html</span>
+</span>
+</a>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Module 03 · <span class="chip ok">complete</span></p>
+<div class="mhead"><h2>S3 — object storage</h2></div>
+</div>
+<div class="lessons">
+<a class="lrow" href="aws/31-keys-not-paths.html">
+<span class="no">3.1</span>
+<span class="body">
+<span class="t">Keys, Not Paths</span>
+<span class="d">S3 looks like a filesystem in every screenshot and behaves like one in almost no way that matters.</span>
+<span class="k">The key is one flat string; folders are grouping computed on read, and rename is copy then delete.</span>
+<span class="f">aws/31-keys-not-paths.html</span>
+</span>
+</a>
+<a class="lrow" href="aws/32-the-second-lock.html">
+<span class="no">3.2</span>
+<span class="body">
+<span class="t">The Second Lock</span>
+<span class="d">Why full S3 permission still fails the upload, and what envelope encryption actually does with your key.</span>
+<span class="k">The key is a second, independent control surface: you can cut off access to data without touching bucket permissions.</span>
+<span class="f">aws/32-the-second-lock.html</span>
+</span>
+</a>
+<a class="lrow" href="aws/33-cheaper-isnt-cheaper.html">
+<span class="no">3.3</span>
+<span class="body">
+<span class="t">Cheaper Isn't Cheaper</span>
+<span class="d">Every storage class below Standard advertises a lower price per gigabyte and attaches conditions that can raise your bill.</span>
+<span class="k">The surprising money is in floors, minimum durations and requests — not in stored bytes.</span>
+<span class="f">aws/33-cheaper-isnt-cheaper.html</span>
+</span>
+</a>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Module 04 · <span class="chip ok">complete</span></p>
+<div class="mhead"><h2>KMS — encryption</h2></div>
+</div>
+<div class="lessons">
+<a class="lrow" href="aws/41-rotation-rotates-nothing.html">
+<span class="no">4.1</span>
+<span class="body">
+<span class="t">Rotation Rotates Nothing</span>
+<span class="d">What <code>enable_key_rotation = true</code> does, what it deliberately does not do, and the four key states — one of which is final.</span>
+<span class="k">Rotation adds key material; it never retires any, and it never touches your data.</span>
+<span class="f">aws/41-rotation-rotates-nothing.html</span>
+</span>
+</a>
+<a class="lrow" href="aws/42-the-key-says-who.html">
+<span class="no">4.2</span>
+<span class="body">
+<span class="t">The Key Says Who</span>
+<span class="d">Key policies, the default policy your repo is using, the four conditions that tighten it, grants — and a runbook for “the key has been compromised”.</span>
+<span class="k">IAM never grants access to a key on its own; the key policy must delegate first.</span>
+<span class="f">aws/42-the-key-says-who.html</span>
+</span>
+</a>
+<a class="lrow" href="aws/43-nothing-breaks-until-it-restarts.html">
+<span class="no">4.3</span>
+<span class="body">
+<span class="t">Nothing Breaks Until It Restarts</span>
+<span class="d">The same key under EBS, RDS, DynamoDB and Secrets Manager: delayed failure, the seven-day clocks, grants that outlive people, request quotas and multi-Region keys.</span>
+<span class="k">Outside S3 the key is on the lifecycle path, so the outage waits for the next restart.</span>
+<span class="f">aws/43-nothing-breaks-until-it-restarts.html</span>
+</span>
+</a>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Module 05 · <span class="chip imp">in progress</span></p>
+<div class="mhead"><h2>DynamoDB</h2></div>
+</div>
+<div class="lessons">
+<a class="lrow" href="aws/51-queries-before-tables.html">
+<span class="no">5.1</span>
+<span class="body">
+<span class="t">Queries Before Tables</span>
+<span class="d">Partition and sort keys as a physical layout, the three verbs and what each costs, why a filter expression saves nothing, and the key schema you cannot change afterwards.</span>
+<span class="k">The keys decide which questions are cheap; every other question is a full table read.</span>
+<span class="f">aws/51-queries-before-tables.html</span>
+</span>
+</a>
+<a class="lrow" href="aws/52-capacity-isnt-a-setting.html">
+<span class="no">5.2</span>
+<span class="body">
+<span class="t">Capacity Isn't a Setting</span>
+<span class="d">On-demand versus provisioned as one ratio, why auto scaling is not on-demand, the per-partition ceiling that neither mode raises, and the hot partition Lesson 5.1 designed.</span>
+<span class="k">Billing mode is a price decision; throughput is a key decision, and the ceiling is per partition.</span>
+<span class="f">aws/52-capacity-isnt-a-setting.html</span>
+</span>
+</a>
+</div>
+</section>
+<section id="road-ahead">
+<div class="sec-head">
+<p class="eyebrow">Curriculum v4 · 37 lessons over 24 weeks</p>
+<h2>Every lesson in the plan</h2>
+<p class="note">The whole course, numbered. A lesson becomes a link when it is written, which
+        happens shortly before you reach it, so it can build on how the one before it went. Topics come
+        from <a href="devops/00-the-recut.html">the plan</a>; dates from
+        <a href="devops/00-study-calendar.html">the calendar</a>. Each phase also builds the next
+        stage of Interchange.</p>
+</div>
+<div class="plan">
+<div class="pphase"><p class="ph"><span class="pn">P0</span> Name what you already do <span class="muted">· wks 1–2 · 12 Oct – 25 Oct · 14 h</span></p>
+<a class="prow done" href="devops/p0-1-build-once-deploy-many.html"><span class="no">0.1</span><span class="pt">Build once, deploy many<span class="pd">Artifact promotion: the rule you already follow, and what breaks without it</span></span><span class="st">done</span></a>
+<a class="prow done" href="devops/p0-2-jenkins-to-github-actions.html"><span class="no">0.2</span><span class="pt">Jenkins to GitHub Actions<span class="pd">The same concepts in different syntax, and the four places the mechanism differs. Interchange gets its first workflow</span></span><span class="st">done</span></a>
+<a class="prow done" href="devops/p0-3-pipeline-secrets-and-oidc.html"><span class="no">0.3</span><span class="pt">Pipeline secrets and OIDC<span class="pd">What Jenkins credentials, Parameter Store and Secrets Manager each guarantee, and OIDC so the pipeline holds no key</span></span><span class="st">done</span></a>
+<a class="prow done" href="devops/p0-4-ansible-idempotency-named.html"><span class="no">0.4</span><span class="pt">Ansible idempotency, named<span class="pd"><code>changed_when</code>, <code>creates</code>, and why <code>shell</code> and <code>command</code> break the model</span></span><span class="st">done</span></a>
+<a class="prow done" href="devops/p0-5-python-that-survives.html"><span class="no">0.5</span><span class="pt">Python that survives leaving your laptop<span class="pd">virtualenv, pinned requirements, and why it failed on the server</span></span><span class="st">done</span></a>
+</div>
+<div class="pphase"><p class="ph"><span class="pn">P1</span> The machine underneath <span class="muted">· wks 3–6 · 26 Oct – 22 Nov · 36 h</span></p>
+<a class="prow done" href="devops/p1-1-where-the-disk-space-went.html"><span class="no">1.1</span><span class="pt">Processes and file descriptors<span class="pd">Why <code>df</code> and <code>du</code> disagree, <code>lsof +L1</code>, log rotation done wrong</span></span><span class="st">done</span></a>
+<a class="prow done" href="devops/p1-2-where-the-memory-went.html"><span class="no">1.2</span><span class="pt">Memory<span class="pd">RSS against page cache, why <code>free</code> looks alarming and is fine, the OOM killer and cgroups</span></span><span class="st">done</span></a>
+<a class="prow done" href="devops/p1-3-the-job-nobody-saw-fail.html"><span class="no">1.3</span><span class="pt">systemd<span class="pd">Units, timers instead of cron, journald, and why your 2am cron job failed silently</span></span><span class="st">done</span></a>
+<a class="prow done" href="devops/p1-4-running-but-unreachable.html"><span class="no">1.4</span><span class="pt">Networking<span class="pd">Interfaces, <code>0.0.0.0</code> against loopback, <code>ss</code>, DNS and the five-second timeout, TLS handshakes</span></span><span class="st">done</span></a>
+<a class="prow now" href="devops/p1-5-the-file-root-left-behind.html"><span class="no">1.5</span><span class="pt">Users, groups and permissions<span class="pd">From below: the owner, group and mode your Ansible playbooks have been setting for years</span></span><span class="st">now</span></a>
+</div>
+<div class="pphase"><p class="ph"><span class="pn">P2</span> Containers, properly <span class="muted">· wks 7–10 · 23 Nov – 20 Dec · 36 h</span></p>
+<div class="prow plan"><span class="no">2.1</span><span class="pt">Layers and copy-on-write<span class="pd">Why ten containers from one image do not use ten images of disk</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">2.2</span><span class="pt">The build cache and multi-stage builds<span class="pd">Instruction order on your Java/Maven stack; 700 MB down to 200 MB</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">2.3</span><span class="pt">Container networking<span class="pd">Bridge, published ports, DNS between containers, and the service bound to localhost</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">2.4</span><span class="pt">Volumes<span class="pd">Named, bind and anonymous, and the Postgres trap that strands your data</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">2.5</span><span class="pt">Registries and image provenance<span class="pd">JFrog again, one layer up: tags, digests, promotion</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">2.6</span><span class="pt">Compose<span class="pd">Several services locally: your first system with more than one moving part</span></span><span class="st">planned</span></div>
+</div>
+<div class="pphase"><p class="ph"><span class="pn">P3</span> AWS, mechanism first <span class="muted">· wks 11–14 · 21 Dec – 17 Jan · 36 h · Christmas falls here</span></p>
+<div class="prow plan"><span class="no">3.1</span><span class="pt">IAM: how a request is evaluated<span class="pd">Principals, explicit deny beating every allow, SCPs and permissions boundaries</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">3.2</span><span class="pt">Roles, instance profiles and IMDS<span class="pd">Where credentials actually come from, IMDSv2, and why SSRF matters</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">3.3</span><span class="pt">VPC<span class="pd">Route tables make a subnet public, IGW against NAT, gateway endpoints, security groups</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">3.4</span><span class="pt">S3, KMS and envelope encryption<span class="pd">The storage mechanics under the Parameter Store you already use</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">3.5</span><span class="pt">Cost as an engineering concern<span class="pd">NAT per gigabyte, data transfer, the invoice that surprises people</span></span><span class="st">planned</span></div>
+</div>
+<div class="pphase"><p class="ph"><span class="pn">P4</span> Terraform, through Ansible <span class="muted">· wks 15–17 · 18 Jan – 7 Feb · 27 h</span></p>
+<div class="prow plan"><span class="no">4.1</span><span class="pt">What is in state<span class="pd">And why the cloud cannot simply be read instead of it</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">4.2</span><span class="pt">Remote backends and locking<span class="pd">What two simultaneous applies do to an unlocked state file</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">4.3</span><span class="pt">The half-failed apply<span class="pd">There is no rollback, and believing there is will hurt you in an incident</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">4.4</span><span class="pt">Drift, import and moved blocks<span class="pd">Bringing hand-built resources under management without downtime</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">4.5</span><span class="pt">Modules, and where Terraform stops<span class="pd">Variables, outputs, and where Terraform ends and Ansible starts</span></span><span class="st">planned</span></div>
+</div>
+<div class="pphase"><p class="ph"><span class="pn">P5</span> Kubernetes <span class="muted">· wks 18–21 · 8 Feb – 7 Mar · 36 h</span></p>
+<div class="prow plan"><span class="no">5.1</span><span class="pt">Pods, deployments, services, ingress<span class="pd">And what the control loop is actually doing</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">5.2</span><span class="pt">The debugging loop<span class="pd">CrashLoopBackOff, describe before logs, <code>--previous</code>, exit codes 0, 1 and 137</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">5.3</span><span class="pt">Requests and limits<span class="pd">QoS classes, OOMKilled against CPU throttled: the asymmetry behind every argument</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">5.4</span><span class="pt">Probes and rolling updates<span class="pd">The thirty-second window where readiness passes and users get 502s</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">5.5</span><span class="pt">EKS specifics<span class="pd">IRSA and Pod Identity, the ALB controller, node groups against Fargate, EBS CSI</span></span><span class="st">planned</span></div>
+</div>
+<div class="pphase"><p class="ph"><span class="pn">P6</span> Operating it, and the on-call you never had <span class="muted">· wks 22–24 · 8 Mar – 28 Mar · 27 h</span></p>
+<div class="prow plan"><span class="no">6.1</span><span class="pt">Metrics, logs and traces<span class="pd">Which answers which question, and why going straight to logs costs you the night</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">6.2</span><span class="pt">Percentiles, not averages<span class="pd">p50 flat and p99 tripled is a different problem from everything slower</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">6.3</span><span class="pt">Prometheus and Grafana<span class="pd">Against your own running system</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">6.4</span><span class="pt">SLOs, SLIs and error budgets<span class="pd">99.9% is 43 minutes a month, and the budget exists to end an argument</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">6.5</span><span class="pt">Alerting that is actionable<span class="pd">And the dead man's switch: alerting on the absence of success</span></span><span class="st">planned</span></div>
+<div class="prow plan"><span class="no">6.6</span><span class="pt">Six incident drills<span class="pd">I break your system at a layer you have learned; you diagnose it and write the postmortem</span></span><span class="st">planned</span></div>
+</div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Superseded, kept for the record</p>
+<h2>Archive</h2>
+</div>
+<div class="lessons">
+<a class="lrow" href="archive/00-curriculum-v2.html">
+<span class="no">PLAN</span>
+<span class="body">
+<span class="t">Three Things, Properly</span>
+<span class="d">The curriculum for a mid-level DevOps engineer role, reweighted after a job-listing survey: two thirds of the hours on AWS, Terraform and Kubernetes, with EKS added as its own module.</span>
+<span class="k">Terraform provisions EKS, CI deploys to it, Prometheus watches it — that join is the job description.</span>
+<span class="f">archive/00-curriculum-v2.html</span>
+</span>
+</a>
+</div>
+</section>
+<footer>
+<p>AWS + DevOps course · index rebuilt 23 October 2026 · all 37 v4 lessons listed · 4 v4 pages, 16 AWS lessons, 3 reading notes</p>
+<p>Every lesson is also a file in <code>lessons/</code> of the <code>devops-course</code>
+      repo, with its fonts in <code>assets/fonts/</code> — they open offline, with no account and
+      no network. The links on this page point at those local files, so the whole set works with
+      no network. The live copies live at claude.ai; the index there is at https://claude.ai/artifact/YDuEWubTNK6uP1DdZMU64M</p>
+<p>The v4 syllabus and log live in <code>DEVOPS_COURSE.md</code>; the AWS modules 1–5 log and scorecards in <code>AWS_COURSE.md</code>.</p>
+</footer>
+</div>
+</body>
+</html>

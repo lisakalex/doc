@@ -1,0 +1,18 @@
+/* 22-how-role-assumption-works: page-specific rules only; shared design system is in assets/css/lesson.css */
+/* phone: long commands must wrap rather than push the page sideways */
+figure svg{min-width:34rem;}
+.call.good{border-left-color:var(--good);background:var(--good-soft);border-color:var(--good-rule);} .call.good h3{color:var(--good);}
+
+/* numbered walkthrough */
+.steps{display:flex;flex-direction:column;gap:0;border:1px solid var(--rule);border-radius:7px;overflow:hidden;background:var(--surface);}
+.step{display:grid;grid-template-columns:auto 1fr;gap:.95rem;padding:1rem 1.1rem;border-bottom:1px solid var(--rule);}
+.step:last-child{border-bottom:none;}
+.step .n{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:.8rem;color:var(--surface);
+  background:var(--accent);width:1.6rem;height:1.6rem;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;flex:none;margin-top:.15rem;}
+.step h3{margin-bottom:.2rem;}
+.step p{font-size:.93rem;color:var(--ink-2);}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px;}
+/* former inline style attributes */
+.u-color-var-muted{color:var(--muted) !important;}
+.u-vertical-align-middle-color-var-muted{vertical-align:middle !important;color:var(--muted) !important;}

@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Second Lock</title>
+<link rel="icon" href="../../assets/img/favicon-module-3.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/32-the-second-lock.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Module 03 · Lesson 3.2 · AWS + DevOps course</p>
+<h1>The Second Lock</h1>
+<p class="lede">Permission to write an object is not permission to write an <em>encrypted</em>
+    object. Your own Terraform already carries the fix, in a comment you have read but probably
+    not needed yet. This is why it is there.</p>
+<div class="facts">
+<span class="fact">account 739489595894</span>
+<span class="fact">us-east-1</span>
+<span class="fact">terraform/main.tf</span>
+<span class="fact">2026-09-13</span>
+</div>
+</header>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Start with the failure</p>
+<h2>Full S3 permission, and the upload still fails</h2>
+</div>
+<p>Imagine the app role held only its first statement — every S3 action it needs, on
+    exactly the right bucket:</p>
+<div class="code">{ "Effect": "Allow",
+  "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:ListBucket"],
+  "Resource": [bucket_arn, bucket_arn + "/*"] }</div>
+<p>A user uploads an avatar. The call fails:</p>
+<div class="code"><span class="r">AccessDenied</span>: User: arn:aws:sts::739489595894:assumed-role/prima-app-role/…
+is not authorized to perform: <span class="w">kms:GenerateDataKey</span> on resource: arn:aws:kms:…:key/…</div>
+<p>Nothing is wrong with the S3 permission. The request never got far enough to be an S3
+    problem. Your repo already anticipates this — <code>terraform/main.tf</code>:</p>
+<div class="code"><span class="c"># Required because the bucket's default encryption uses the CMK</span>
+<span class="c"># above: PutObject needs GenerateDataKey, GetObject needs Decrypt.</span>
+Effect   = "Allow"
+Action   = [<span class="k">"kms:Decrypt"</span>, <span class="k">"kms:GenerateDataKey"</span>]
+Resource = aws_kms_key.avatars.arn</div>
+<div class="call">
+<h3>The rule</h3>
+<p>On a bucket with KMS default encryption, <strong>every object operation needs permission
+      on two separate resources</strong>: the object, and the key. Grant one without the other and
+      you get a denial that names a service you were not thinking about.</p>
+</div>
+<p>To understand <em>why</em> a write needs a key operation called <code>GenerateDataKey</code>
+    — rather than something called <code>Encrypt</code> — you have to know what S3
+    actually does with your CMK. It is not what most people assume.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The mechanism</p>
+<h2>Nothing is ever encrypted with your CMK</h2>
+</div>
+<p>Your customer-managed key never touches your data. It cannot — KMS will not encrypt
+    more than 4 KB in a single call, and your avatars are larger than that. What happens instead is
+    <strong>envelope encryption</strong>:</p>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="On PutObject, S3 calls KMS GenerateDataKey against the customer managed key. KMS returns a data key in two forms: plaintext and encrypted. S3 encrypts the object with the plaintext data key, discards the plaintext copy from memory, and stores the ciphertext object together with the encrypted data key. On GetObject the stored encrypted data key is sent to KMS Decrypt to recover the plaintext data key." role="img" viewbox="0 0 900 330">
+<defs>
+<marker id="e" markerheight="7" markerwidth="7" orient="auto-start-reverse" refx="9" refy="5" viewbox="0 0 10 10">
+<path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+</marker>
+</defs>
+<g fill="none" stroke="currentColor" stroke-width="1.4">
+<rect height="70" rx="5" width="150" x="24" y="112"></rect>
+<rect height="70" rx="5" width="168" x="328" y="112"></rect>
+<rect height="70" rx="5" width="188" x="688" y="112"></rect>
+</g>
+<g fill="currentColor" font-family="IBM Plex Sans, sans-serif">
+<text font-size="13" font-weight="600" text-anchor="middle" x="99" y="142">your app</text>
+<text font-size="11" opacity=".68" text-anchor="middle" x="99" y="162">prima-app-role</text>
+<text font-size="13" font-weight="600" text-anchor="middle" x="412" y="142">Amazon S3</text>
+<text font-size="11" opacity=".68" text-anchor="middle" x="412" y="162">does the encrypting</text>
+<text font-size="13" font-weight="600" text-anchor="middle" x="782" y="142">AWS KMS</text>
+<text font-size="11" opacity=".68" text-anchor="middle" x="782" y="162">holds the CMK, always</text>
+</g>
+<line marker-end="url(#e)" stroke="currentColor" stroke-width="1.5" x1="174" x2="322" y1="147" y2="147"></line>
+<text fill="currentColor" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" x="248" y="137">1 PutObject</text>
+<line marker-end="url(#e)" stroke="currentColor" stroke-width="1.5" x1="496" x2="682" y1="132" y2="132"></line>
+<text fill="var(--accent)" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" x="589" y="122">2 GenerateDataKey</text>
+<line color="var(--good)" marker-end="url(#e)" stroke="var(--good)" stroke-width="1.5" x1="682" x2="502" y1="166" y2="166"></line>
+<text fill="var(--good)" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" x="592" y="184">3 data key, twice</text>
+<rect fill="none" height="104" rx="5" stroke="var(--rule-strong)" stroke-dasharray="4 4" stroke-width="1.2" width="376" x="500" y="204"></rect>
+<g font-family="IBM Plex Mono, monospace" font-size="11.5">
+<text fill="var(--good)" x="516" y="228">plaintext data key</text>
+<text fill="currentColor" opacity=".7" x="516" y="248">→ encrypts the object, then is</text>
+<text fill="var(--stop)" x="516" y="266">discarded from memory</text>
+<text fill="var(--warn)" x="516" y="292">encrypted data key  →  stored beside the object</text>
+</g>
+<line marker-end="url(#e)" stroke="currentColor" stroke-width="1.5" x1="412" x2="412" y1="182" y2="250"></line>
+<rect fill="none" height="82" rx="5" stroke="currentColor" stroke-width="1.4" width="352" x="24" y="226"></rect>
+<g fill="currentColor" font-family="IBM Plex Sans, sans-serif">
+<text font-size="12.5" font-weight="600" text-anchor="middle" x="200" y="252">what is stored in the bucket</text>
+</g>
+<g font-family="IBM Plex Mono, monospace" font-size="11">
+<text fill="currentColor" opacity=".8" text-anchor="middle" x="200" y="274">ciphertext object</text>
+<text fill="var(--warn)" text-anchor="middle" x="200" y="294">+ encrypted data key</text>
+</g>
+<line stroke="currentColor" stroke-dasharray="3 3" stroke-width="1.2" x1="376" x2="496" y1="266" y2="266"></line>
+<text fill="var(--accent)" font-family="IBM Plex Mono, monospace" font-size="11.5" letter-spacing="1.2" x="24" y="36">WRITE PATH</text>
+<text fill="currentColor" font-family="IBM Plex Sans, sans-serif" font-size="12" opacity=".72" x="24" y="60">The CMK never leaves KMS. Your object never goes to KMS. Only a 256-bit</text>
+<text fill="currentColor" font-family="IBM Plex Sans, sans-serif" font-size="12" opacity=".72" x="24" y="78">data key crosses between them — small enough for KMS to encrypt directly.</text>
+</svg>
+</div>
+<figcaption>Read it as: KMS protects a small key, and that small key protects the large
+      object. <code>GenerateDataKey</code> returns the <em>same</em> key twice — once usable,
+      once wrapped. S3 keeps the wrapped copy and throws the usable one away.</figcaption>
+</figure>
+<p>On the way back out, the steps run in reverse: S3 reads the encrypted data key stored beside
+    the object, sends <em>that</em> to KMS as <code>kms:Decrypt</code>, gets the plaintext data key
+    back, decrypts the object, and forgets the key again. Which is exactly why your policy grants
+    those two actions and no others.</p>
+<div class="call">
+<h3>Three consequences worth stating in an interview</h3>
+<p><strong>Your data never travels to KMS.</strong> Only a 256-bit key does. You can encrypt
+      petabytes through a service with a 4 KB request limit.</p>
+<p><strong>Revocation is instant and total.</strong> Disable the CMK and every object in the
+      bucket becomes unreadable immediately — no re-encryption, no sweep. The data keys are
+      still there, still wrapped, and nothing can unwrap them. This is the Module 3.1 answer to
+      “what does versioning not save you from”, seen from the other side.</p>
+<p><strong>Every read and write is an auditable KMS event.</strong> CloudTrail records each
+      <code>Decrypt</code> and <code>GenerateDataKey</code> with the caller's identity. That is the
+      real reason to choose a CMK over the default key, and it is the next section.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The choice you already made</p>
+<h2>SSE-S3 vs SSE-KMS with a customer key</h2>
+</div>
+<p>Every object in S3 is encrypted at rest — that has been the unconditional default since
+    January 2023, and it is not something you switch on. What you choose is <strong>who controls the
+    key</strong>:</p>
+<div class="tw"><table>
+<thead><tr><th></th><th>SSE-S3 <span class="u-font-weight-400-color-var-muted">(AES256)</span></th><th>SSE-KMS, AWS key <span class="u-font-weight-400-color-var-muted">(aws/s3)</span></th><th>SSE-KMS, your CMK <span class="u-font-weight-400-color-var-muted">← yours</span></th></tr></thead>
+<tbody>
+<tr><td class="key">who holds it</td><td>AWS, invisibly</td><td>AWS, in your account</td><td><strong>You</strong></td></tr>
+<tr><td class="key">key policy</td><td>none to write</td><td>fixed by AWS</td><td><strong>yours to write</strong></td></tr>
+<tr><td class="key">CloudTrail per object</td><td><span class="chip exp">no</span></td><td><span class="chip ok">yes</span></td><td><span class="chip ok">yes</span></td></tr>
+<tr><td class="key">rotation</td><td>automatic, opaque</td><td>annual, fixed</td><td><code>enable_key_rotation = true</code></td></tr>
+<tr><td class="key">can you revoke access instantly</td><td><span class="chip exp">no</span></td><td><span class="chip imp">partly</span></td><td><span class="chip ok">yes — disable the key</span></td></tr>
+<tr><td class="key">cross-account grants</td><td><span class="chip exp">no</span></td><td><span class="chip exp">no</span></td><td><span class="chip ok">yes</span></td></tr>
+<tr><td class="key">cost</td><td>free</td><td>$1/month + per-request</td><td><strong>$1/month + per-request</strong></td></tr>
+</tbody>
+</table></div>
+<p>Your repo comments the reasoning already: <em>“a customer-managed key rather than the
+    AWS-managed <code>aws/s3</code> key gives us key rotation, CloudTrail auditing of key usage, and
+    the ability to revoke access by disabling the key — independent of the bucket/object
+    permissions themselves.”</em> That last clause is the one to remember: <strong>the key is a
+    second, independent control surface.</strong> You can cut off access to data without touching a
+    single IAM policy.</p>
+<p class="note">Two more exist and are worth naming only so you are not surprised: <strong>SSE-C</strong>,
+    where you send the key with every request and AWS stores none of it (you own the loss risk), and
+    <strong>DSSE-KMS</strong>, which applies two independent layers for regulated workloads at roughly
+    double the KMS cost. Neither is a sensible default.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">A cost decision in a security setting's clothes</p>
+<h2><code>bucket_key_enabled = true</code></h2>
+</div>
+<p>One line in your encryption block, easy to skim past, and on a busy bucket it is the
+    difference between pennies and a genuine bill:</p>
+<div class="code">rule {
+  apply_server_side_encryption_by_default {
+    sse_algorithm     = "aws:kms"
+    kms_master_key_id = aws_kms_key.avatars.arn
+  }
+  <span class="k">bucket_key_enabled = true</span>
+}</div>
+<p>Without it, envelope encryption does what the diagram shows <strong>on every single
+    request</strong>: one <code>GenerateDataKey</code> per PUT, one <code>Decrypt</code> per GET. KMS
+    charges about <strong>$0.03 per 10,000 requests</strong>. With an S3 Bucket Key, S3 asks KMS for
+    a short-lived <em>bucket-level</em> key and derives per-object keys from it locally —
+    cutting KMS calls by up to <strong>99%</strong>.</p>
+<div class="tw"><table>
+<thead><tr><th>Monthly traffic on the bucket</th><th>KMS calls without</th><th>KMS cost without</th><th>with bucket key</th></tr></thead>
+<tbody>
+<tr><td>100k requests</td><td class="num">100,000</td><td class="num">$0.30</td><td class="num">~$0.01</td></tr>
+<tr><td>10M requests</td><td class="num">10,000,000</td><td class="num">$30</td><td class="num">~$0.30</td></tr>
+<tr><td>500M requests</td><td class="num">500,000,000</td><td class="num"><strong>$1,500</strong></td><td class="num"><strong>~$15</strong></td></tr>
+</tbody>
+</table></div>
+<p>Nothing about the security posture changes — same CMK, same audit trail at the bucket
+    level, same revocation. What changes is how many times S3 has to phone KMS. You have it on, which
+    is correct, and the trade is worth stating precisely: <strong>per-object CloudTrail granularity
+    is reduced</strong>, because many objects now share one key-generation event. For an avatar
+    bucket that is the right call; for a bucket where you must prove who read which specific object,
+    it is not.</p>
+<div class="call warn">
+<h3>Connect it to last week</h3>
+<p>This is a <em>cost-reflective</em> charge in the sense we discussed: you reduce it by doing
+      less work. It is also the single most common surprise on KMS bills, because the line that
+      controls it lives in an encryption block that reviewers read as a security setting and skip.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Two policies, both must say yes</p>
+<h2>Where the second lock is actually defined</h2>
+</div>
+<p>Lesson 2.3 introduced resource-based policies as a diagram. Here they are holding your data.
+    Reading an encrypted object requires <strong>both</strong>:</p>
+<div class="split">
+<div class="card">
+<span class="tag">identity-based — on the role</span>
+<h3>May this principal use the key?</h3>
+<p><code>kms:Decrypt</code> and <code>kms:GenerateDataKey</code> on the key ARN. This is the
+        block in your <code>main.tf</code>.</p>
+</div>
+<div class="card">
+<span class="tag">resource-based — on the key</span>
+<h3>Does the key accept this principal?</h3>
+<p>The <strong>key policy</strong>. Terraform did not write one, so the key got the AWS
+        default — and that default is what makes your IAM grant sufficient.</p>
+</div>
+</div>
+<div class="code">{ "Sid": "Enable IAM User Permissions",
+  "Effect": "Allow",
+  <span class="k">"Principal"</span>: { "AWS": "arn:aws:iam::739489595894:<span class="w">root</span>" },
+  "Action": "kms:*",
+  "Resource": "*" }</div>
+<p>From 2.3: <code>:root</code> in a resource policy means <strong>the account as a whole</strong>,
+    not the root user. The statement says <em>“defer to IAM”</em> — anyone in this
+    account whose identity policy allows a KMS action may perform it. That is the only reason adding
+    <code>kms:Decrypt</code> to a role is enough.</p>
+<div class="call stop">
+<h3>The failure mode that makes this worth knowing</h3>
+<p>Replace that default key policy with a narrower one that forgets to include the account or
+      your admin role, and you have <strong>permanently lost the key</strong> — and with it every
+      object encrypted under it. No IAM permission can repair it, because the key policy is what
+      decides who may edit the key policy. Not even root can override it. AWS Support is the only
+      route back, and it is not guaranteed.</p>
+<p>This is the single most dangerous resource policy in AWS, and it is why the default always
+      contains that <code>:root</code> statement. <strong>Never remove it. Add to it.</strong></p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Access · the part that makes headlines</p>
+<h2>Four switches that do four different things</h2>
+</div>
+<p>Everyone copies this block of four booleans and nobody can say what the individual lines do.
+    They form a 2×2: two are about <strong>ACLs</strong>, two about <strong>bucket policies</strong>;
+    two <strong>reject new</strong> settings, two <strong>neutralise existing</strong> ones.</p>
+<div class="tw"><table>
+<thead><tr><th></th><th>ACLs</th><th>Bucket policies</th></tr></thead>
+<tbody>
+<tr><td class="key">reject new</td><td><code>block_public_acls</code><br/><span class="u-color-var-muted">a request that sets a public ACL fails</span></td><td><code>block_public_policy</code><br/><span class="u-color-var-muted">a policy granting public access is rejected</span></td></tr>
+<tr><td class="key">neutralise existing</td><td><code>ignore_public_acls</code><br/><span class="u-color-var-muted">public ACLs already set are ignored</span></td><td><code>restrict_public_buckets</code><br/><span class="u-color-var-muted">an already-public policy only serves authorised principals</span></td></tr>
+</tbody>
+</table></div>
+<p>The two columns matter because they are <em>different mechanisms</em>. Blocking public policies
+    does nothing about an object made public by an ACL, and vice versa. Setting all four — which
+    both your buckets do — is the only configuration with no gap.</p>
+<p>Since April 2023 AWS enables all four by default on new buckets, precisely because the era of
+    accidentally-public buckets produced a decade of breaches. Your Terraform predates nothing and sets
+    them explicitly, which is still right: <strong>defaults change, declared intent does not.</strong></p>
+<h3>And the ACL setting beside them</h3>
+<div class="code">resource "aws_s3_bucket_ownership_controls" "avatars" {
+  rule { object_ownership = <span class="w">"BucketOwnerPreferred"</span> }
+}</div>
+<p>ACLs are S3's original permission system, older than IAM, attached per-object, and the source of
+    endless confusion — an object uploaded by another account could be owned by <em>them</em>, in
+    <em>your</em> bucket, unreadable by you. <code>BucketOwnerPreferred</code> fixes the ownership but
+    <strong>keeps ACLs switched on</strong>.</p>
+<div class="call">
+<h3>A real improvement you could make</h3>
+<p>AWS's current recommendation is <code>BucketOwnerEnforced</code>, which <strong>disables ACLs
+      entirely</strong> and makes bucket policies the only access mechanism. One system instead of two,
+      and one fewer way to be accidentally public. Your buckets take uploads from nobody but your own
+      role, so nothing would break. This is a genuine, small, defensible change — the kind worth
+      having in a portfolio diff.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The gap in your setup</p>
+<h2>Encrypted at rest is not encrypted in transit</h2>
+</div>
+<p>Everything so far protects bytes <em>sitting</em> in S3. Nothing so far requires that they arrive
+    over TLS. S3 accepts plain HTTP, and neither of your buckets forbids it:</p>
+<div class="code">$ aws s3api get-bucket-policy --bucket prima-tech-challenge-lisakalex-tfstate
+<span class="r">NoSuchBucketPolicy</span>: The bucket policy does not exist</div>
+<p>In practice your traffic is HTTPS — boto3 defaults to it, as does the CLI. But <em>in
+    practice</em> is not a control. The control is a bucket policy that denies anything else:</p>
+<div class="code">{ "Sid": "DenyInsecureTransport",
+  <span class="k">"Effect": "Deny"</span>,
+  "Principal": "*",
+  "Action": "s3:*",
+  "Resource": ["arn:aws:s3:::BUCKET", "arn:aws:s3:::BUCKET/*"],
+  "Condition": { "Bool": { <span class="w">"aws:SecureTransport": "false"</span> } } }</div>
+<p>Note the shape, because Lesson 2.5 taught exactly this trap: it is a <strong>Deny</strong> with a
+    <strong>negative</strong> condition. <code>aws:SecureTransport</code> is always present on an S3
+    request — every call arrives over one protocol or the other — so plain <code>Bool</code>
+    is safe here, unlike <code>aws:MultiFactorAuthPresent</code>, which can be absent entirely. Knowing
+    <em>why</em> the two cases differ is the difference between copying a snippet and understanding it.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Hands-on · ~5 minutes · read-only, costs nothing</p>
+<h2>Inspect what is actually configured</h2>
+<p class="note">Warm the session first: <code>aws sts get-caller-identity --profile admin</code>.
+      Every command below only reads.</p>
+</div>
+<div class="steps">
+<div class="step"><span class="n">1</span><div>
+<h3>See the encryption config</h3>
+<p><code>aws s3api get-bucket-encryption --bucket prima-tech-challenge-lisakalex-tfstate --profile admin</code>
+        — the algorithm, the key ARN, and <code>BucketKeyEnabled</code> in one place.</p>
+</div></div>
+<div class="step"><span class="n">2</span><div>
+<h3>Prove it on a real object</h3>
+<p><code>aws s3api head-object --bucket … --key senior-sre-tech-challenge/terraform.tfstate --profile admin</code>
+        — look for <code>ServerSideEncryption</code>, <code>SSEKMSKeyId</code> and
+        <code>BucketKeyEnabled</code>. Per-object proof, not just bucket intent.</p>
+</div></div>
+<div class="step"><span class="n">3</span><div>
+<h3>Read the key policy</h3>
+<p><code>aws kms get-key-policy --key-id &lt;id&gt; --policy-name default --profile admin</code>
+        — find the <code>:root</code> statement and say out loud what it means.</p>
+</div></div>
+<div class="step"><span class="n">4</span><div>
+<h3>Confirm all four switches</h3>
+<p><code>aws s3api get-public-access-block --bucket … --profile admin</code> — four
+        <code>true</code>s. Then <code>get-bucket-ownership-controls</code> for the ACL setting.</p>
+</div></div>
+<div class="step"><span class="n">5</span><div>
+<h3>Confirm the TLS gap</h3>
+<p><code>aws s3api get-bucket-policy --bucket … --profile admin</code> —
+        <code>NoSuchBucketPolicy</code>. That is the finding, not an error.</p>
+</div></div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check yourself</p>
+<h2>Four questions</h2>
+<p class="note">Your own words, closed book. Given the 3.1 pattern, watch the term pairs —
+      two of these turn on picking the right one of two similar words.</p>
+</div>
+<details>
+<summary>A teammate grants a new role <code>s3:*</code> on the avatars bucket. It can list, but every upload fails. What is missing, and what does the error name?</summary>
+<div class="answer"><p>The denial will name a service that is not S3. Work out which action a write needs on the key, and why it is that one rather than <code>kms:Encrypt</code>.</p></div>
+</details>
+<details>
+<summary>You disable the CMK. What happens to the objects — and how does that differ from deleting them?</summary>
+<div class="answer"><p>Consider what is physically still in the bucket, and what is required to make it meaningful. Then ask which of the two is reversible.</p></div>
+</details>
+<details>
+<summary>Why does <code>bucket_key_enabled = true</code> save money, and what do you give up? Be specific about what gets coarser.</summary>
+<div class="answer"><p>Count the KMS calls in the diagram, then ask what CloudTrail can still tell you afterwards.</p></div>
+</details>
+<details>
+<summary><code>block_public_policy</code> is set but <code>ignore_public_acls</code> is not. Is the bucket safe? Explain using the 2×2.</summary>
+<div class="answer"><p>The two columns are independent mechanisms. Ask what an object-level ACL can still do while every bucket policy is being screened.</p></div>
+</details>
+</section>
+<footer>
+<p>Module 03, Lesson 3.2 · syllabus, progress log and full revision Q&amp;A in <code>docs/AWS_COURSE.md</code></p>
+<p>Next: <strong>3.3</strong> — storage classes and lifecycle economics: Intelligent-Tiering
+    versus the transition rule you already wrote, <code>noncurrent_version_expiration</code>, and why
+    the multipart-abort rule is the cheapest line in your Terraform.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

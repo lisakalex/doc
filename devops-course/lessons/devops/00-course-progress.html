@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Course Progress</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/00-course-progress.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+<p class="eyebrow">Updated 18 Nov 2026 · Week 6 of 24 · Phase 1, the machine underneath</p>
+<h1>Course progress</h1>
+<p class="lede">Every lesson has seven stages, and one lesson is finished before the next starts.
+  This page shows where each lesson stands, and where the Interchange build stands.</p>
+</header>
+
+<section>
+<div class="now">
+  <div class="now-card">
+    <span class="k">Now</span>
+    <span class="v">Lesson 1.5</span>
+    <span class="d">Written 18 Nov. Read it, then lab Parts 1 to 5 on the laptop. Lesson 1.4's spoken interview answer waits for an evening at home.</span>
+  </div>
+  <div class="now-card">
+    <span class="k">Current lesson</span>
+    <span class="v">1.5 The File Root Left Behind</span>
+    <span class="d">Users, groups and permissions. Build 5 runs <code>reference</code> as its own user, with sudo.</span>
+  </div>
+  <div class="now-card">
+    <span class="k">After that</span>
+    <span class="v">Phase 1 reviews</span>
+    <span class="d">The open review questions and interview answers for 1.1 to 1.3, then lesson 1.5.</span>
+  </div>
+</div>
+<div class="counts">
+  <span class="count"><b>0 / 9</b> interview answers</span>
+  <span class="count"><b>8</b> reviews open</span>
+  <span class="count"><b>3</b> at-work checks open</span>
+  <span class="count"><b>5 of 6</b> Phase 1 builds done</span>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+  <p class="eyebrow">The seven stages</p>
+  <h2>Every lesson, stage by stage</h2>
+</div>
+<div class="legend">
+  <span class="s done">done</span>
+  <span class="s part">partly done</span>
+  <span class="s todo">not done</span>
+  <span class="s na">the lesson has no such stage</span>
+</div>
+<div class="grid-box">
+<table class="stages">
+<thead>
+<tr><th>Lesson</th><th>Lesson</th><th>Lab</th><th>At work</th><th>Build</th><th>Questions</th><th>Interview</th><th>Review</th></tr>
+</thead>
+<tbody>
+<tr class="phase"><td colspan="8">Phase 0 · written before the seven stages existed</td></tr>
+<tr><th scope="row"><span class="n">0.1</span>Build once, deploy many</th>
+  <td><span class="s done"></span></td><td><span class="s na"></span></td><td><span class="s todo"></span></td>
+  <td><span class="s done"><small>enforcer in CI</small></span></td><td><span class="s done"><small>3/5</small></span></td>
+  <td><span class="s todo"></span></td><td><span class="s todo"><small>Q4, Q5</small></span></td></tr>
+<tr><th scope="row"><span class="n">0.2</span>Jenkins to GitHub Actions</th>
+  <td><span class="s done"></span></td><td><span class="s na"></span></td><td><span class="s todo"><small>own pipeline</small></span></td>
+  <td><span class="s done"><small>ci.yml</small></span></td><td><span class="s part"><small>2 of 5</small></span></td>
+  <td><span class="s todo"></span></td><td><span class="s todo"><small>stage vs job</small></span></td></tr>
+<tr><th scope="row"><span class="n">0.3</span>Secrets and OIDC</th>
+  <td><span class="s done"></span></td><td><span class="s na"></span></td><td><span class="s todo"></span></td>
+  <td><span class="s done"><small>OIDC whoami</small></span></td><td><span class="s done"><small>3¼/5</small></span></td>
+  <td><span class="s todo"></span></td><td><span class="s todo"><small>Q1, Q5</small></span></td></tr>
+<tr><th scope="row"><span class="n">0.4</span>Ansible idempotency</th>
+  <td><span class="s done"></span></td><td><span class="s done"></span></td><td><span class="s part"><small>public repo</small></span></td>
+  <td><span class="s na"></span></td><td><span class="s done"><small>1¾/5</small></span></td>
+  <td><span class="s todo"></span></td><td><span class="s done"><small>Q3, Q5 ¾</small></span></td></tr>
+<tr><th scope="row"><span class="n">0.5</span>Python that survives</th>
+  <td><span class="s done"></span></td><td><span class="s done"></span></td><td><span class="s done"></span></td>
+  <td><span class="s na"></span></td><td><span class="s done"><small>2¾/5</small></span></td>
+  <td><span class="s todo"></span></td><td><span class="s todo"><small>Q1, Q3</small></span></td></tr>
+<tr class="phase"><td colspan="8">Phase 1 · the machine underneath</td></tr>
+<tr><th scope="row"><span class="n">1.1</span>Disk space</th>
+  <td><span class="s done"></span></td><td><span class="s done"></span></td><td><span class="s todo"><small>Part 6</small></span></td>
+  <td><span class="s done"><small>log, Break #1, postmortem</small></span></td><td><span class="s done"><small>2½/5</small></span></td>
+  <td><span class="s todo"></span></td><td><span class="s todo"><small>Q1, Q5</small></span></td></tr>
+<tr><th scope="row"><span class="n">1.2</span>Memory</th>
+  <td><span class="s done"></span></td><td><span class="s done"></span></td><td><span class="s done"></span></td>
+  <td><span class="s done"><small>box, 75%, OOM kill</small></span></td><td><span class="s done"><small>3¼/5</small></span></td>
+  <td><span class="s todo"></span></td><td><span class="s todo"><small>Q3, Q4</small></span></td></tr>
+<tr><th scope="row"><span class="n">1.3</span>systemd</th>
+  <td><span class="s done"></span></td><td><span class="s done"></span></td><td><span class="s todo"><small>Part 6</small></span></td>
+  <td><span class="s done"><small>unit, kill test, box</small></span></td><td><span class="s done"><small>2¼/5</small></span></td>
+  <td><span class="s todo"></span></td><td><span class="s todo"><small>Q2, Q4</small></span></td></tr>
+<tr><th scope="row"><span class="n">1.4</span>Networking</th>
+  <td><span class="s done"></span></td><td><span class="s done"></span></td><td><span class="s done"><small>Part 6</small></span></td>
+  <td><span class="s done"><small>ss, LAN, timing.sh</small></span></td><td><span class="s done"><small>2½/5</small></span></td>
+  <td><span class="s todo"><small>at home</small></span></td><td><span class="s todo"><small>Q2, Q4 in 1.5</small></span></td></tr>
+<tr class="current"><th scope="row"><span class="n">1.5</span>Permissions</th>
+  <td><span class="s todo"><small>written 18 Nov</small></span></td><td><span class="s todo"></span></td><td><span class="s todo"></span></td>
+  <td><span class="s todo"></span></td><td><span class="s todo"></span></td>
+  <td><span class="s todo"></span></td><td><span class="s todo"></span></td></tr>
+</tbody>
+</table>
+</div>
+<p class="note">Also read, without stages: 0.1a Same Commit, Different Bytes (extra reading) and
+  The Whole Machine (an orientation map).</p>
+</section>
+
+<section>
+<div class="sec-head">
+  <p class="eyebrow">Interchange · builds 0 to 4 merged to main in PR #5, 17 Nov</p>
+  <h2>Phase 1 builds</h2>
+</div>
+<ol class="builds">
+  <li><span class="b">0</span>
+    <span class="what"><span class="s done"><strong>The reference app</strong></span>
+      <span><code>GET /customers/{id}</code>, 404 for unknown ids, health check, two tests.</span></span>
+    <span class="c">d986ec5</span></li>
+  <li><span class="b">1</span>
+    <span class="what"><span class="s done"><strong>Log file, Break #1, postmortem 1</strong></span>
+      <span>Every lookup logged to <code>logs/reference.log</code>. Deleted it while open, recovered, wrote the postmortem.</span></span>
+    <span class="c">9dbc3e5</span></li>
+  <li><span class="b">2</span>
+    <span class="what"><span class="s done"><strong>Memory limits</strong></span>
+      <span><code>infra/run-capped.sh</code>: a 512M box with swap off, heap at 75%. A 64M box is OOM-killed with exit 137.</span></span>
+    <span class="c">1233b5f</span></li>
+  <li><span class="b">3</span>
+    <span class="what"><span class="s done"><strong>systemd unit</strong></span>
+      <span><code>reference.service</code>: logs in journald, <code>kill -9</code> restarted in 5 s, 512M box, exits on heap OOM.</span></span>
+    <span class="c">1f358b4</span></li>
+  <li><span class="b">4</span>
+    <span class="what"><span class="s done"><strong>Reachable from the network</strong></span>
+      <span>Listening address proved with <code>ss</code> and a LAN curl. <code>infra/timing.sh</code> splits a request into dns, connect, tls, server, download.</span></span>
+    <span class="c">f3d28fd</span></li>
+  <li><span class="b">5</span>
+    <span class="what"><span class="s todo"><strong>Its own user</strong></span>
+      <span>A system user <code>interchange</code>, the jar in <code>/opt</code> owned by root, logs in <code>/var/log/interchange</code>, <code>UMask=0027</code>. Drill: a root-owned log.</span></span>
+    <span class="c">lesson 1.5</span></li>
+</ol>
+</section>
+
+</div>
+</body>
+</html>

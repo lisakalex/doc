@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Explicit Deny Wins</title>
+<link rel="icon" href="../../assets/img/favicon-module-2.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Module 02 · Lesson 2.3 · AWS + DevOps course</p>
+<h1>Explicit Deny Wins</h1>
+<p class="lede">How AWS actually decides yes or no. It's three rules in a fixed order, and knowing them explains the most common wasted afternoon in AWS: “I added the permission and it still doesn't work.”</p>
+</header>
+<!-- ============ THREE ANSWERS ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">The vocabulary</p>
+<h2>There are three answers, not two</h2>
+</div>
+<p>Everyone assumes AWS answers <em>allowed</em> or <em>denied</em>. It actually distinguishes <strong>two different kinds of no</strong>, and the difference matters enormously. Run against your own account:</p>
+<div class="code"><span class="c"># your user — AdministratorAccess</span>
+s3:ListAllMyBuckets    <span class="g">allowed</span>
+iam:ListUsers          <span class="g">allowed</span>
+ec2:TerminateInstances <span class="g">allowed</span>
+<span class="c"># the learning-mfa-demo role — one permission only</span>
+s3:ListAllMyBuckets    <span class="g">allowed</span>
+iam:ListUsers          <span class="w">implicitDeny</span>
+s3:GetObject           <span class="w">implicitDeny</span>
+<span class="c"># your admin user, with a single explicit Deny added</span>
+ec2:TerminateInstances <span class="r">explicitDeny</span>
+s3:ListAllMyBuckets    <span class="g">allowed</span></div>
+<div class="tw"><table>
+<thead><tr><th>Answer</th><th>Means</th><th>How to fix it</th></tr></thead>
+<tbody>
+<tr><td><span class="chip ok">allowed</span></td><td>Some policy said <code>Allow</code>, and nothing said <code>Deny</code></td><td>—</td></tr>
+<tr><td><span class="chip imp">implicitDeny</span></td><td><strong>Nobody mentioned it.</strong> No policy allows it, none denies it</td><td><strong>Add an <code>Allow</code></strong></td></tr>
+<tr><td><span class="chip exp">explicitDeny</span></td><td>A policy said <code>Deny</code> outright</td><td><strong>Find and remove the <code>Deny</code>.</strong> Adding <code>Allow</code> will not help</td></tr>
+</tbody>
+</table></div>
+<div class="call">
+<h3>Why this distinction saves you hours</h3>
+<p>If you're getting <code>implicitDeny</code>, adding a permission fixes it. If you're getting <code>explicitDeny</code>, you can add permissions all day and <strong>nothing will change</strong> — you have to find the <code>Deny</code> and remove it. Knowing which one you're facing tells you where to look.</p>
+</div>
+</section>
+<!-- ============ THE FLOW ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">The mechanism</p>
+<h2>The decision, in order</h2>
+</div>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="AWS evaluates every request by starting from denied. First it checks whether any policy contains an explicit Deny for the action; if yes, the request is denied and this cannot be overridden. If no, it checks whether any policy contains an Allow; if not, the request is denied implicitly. Only if an Allow exists and no Deny exists is the request allowed." role="img" viewbox="0 0 700 500">
+<defs>
+<marker id="a" markerheight="7" markerwidth="7" orient="auto-start-reverse" refx="9" refy="5" viewbox="0 0 10 10">
+<path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+</marker>
+</defs>
+<!-- start -->
+<rect fill="var(--surface-2)" height="46" rx="6" stroke="currentColor" stroke-width="1.5" width="220" x="190" y="16"></rect>
+<text fill="currentColor" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="600" text-anchor="middle" x="300" y="38">API request arrives</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="middle" x="300" y="54">you start with ZERO permissions</text>
+<line marker-end="url(#a)" stroke="currentColor" stroke-width="1.5" x1="300" x2="300" y1="62" y2="92"></line>
+<!-- decision 1 -->
+<polygon fill="var(--stop-soft)" points="300,96 452,146 300,196 148,146" stroke="var(--stop)" stroke-width="2"></polygon>
+<text fill="currentColor" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" text-anchor="middle" x="300" y="142">Any explicit Deny?</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="middle" x="300" y="160">in ANY policy, anywhere</text>
+<!-- yes -> denied -->
+<line marker-end="url(#a)" stroke="currentColor" stroke-width="1.5" x1="452" x2="512" y1="146" y2="146"></line>
+<text fill="var(--stop)" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" text-anchor="middle" x="482" y="138">YES</text>
+<rect fill="var(--stop-soft)" height="48" rx="6" stroke="var(--stop)" stroke-width="2" width="170" x="516" y="122"></rect>
+<text fill="var(--stop)" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" text-anchor="middle" x="601" y="143">DENIED</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="middle" x="601" y="159">final — cannot be overridden</text>
+<!-- no -> down -->
+<line marker-end="url(#a)" stroke="currentColor" stroke-width="1.5" x1="300" x2="300" y1="196" y2="234"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" text-anchor="end" x="288" y="217">no</text>
+<!-- decision 2 -->
+<polygon fill="var(--accent-soft)" points="300,238 452,288 300,338 148,288" stroke="var(--accent)" stroke-width="2"></polygon>
+<text fill="currentColor" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" text-anchor="middle" x="300" y="284">Any Allow?</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="middle" x="300" y="302">identity or resource policy</text>
+<!-- no -> implicit denied -->
+<line marker-end="url(#a)" stroke="currentColor" stroke-width="1.5" x1="452" x2="512" y1="288" y2="288"></line>
+<text fill="var(--warn)" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" text-anchor="middle" x="482" y="280">NO</text>
+<rect fill="var(--warn-soft)" height="48" rx="6" stroke="var(--warn)" stroke-width="2" width="170" x="516" y="264"></rect>
+<text fill="var(--warn)" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" text-anchor="middle" x="601" y="285">DENIED</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="middle" x="601" y="301">implicitly — just add an Allow</text>
+<!-- yes -> allowed -->
+<line marker-end="url(#a)" stroke="currentColor" stroke-width="1.5" x1="300" x2="300" y1="338" y2="386"></line>
+<text fill="var(--good)" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" text-anchor="end" x="288" y="366">yes</text>
+<rect fill="var(--good-soft)" height="52" rx="6" stroke="var(--good)" stroke-width="2" width="220" x="190" y="390"></rect>
+<text fill="var(--good)" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" text-anchor="middle" x="300" y="413">ALLOWED</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="middle" x="300" y="430">the only path to yes</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="12" font-style="italic" text-anchor="middle" x="300" y="472">Default is DENY. Every permission you have was granted explicitly.</text>
+</svg>
+</div>
+<figcaption>Three rules, always in this order: <strong>explicit Deny beats Allow, and Allow beats implicit deny.</strong> There is no step in which an <code>Allow</code> can rescue a request that a <code>Deny</code> has already caught.</figcaption>
+</figure>
+<div class="call stop">
+<h3>Proved on your own account</h3>
+<p>Your user holds <code>AdministratorAccess</code> — <code>"Action": "*"</code> on <code>"Resource": "*"</code>. Adding one <code>Deny</code> statement produced <code>explicitDeny</code> for that action, while everything else stayed <code>allowed</code>.</p>
+<p><strong>Administrator is not a trump card.</strong> There is no permission level in AWS that overrides an explicit <code>Deny</code> — not admin, not the account owner. Only removing the <code>Deny</code> works.</p>
+</div>
+</section>
+<!-- ============ ANATOMY ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">Reading the JSON</p>
+<h2>What a policy is made of</h2>
+</div>
+<div class="code">{
+  <span class="k">"Version"</span>: "2012-10-17",          <span class="c">← schema version, NOT a date you pick. Always this.</span>
+<span class="k">"Statement"</span>: [{
+    <span class="k">"Sid"</span>:       "AllowBucketList",  <span class="c">← optional label, for humans</span>
+<span class="k">"Effect"</span>:    "Allow",            <span class="c">← Allow or Deny</span>
+<span class="k">"Action"</span>:    ["s3:ListBucket"],  <span class="c">← WHAT verb</span>
+<span class="k">"Resource"</span>:  ["arn:aws:s3:::my-bucket"],  <span class="c">← on WHICH thing</span>
+<span class="k">"Condition"</span>: { "Bool": { "aws:MultiFactorAuthPresent": "true" } }  <span class="c">← WHEN</span>
+  }]
+}</div>
+<p>Five fields worth knowing. <code>Version</code> catches people out — it's a fixed schema identifier, not today's date, and <code>2012-10-17</code> is the only value you should ever write.</p>
+<div class="call warn">
+<h3>The sixth field, and why it's the important one</h3>
+<p>There's one more: <strong><code>Principal</code></strong> — <em>who</em>. And whether a policy has it tells you what kind of policy it is.</p>
+</div>
+</section>
+<!-- ============ TWO PLACES ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">Where policies live</p>
+<h2>Policies attach to two different things</h2>
+</div>
+<div class="split">
+<div class="card">
+<span class="tag">Identity-based</span>
+<h3>Attached to a user or role</h3>
+<p>“<strong>This identity</strong> may do X to Y.” No <code>Principal</code> field — the principal is whoever it's attached to.</p>
+<p><code>AdministratorAccess</code> on your user is one. So is the <code>list-buckets-only</code> policy on your demo role.</p>
+</div>
+<div class="card">
+<span class="tag">Resource-based</span>
+<h3>Attached to the thing itself</h3>
+<p>“<strong>These principals</strong> may do X to me.” <strong>Has a <code>Principal</code> field</strong>, because the resource must say who it's talking about.</p>
+<p>S3 bucket policies, KMS key policies, SQS queue policies — and <strong>role trust policies</strong>, which are just resource-based policies on a role.</p>
+</div>
+</div>
+<p>That's the answer to something from Lesson 2.1: <strong>a trust policy is a resource-based policy.</strong> It hangs off the role and names who may assume it. Same JSON shape, <code>Principal</code> included.</p>
+<p>Your account has one real resource-based policy already — on the KMS key protecting your Terraform state:</p>
+<div class="code">$ aws kms get-key-policy --key-id 85618890-… --policy-name default
+
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "Enable IAM User Permissions",
+    "Effect": "Allow",
+    <span class="k">"Principal"</span>: { "AWS": "arn:aws:iam::739489595894:<span class="w">root</span>" },
+    "Action": "kms:*",
+    "Resource": "*"
+  }]
+}</div>
+<div class="call warn">
+<h3><code>root</code> here does not mean the root user</h3>
+<p>This trips up almost everybody. In a resource policy, <code>arn:aws:iam::739489595894:root</code> means <strong>“the account as a whole”</strong> — not the root login.</p>
+<p>What the statement actually says is: <em>“defer to IAM.”</em> Anyone in account 739489595894 whose <strong>identity-based</strong> policy allows a KMS action may perform it. Without this statement the key would be unusable by everyone — including you — and since a key policy is the only way to grant KMS access, <strong>you can permanently lock yourself out of a KMS key.</strong> It's the classic way to make a bucket's data unrecoverable.</p>
+</div>
+<p class="note">Your S3 state bucket, by contrast, has no bucket policy at all (<code>NoSuchBucketPolicy</code>) — access is decided purely by identity-based policies. That's normal and usually preferable; reach for a bucket policy when you need to grant access to another <em>account</em>, or to deny something account-wide.</p>
+</section>
+<!-- ============ SIMULATOR ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">The tool</p>
+<h2>Stop guessing — simulate it</h2>
+</div>
+<p>Every output on this page came from the <strong>policy simulator</strong>, which answers “would this be allowed?” <em>without actually doing it</em>. Read-only, free, and it tells you which of the three answers you'd get:</p>
+<div class="code">aws iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::739489595894:role/learning-mfa-demo \
+  --action-names s3:ListAllMyBuckets iam:ListUsers \
+  --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output text</div>
+<p>Add <code>--resource-arns</code> to test a specific resource, or <code>--policy-input-list</code> to try a policy you haven't written yet. It's the right first move whenever someone reports “I can't do X” — it distinguishes <code>implicitDeny</code> from <code>explicitDeny</code> in one command, and that tells you whether you're adding a permission or hunting a <code>Deny</code>.</p>
+</section>
+<!-- ============ QUESTIONS ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">Your turn</p>
+<h2>Three questions</h2>
+<p class="note">Answer in the terminal. Hints only inside — open after you've committed.</p>
+</div>
+<details>
+<summary>A developer says "I gave my role <code>AdministratorAccess</code> and it still can't delete that S3 object." What's your first hypothesis, and what command do you run?</summary>
+<div class="answer"><p>If admin isn't enough, only one thing on this page can be happening. And there's a command that confirms it in one shot without touching anything.</p></div>
+</details>
+<details>
+<summary>What's the difference between an identity-based and a resource-based policy? Name the field that gives it away.</summary>
+<div class="answer"><p>One field is present in exactly one of them, and it has to be, because of what the policy is attached to.</p></div>
+</details>
+<details>
+<summary>Why is <code>implicitDeny</code> good news compared to <code>explicitDeny</code>?</summary>
+<div class="answer"><p>Think about what each one tells you about your next action — and whether adding an <code>Allow</code> will do anything.</p></div>
+</details>
+</section>
+<footer>
+<p>Module 02, Lesson 2.3 · syllabus, progress log and full revision Q&amp;A in <code>docs/AWS_COURSE.md</code></p>
+<p>Next: <strong>2.4</strong> — reading your own IRSA trust policy in <code>terraform/main.tf</code> and finding the missing condition. Then <strong>2.5</strong>: MFA-gating your real credentials.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

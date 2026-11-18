@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Job Nobody Saw Fail</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/p1-3-the-job-nobody-saw-fail.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Phase 1 · Lesson 1.3 · AWS + DevOps course</p>
+<h1>The Job Nobody Saw Fail</h1>
+<p class="lede">A backup script runs fine when you type it. Put it in cron for 02:00 and it fails
+  every night for three weeks, and nobody finds out until the day someone needs a backup. No
+  error, no email, no log. This lesson is about systemd, the program that starts everything else
+  on a Linux server: how it runs services, restarts them, keeps their logs, runs jobs on a
+  schedule, and tells you when one fails.</p>
+<div class="facts">
+<span class="fact">~3 hours</span>
+<span class="fact">week 5</span>
+<span class="fact">laptop only, no AWS</span>
+<span class="fact">Ubuntu 26.04 · systemd 259</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The incident</p>
+<h2>Works in the terminal, fails in cron</h2>
+</div>
+<p>There are two separate reasons, and a silent cron failure usually has both.</p>
+<p><strong>1. cron runs your script with almost nothing set.</strong> cron gives a job
+  <code>PATH=/usr/bin:/bin</code> and <code>SHELL=/bin/sh</code>. It doesn't read your
+  <code>.bashrc</code> or <code>.profile</code>, so anything they add isn't there. On this
+  laptop:</p>
+<div class="tw"><table>
+<thead><tr><th>Command</th><th>In my terminal</th><th>In cron's PATH</th></tr></thead>
+<tbody>
+<tr><td class="key">java</td><td class="num">/usr/bin/java</td><td><span class="chip ok">found</span></td></tr>
+<tr><td class="key">python3</td><td class="num">/usr/bin/python3</td><td><span class="chip ok">found</span></td></tr>
+<tr><td class="key">uv</td><td class="num">~/.local/bin/uv</td><td><span class="chip exp">missing</span></td></tr>
+<tr><td class="key">aws</td><td class="num">/snap/bin/aws</td><td><span class="chip exp">missing</span></td></tr>
+<tr><td class="key">terraform</td><td class="num">/snap/bin/terraform</td><td><span class="chip exp">missing</span></td></tr>
+</tbody></table></div>
+<p class="note">Checked with <code>env -i PATH=/usr/bin:/bin /bin/sh -c 'command -v uv'</code>,
+  which runs a command with cron's environment and nothing else.</p>
+<p><strong>2. cron's output goes nowhere.</strong> cron mails anything a job prints to the
+  crontab's owner. Most servers have no mail system, so Ubuntu's cron writes <code>(CRON) info
+  (No MTA installed, discarding output)</code> to syslog and throws the error message away. The
+  script said "aws: not found" every night, to nobody.</p>
+<p>systemd fixes both, and adds the things cron never had: restarts, limits, a log you can
+  search, and a hook that runs when something fails.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The mechanism</p>
+<h2>systemd is the parent of every service</h2>
+</div>
+<div class="ladder">
+<div class="rung"><span class="s">1</span><p><span class="who">PID 1</span>systemd is the first
+  process the kernel starts, and every service on the machine is its child. A parent is told the
+  moment its child exits, and with what exit code or signal. That's how systemd knows a service
+  died, without polling.</p></div>
+<div class="rung"><span class="s">2</span><p><span class="who">A unit file per service</span>Each
+  service is described by a small text file, a <strong>unit</strong>: what to run, as which
+  user, with which environment and limits, and what to do when it exits.</p></div>
+<div class="rung"><span class="s">3</span><p><span class="who">A cgroup per service</span>Every
+  service gets its own cgroup, so <code>MemoryMax=</code> from Lesson 1.2 applies to the service
+  and all its children, and stopping it kills everything it started. Nothing can escape by
+  forking.</p></div>
+<div class="rung"><span class="s">4</span><p><span class="who">The journal</span>A service's
+  stdout and stderr go to <strong>journald</strong>, indexed by unit and time. No log file to
+  rotate, which is Lesson 1.1's problem solved a different way.</p></div>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">A unit file</p>
+<h2>A Java service, the way it should run</h2>
+</div>
+<p>A unit for a Spring Boot or Mule-style service. Each line replaces something you would
+  otherwise do by hand or in a start script:</p>
+<div class="code"><code><span class="c"># /etc/systemd/system/ingest.service</span>
+[Unit]
+Description=Interchange ingest
+After=network-online.target           <span class="c"># start after the network is up</span>
+Wants=network-online.target
+StartLimitIntervalSec=300             <span class="c"># at most 5 starts in 5 minutes,</span>
+StartLimitBurst=5                     <span class="c"># then give up and stay failed</span>
+
+[Service]
+User=ingest                           <span class="c"># never root</span>
+WorkingDirectory=/opt/ingest
+Environment=JAVA_OPTS=-XX:MaxRAMPercentage=75
+ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/ingest/ingest.jar
+Restart=on-failure                    <span class="c"># restart if it crashes, not if you stop it</span>
+RestartSec=5
+MemoryMax=2G                          <span class="c"># Lesson 1.2: a cgroup limit</span>
+LimitNOFILE=65536                     <span class="c"># Lesson 1.1: the descriptor limit</span>
+
+[Install]
+WantedBy=multi-user.target            <span class="c"># start at boot</span></code></div>
+<div class="tw"><table>
+<thead><tr><th>Command</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td class="key">systemctl daemon-reload</td><td>Re-reads unit files. Needed after every edit, or systemd keeps using the old version.</td></tr>
+<tr><td class="key">systemctl start ingest</td><td>Starts it now. Doesn't survive a reboot.</td></tr>
+<tr><td class="key">systemctl enable ingest</td><td>Starts it at boot, by linking it into <code>multi-user.target</code>. Doesn't start it now. <code>enable --now</code> does both.</td></tr>
+<tr><td class="key">systemctl status ingest</td><td>State, main PID, memory, the last log lines.</td></tr>
+<tr><td class="key">systemctl cat ingest</td><td>The unit file systemd is really using, with any overrides.</td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Restarts</p>
+<h2>"Start request repeated too quickly"</h2>
+</div>
+<p>A service that exits with code 3 one second after it starts. <code>Restart=on-failure</code>
+  restarts it, and the start limit, 3 starts in 30 seconds, stops the loop:</p>
+<div class="code"><code>starting, pid 423025
+lesson13-crash.service: Scheduled restart job, restart counter is at 1.
+starting, pid 423048
+lesson13-crash.service: Scheduled restart job, restart counter is at 2.
+starting, pid 423069
+lesson13-crash.service: Scheduled restart job, restart counter is at 3.
+lesson13-crash.service: <span class="r">Start request repeated too quickly.</span>
+Failed to start lesson13-crash.service - Lesson 1.3: a service that crashes after 1 second.
+
+$ systemctl --user show -p NRestarts,Result,ExecMainStatus lesson13-crash.service
+Result=exit-code
+NRestarts=3
+ExecMainStatus=3</code></div>
+<p>The limit is what protects the machine. Without it, a service that crashes on start restarts
+  forever, filling the journal and burning CPU. Once it trips, the unit stays
+  <code>failed</code> until someone fixes the cause and runs <code>systemctl reset-failed</code>
+  or starts it by hand. "Repeated too quickly" is never the problem itself. The problem is in
+  the log lines above it.</p>
+<div class="call warn">
+<h3>The first version of this demo was wrong in two ways, and systemd carried on</h3>
+<p><strong>The limit was in the wrong section.</strong> <code>StartLimitIntervalSec=</code>
+  belongs in <code>[Unit]</code>. Put in <code>[Service]</code>, systemd logged
+  <code>Unknown key 'StartLimitIntervalSec' in section [Service], ignoring.</code> and started the
+  service anyway, with the default limit. <code>systemd-analyze verify file.service</code> prints
+  the same warning before you start anything. Run it after every edit. (On this laptop it also
+  found a misplaced key in a vendor's unit, <code>spice-vdagent.service</code>.)</p>
+<p><strong><code>$$</code> printed <code>$</code>.</strong> systemd expands
+  <code>$NAME</code> in <code>ExecStart=</code> itself, before any shell sees the line, and
+  <code>$$</code> is its escape for one literal <code>$</code>. To hand the shell
+  <code>$$</code>, write <code>$$$$</code>. Likewise <code>%</code> is systemd's own specifier
+  character, so <code>date +%T</code> must be written <code>date +%%T</code>.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Environment</p>
+<h2>A service doesn't read <code>.bashrc</code> either</h2>
+</div>
+<p>systemd is not a shell, so nothing from your login files reaches a service. The environment a
+  system service gets on this laptop is three variables:</p>
+<div class="code"><code>$ systemctl show-environment
+LANG=en_GB.UTF-8
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
+XDG_DATA_DIRS=/var/lib/flatpak/exports/share:/usr/local/share/:/usr/share/</code></div>
+<p>No <code>JAVA_HOME</code>, no <code>~/.local/bin</code>, no <code>~/.nvm</code>, and no
+  <code>HOME</code> unless the unit sets <code>User=</code>. The difference from cron is that
+  systemd makes you <em>say</em> what the service needs, in the unit, where the next person can
+  read it:</p>
+<div class="code"><code>Environment=JAVA_OPTS=-XX:MaxRAMPercentage=75
+Environment=PATH=/opt/ingest/bin:/usr/bin:/bin
+EnvironmentFile=/etc/ingest/ingest.env       <span class="c"># KEY=value lines; keep secrets out of the unit itself</span></code></div>
+<div class="code"><code>$ systemd-run --user --wait --pipe -p Environment=JAVA_OPTS=-XX:MaxRAMPercentage=75 sh -c 'echo "JAVA_OPTS=$JAVA_OPTS"'
+JAVA_OPTS=-XX:MaxRAMPercentage=75</code></div>
+<p class="note">Without that <code>-p Environment=</code>, the same command printed
+  <code>JAVA_OPTS=&lt;unset&gt;</code>, even though the variable might be set in your
+  terminal.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Logs</p>
+<h2>journalctl: every service's output, searchable</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Command</th><th>Shows</th></tr></thead>
+<tbody>
+<tr><td class="key">journalctl -u ingest</td><td>One unit's log, oldest first. Add <code>-e</code> to jump to the end.</td></tr>
+<tr><td class="key">journalctl -u ingest -f</td><td>Follow it live, like <code>tail -f</code>.</td></tr>
+<tr><td class="key">journalctl -u ingest --since "02:00" --until "02:10"</td><td>The window when the job ran.</td></tr>
+<tr><td class="key">journalctl -b -1 -u ingest</td><td>The previous boot. Needs a persistent journal (<code>/var/log/journal</code> exists).</td></tr>
+<tr><td class="key">journalctl -k</td><td>Kernel messages, where Lesson 1.2's OOM kills are.</td></tr>
+<tr><td class="key">journalctl -p err</td><td>Only messages logged as errors or worse.</td></tr>
+</tbody></table></div>
+<div class="call">
+<h3><code>-p err</code> doesn't show what a program printed to stderr</h3>
+<p>When the nightly job below failed, <code>journalctl -p err</code> showed systemd's
+  "Failed to start" line but not the program's own <code>ls: cannot access …</code> message.
+  journald records a service's stdout <em>and</em> stderr at priority <code>info</code> unless
+  the program says otherwise. Filter by unit (<code>-u</code>), not by priority, when you want
+  the reason.</p>
+</div>
+<p class="note">The journal rotates itself: <code>journalctl --disk-usage</code> said 2.4 GB on
+  this laptop, capped by <code>SystemMaxUse=</code> in <code>/etc/systemd/journald.conf</code>.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Timers</p>
+<h2>Two files instead of one cron line</h2>
+</div>
+<p>A timer is a unit that starts another unit at given times. The job itself is an ordinary
+  <code>oneshot</code> service, so it gets everything above: environment, limits, the
+  journal.</p>
+<div class="pair">
+<div><p class="lab">nightly.service · what to run</p>
+<div class="code"><code>[Unit]
+Description=The nightly job
+OnFailure=alert@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/jobs/backup.sh</code></div></div>
+<div><p class="lab">nightly.timer · when</p>
+<div class="code"><code>[Unit]
+Description=Run the nightly job at 02:00
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target</code></div></div>
+</div>
+<p>Check a schedule before you trust it. <code>systemd-analyze calendar</code> prints the next
+  times it will fire:</p>
+<div class="code"><code>$ systemd-analyze calendar --iterations=3 'Mon..Fri 02:00'
+  Original form: Mon..Fri 02:00
+Normalized form: Mon..Fri *-*-* 02:00:00
+    Next elapse: Wed 2026-11-11 02:00:00 GMT
+   Iteration #2: Thu 2026-11-12 02:00:00 GMT
+   Iteration #3: Fri 2026-11-13 02:00:00 GMT</code></div>
+<p><strong><code>Persistent=true</code> catches up on runs the machine slept through.</strong>
+  The timer records when it last fired. Here it last fired at 23:00 the night before, so
+  today's 02:00 was missed. Started at 14:49, it ran the job at once:</p>
+<div class="code"><code>14:49:03 systemd[3474]: Starting lesson13-nightly.service - Lesson 1.3: the nightly job...
+14:49:03 sh[423194]: nightly job ran at 14:49:03
+14:49:03 systemd[3474]: Finished lesson13-nightly.service - Lesson 1.3: the nightly job.
+
+$ systemctl --user list-timers lesson13-nightly.timer
+NEXT                        LEFT LAST                        PASSED UNIT
+Wed 2026-11-11 02:00:00 GMT  11h Tue 2026-11-10 14:49:03 GMT 2s ago lesson13-nightly.timer</code></div>
+<p class="note">cron has no memory of missed runs. This laptop's own crontab has a line for a
+  daily job with "hourly catch-up for days missed while asleep/off", which is a hand-built
+  <code>Persistent=true</code>.</p>
+<div class="tw"><table>
+<thead><tr><th></th><th>cron</th><th>systemd timer</th></tr></thead>
+<tbody>
+<tr><td class="key">Environment</td><td>Bare, and invisible</td><td>Bare, but set in the unit where you can read it</td></tr>
+<tr><td class="key">Output</td><td>Mailed, usually to nowhere</td><td>The journal, per unit</td></tr>
+<tr><td class="key">Missed runs</td><td>Skipped</td><td><code>Persistent=true</code> runs them at start</td></tr>
+<tr><td class="key">Two runs overlapping</td><td>Both run</td><td>Never: a unit that is still running isn't started again</td></tr>
+<tr><td class="key">Last result</td><td>Nowhere</td><td><code>systemctl status</code>, <code>list-timers</code>, <code>--failed</code></td></tr>
+<tr><td class="key">On failure</td><td>Nothing</td><td><code>OnFailure=</code> starts another unit</td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Failing loudly</p>
+<h2><code>OnFailure=</code>: run something when it breaks</h2>
+</div>
+<p>The nightly job, made to fail, with <code>OnFailure=lesson13-alert@%n.service</code>.
+  <code>%n</code> is the failing unit's name, passed to a <strong>template</strong> unit
+  (<code>alert@.service</code>), which reads it back as <code>%i</code>:</p>
+<div class="code"><code>14:49:16 sh[423277]: backing up
+14:49:16 sh[423278]: ls: cannot access '/nonexistent/backup-dir': No such file or directory
+14:49:16 systemd[3474]: lesson13-nightly.service: Main process exited, code=exited, status=2/INVALIDARGUMENT
+14:49:16 systemd[3474]: lesson13-nightly.service: Failed with result 'exit-code'.
+14:49:16 systemd[3474]: lesson13-nightly.service: <span class="w">Triggering OnFailure= dependencies.</span>
+14:49:16 lesson13-alert[423283]: <span class="r">ALERT: lesson13-nightly.service failed, see: journalctl --user -u lesson13-nightly.service</span></code></div>
+<p>Here the alert only writes to the journal. On a server it would post to Slack, page someone,
+  or push a metric. And systemd keeps a list of what failed, which survives until it's cleared.
+  On this laptop it still held the OOM kills from Lesson 1.2:</p>
+<div class="code"><code>$ systemctl --user --failed
+UNIT                      LOAD   ACTIVE SUB    DESCRIPTION
+run-p270848-i257652.scope loaded failed failed [systemd-run] /usr/bin/python3 -I …/grow.py
+run-p271037-i283211.scope loaded failed failed [systemd-run] /usr/bin/java -Xmx2g Grow
+run-p318854-i320657.scope loaded failed failed [systemd-run] /usr/bin/python3 grow.py</code></div>
+<div class="call warn">
+<h3>OnFailure can't catch a job that never ran</h3>
+<p>If the timer is disabled, or the server is rebuilt without it, nothing fails, so nothing
+  alerts. Catching "it didn't happen" needs the opposite check, from outside: the job reports
+  success somewhere, and an alarm fires when that report is missing. That's a dead man's switch,
+  and it's Interchange failure 8.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Changing a vendor's unit</p>
+<h2>Drop-ins: never edit the package's file</h2>
+</div>
+<p>Units installed by a package live in <code>/usr/lib/systemd/system/</code>, and the next
+  package upgrade overwrites them. To change one, add a <strong>drop-in</strong>: a small file
+  that overrides only the lines you name.</p>
+<div class="code"><code>$ sudo systemctl edit jenkins          <span class="c"># opens /etc/systemd/system/jenkins.service.d/override.conf</span>
+[Service]
+LimitNOFILE=65536
+Environment=JAVA_OPTS=-Xmx4g
+
+$ systemctl cat jenkins                <span class="c"># shows the vendor file, then your override below it</span>
+$ sudo systemctl restart jenkins       <span class="c"># systemctl edit already ran daemon-reload</span>
+$ grep 'open files' /proc/$(systemctl show -p MainPID --value jenkins)/limits</code></div>
+<p class="note">The last line closes the loop from Lesson 1.1: don't trust the unit file, read
+  the limit the running process really has.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Build it</p>
+<h2>Break a service, schedule a job, make it fail loudly</h2>
+</div>
+<p>Everything runs as your own user, with <code>systemctl --user</code>: the same systemd, the
+  same unit files, no <code>sudo</code>. User units live in <code>~/.config/systemd/user/</code>.
+  Work in <code>devops-course/labs/p1-3/</code> and name every unit <code>lab13-…</code> so the
+  clean-up at the end is easy.</p>
+
+<h3>Part 1: what cron and systemd would see</h3>
+<div class="code"><code>mkdir -p ~/IdeaProjects/devops-course/labs/p1-3 ~/.config/systemd/user &amp;&amp; cd ~/IdeaProjects/devops-course/labs/p1-3
+for c in java python3 uv aws terraform; do
+  printf '%-10s shell:%-28s cron:%s\n' $c "$(command -v $c)" "$(env -i PATH=/usr/bin:/bin /bin/sh -c "command -v $c" || echo MISSING)"
+done
+systemctl show-environment
+crontab -l</code></div>
+<p>Which of your tools would a 02:00 cron job not find? Does your crontab use full paths?</p>
+
+<h3>Part 2: a service that crashes</h3>
+<div class="code"><code>cat &gt; ~/.config/systemd/user/lab13-crash.service &lt;&lt;'EOF'
+[Unit]
+Description=Lab 1.3: crashes after 1 second
+StartLimitIntervalSec=30
+StartLimitBurst=3
+
+[Service]
+ExecStart=/bin/sh -c 'echo "starting, pid $$$$"; sleep 1; echo "giving up" &gt;&amp;2; exit 3'
+Restart=on-failure
+RestartSec=1
+EOF
+systemd-analyze --user verify ~/.config/systemd/user/lab13-crash.service
+systemctl --user daemon-reload
+systemctl --user start lab13-crash.service; sleep 9
+journalctl --user -u lab13-crash.service -o cat --since -15s
+systemctl --user show -p NRestarts,Result,ExecMainStatus lab13-crash.service</code></div>
+<p>Predict before you run it: how many times does it start, and what is its state at the end?
+  Then move <code>StartLimitIntervalSec=30</code> into <code>[Service]</code>, run
+  <code>verify</code> again, and read what it says.</p>
+
+<h3>Part 3: a timer that catches up</h3>
+<div class="code"><code>cat &gt; ~/.config/systemd/user/lab13-nightly.service &lt;&lt;'EOF'
+[Unit]
+Description=Lab 1.3: the nightly job
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo "nightly job ran at $$(date +%%T)"'
+EOF
+cat &gt; ~/.config/systemd/user/lab13-nightly.timer &lt;&lt;'EOF'
+[Unit]
+Description=Lab 1.3: run the nightly job at 02:00
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+[Install]
+WantedBy=timers.target
+EOF
+systemd-analyze calendar --iterations=3 '*-*-* 02:00:00'
+mkdir -p ~/.local/share/systemd/timers
+touch -d 'yesterday 23:00' ~/.local/share/systemd/timers/stamp-lab13-nightly.timer
+systemctl --user daemon-reload
+systemctl --user start lab13-nightly.timer; sleep 2
+journalctl --user -u lab13-nightly.service -o cat --since -10s
+systemctl --user list-timers lab13-nightly.timer</code></div>
+<p class="note">The <code>touch</code> fakes "last ran yesterday at 23:00", the way a laptop that
+  was asleep at 02:00 would look. Predict: does the job run now, or at 02:00 tomorrow?</p>
+
+<h3>Part 4: make it fail loudly</h3>
+<div class="code"><code>cat &gt; ~/.config/systemd/user/lab13-alert@.service &lt;&lt;'EOF'
+[Unit]
+Description=Lab 1.3: alert for %i
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo "ALERT: %i failed" | systemd-cat -t lab13-alert -p err'
+EOF
+cat &gt; ~/.config/systemd/user/lab13-nightly.service &lt;&lt;'EOF'
+[Unit]
+Description=Lab 1.3: the nightly job
+OnFailure=lab13-alert@%n.service
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo "backing up"; ls /nonexistent/backup-dir'
+EOF
+systemctl --user daemon-reload
+systemctl --user start lab13-nightly.service; sleep 1
+journalctl --user -p err --since -10s -o cat
+journalctl --user -u lab13-nightly.service --since -10s -o cat
+systemctl --user --failed</code></div>
+<p>Which command showed the real reason, the <code>ls</code> error: the <code>-p err</code> one
+  or the <code>-u</code> one? Why?</p>
+
+<h3>Part 5: a drop-in and the limit it changes</h3>
+<div class="code"><code>cat &gt; ~/.config/systemd/user/lab13-sleeper.service &lt;&lt;'EOF'
+[Service]
+ExecStart=/bin/sleep 600
+EOF
+systemctl --user daemon-reload; systemctl --user start lab13-sleeper.service
+P=$(systemctl --user show -p MainPID --value lab13-sleeper.service); sleep 1; grep 'open files' /proc/$P/limits
+mkdir -p ~/.config/systemd/user/lab13-sleeper.service.d
+printf '[Service]\nLimitNOFILE=4096\n' &gt; ~/.config/systemd/user/lab13-sleeper.service.d/override.conf
+systemctl --user daemon-reload; systemctl --user restart lab13-sleeper.service
+P=$(systemctl --user show -p MainPID --value lab13-sleeper.service); sleep 1; grep 'open files' /proc/$P/limits
+systemctl --user cat lab13-sleeper.service</code></div>
+<p>The first <code>grep</code> shows systemd's default for a service: a soft limit of 1024 and a
+  hard limit of 524288. Predict: after the override, does the <em>same</em> sleep process have
+  the new limit, or a new one? Look at the PID. The <code>sleep 1</code> matters: read the limits straight after a start and you may catch the child
+  before it has applied its limits and run <code>sleep</code>. It shows as <code>(sleep)</code> in <code>/proc/$P/comm</code>, still carrying the manager's values.</p>
+<p class="note">Clean up when you're done: <code>systemctl --user stop 'lab13-*'; rm -r
+  ~/.config/systemd/user/lab13-*; systemctl --user daemon-reload; systemctl --user reset-failed</code></p>
+
+<h3>Part 6: your servers</h3>
+<p>On a Jenkins agent or Mule server, and only looking: <code>systemctl list-timers</code>,
+  <code>crontab -l</code> for your own user, and <code>systemctl --failed</code>. How is the Mule
+  runtime started: a systemd unit (<code>systemctl list-units --type=service | grep -i
+  mule</code>), an init script, or <code>nohup</code> from a Jenkins job? If it's a unit,
+  <code>systemctl cat</code> it and look for <code>Restart=</code>, <code>LimitNOFILE=</code> and
+  <code>MemoryMax=</code>. Is there a nightly job that would fail without anyone knowing? That's
+  your interview story. Leave out hostnames, unit names that identify the customer, and anything
+  that looks like a password.</p>
+<p><strong>Done when:</strong> you can explain, without notes, the two reasons a cron job fails
+  silently, and what <code>Persistent=true</code> and <code>OnFailure=</code> each fix.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check</p>
+<h2>Five questions</h2>
+</div>
+<p>Out loud first, and end each one with "because…" and the consequence.</p>
+<details><summary>A script runs fine from your terminal. From cron at 02:00 it fails every night, and there is no error anywhere. Give two reasons.</summary><div class="answer"><p><strong>The environment, and where the output goes.</strong> cron runs the job with <code>PATH=/usr/bin:/bin</code> and doesn't read <code>.bashrc</code>, so tools in <code>~/.local/bin</code>, <code>/snap/bin</code> or <code>/opt</code> aren't found, and variables like <code>JAVA_HOME</code> aren't set. And cron mails the job's output to its owner; with no mail system on the server, the error message is discarded. Use full paths and set the environment explicitly, and run it as a systemd timer so the output lands in the journal.</p></div></details>
+<details><summary>A service is in state <code>failed</code> and the log ends with "Start request repeated too quickly". What does that mean, and what do you do?</summary><div class="answer"><p><strong>The service kept crashing, and the start limit stopped systemd restarting it.</strong> <code>Restart=on-failure</code> restarted it until it hit <code>StartLimitBurst</code> starts within <code>StartLimitIntervalSec</code>, and then systemd left it failed so it wouldn't loop forever. That line is never the cause. Read the lines above it with <code>journalctl -u name</code> to find why each start exited, fix that, then <code>systemctl reset-failed name</code> and start it.</p></div></details>
+<details><summary>A server was switched off for patching from 01:00 to 03:00. A cron job and a systemd timer were both set for 02:00. What happens to each?</summary><div class="answer"><p><strong>The cron job is skipped; the timer runs at boot if it has <code>Persistent=true</code>.</strong> cron only checks the clock while it's running and keeps no record of missed runs. A persistent timer records when it last fired, and on start it sees that a scheduled time passed while it was down, so it runs the job straight away. Without <code>Persistent=true</code> the timer behaves like cron.</p></div></details>
+<details><summary>The vendor's <code>mule.service</code> needs <code>LimitNOFILE=65536</code>. Where do you put it, and why not edit the unit file? How do you prove it worked?</summary><div class="answer"><p><strong>In a drop-in, because the package owns the unit file.</strong> <code>sudo systemctl edit mule</code> writes <code>/etc/systemd/system/mule.service.d/override.conf</code>, which overrides only the lines you give and survives package upgrades; an edit to <code>/usr/lib/systemd/system/mule.service</code> is overwritten by the next upgrade. Then restart the service, because limits are set when a process starts, and prove it with <code>grep 'open files' /proc/&lt;MainPID&gt;/limits</code>, not by reading the file.</p></div></details>
+<details><summary>A Jenkins job starts a service with <code>nohup java -jar app.jar &gt; app.out 2&gt;&amp;1 &lt; /dev/null &amp;</code>. It works. Why move it into a systemd unit anyway? Name three things you gain.</summary><div class="answer"><p><strong>Because then systemd, not a finished build, is the service's parent.</strong> It restarts the service if it crashes (<code>Restart=</code>) and starts it at boot (<code>enable</code>). Its output goes to the journal instead of a file nobody rotates. Limits like <code>MemoryMax</code> and <code>LimitNOFILE</code> are set in one readable place, and its cgroup means <code>stop</code> kills every process it started. The Jenkins job then only runs <code>sudo systemctl restart app</code>, which ends immediately and holds no descriptors, so no "leaked file descriptors".</p></div></details>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Interchange</p>
+<h2>Setting up failure 8 of 8</h2>
+</div>
+<p>The project's last deliberate failure, in Phase 6, is a nightly job that silently stops. This
+  lesson gives you half of the defence: a timer with <code>Persistent=true</code> and an
+  <code>OnFailure=</code> alert catch a job that runs and fails. The other half, a dead man's
+  switch that alerts when the job doesn't run at all, comes with CloudWatch. When
+  <code>ingest</code> runs on a VM in Phase 3, it will run as a systemd unit like the one above,
+  with <code>MemoryMax</code> and <code>LimitNOFILE</code> set, which is where failures 1 and 2
+  happen for the first time.</p>
+</section>
+
+<footer>
+<p>Sources: man pages <code>systemd.unit(5)</code> (<code>StartLimitIntervalSec</code>,
+  <code>OnFailure</code>, specifiers), <code>systemd.service(5)</code> (<code>Type</code>,
+  <code>Restart</code>, <code>ExecStart</code> and <code>$</code> expansion),
+  <code>systemd.exec(5)</code> (<code>Environment</code>, <code>EnvironmentFile</code>,
+  <code>LimitNOFILE</code>), <code>systemd.resource-control(5)</code>,
+  <code>systemd.timer(5)</code> (<code>OnCalendar</code>, <code>Persistent</code>),
+  <code>systemd.time(7)</code>, <code>journalctl(1)</code>, <code>systemd-analyze(1)</code>,
+  <code>systemctl(1)</code>; <code>cron(8)</code> and <code>crontab(5)</code> for cron's
+  environment and mail. Every output on this page comes from a real run on Ubuntu 26.04 with
+  systemd 259, checked 10 November 2026. Paths are shortened with <code>…</code>.</p>
+<p>Next: Lesson 1.4, networking: interfaces, <code>0.0.0.0</code> against loopback,
+  <code>ss</code>, DNS and the five-second timeout, TLS handshakes.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

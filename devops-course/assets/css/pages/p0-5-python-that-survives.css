@@ -1,0 +1,14 @@
+/* lesson 0.5: Python that survives leaving your laptop */
+.facts{display:flex;flex-wrap:wrap;gap:.5rem;}
+.fact{font-family:"IBM Plex Mono",monospace;font-size:.72rem;font-weight:500;padding:.22rem .55rem;border:1px solid var(--rule-strong);border-radius:4px;color:var(--ink-2);background:var(--surface);}
+.ladder{display:flex;flex-direction:column;border:1px solid var(--rule);border-radius:7px;overflow:hidden;background:var(--surface);}
+.rung{display:grid;grid-template-columns:2.2rem 1fr;gap:.8rem;padding:.85rem 1rem;border-bottom:1px solid var(--rule);}
+.rung:last-child{border-bottom:none;}
+.rung .s{font-family:"IBM Plex Mono",monospace;font-size:.8rem;font-weight:600;color:var(--accent);padding-top:.1rem;}
+.rung p{font-size:.93rem;color:var(--ink-2);}
+.rung .who{font-family:"IBM Plex Mono",monospace;font-size:.66rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.15rem;}
+ol.todo,ul.todo{margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.45rem;max-width:65ch;}
+ol.todo li,ul.todo li{font-size:.94rem;color:var(--ink-2);}
+.pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(19rem,1fr));gap:1rem;align-items:start;}
+.pair .lab{font-family:"IBM Plex Mono",monospace;font-size:.68rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem;}
+.pair .code{font-size:.76rem;}

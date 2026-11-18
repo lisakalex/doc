@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Key That Only Knocks</title>
+<link rel="icon" href="../../assets/img/favicon-module-2.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/25-the-key-that-only-knocks.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Module 02 · Lesson 2.5 · AWS + DevOps course</p>
+<h1>The Key That Only Knocks</h1>
+<p class="lede">Right now, one readable file on your laptop is your entire AWS account. By the end of this
+    lesson that same file will be able to do exactly one thing — knock on a door that does not open
+    without your phone.</p>
+<p class="note">This is the capstone of Module 2: everything from 2.1 to 2.4 aimed at the credential you
+    actually use every day.</p>
+</header>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The situation</p>
+<h2>What an attacker gets from one <code>cat</code></h2>
+</div>
+<div class="code"><span class="c">$ ls -l ~/.aws/credentials</span>
+-rw------- 1 al al 116 Jul 21 16:07 <span class="w">~/.aws/credentials</span>
+<span class="c">$ cat ~/.aws/credentials</span>
+[default]
+aws_access_key_id     = <span class="r">AKIA2YLI****</span>
+aws_secret_access_key = <span class="r">5Cuk****</span></div>
+<div class="tw">
+<table>
+<thead><tr><th>Fact</th><th>Your account today</th></tr></thead>
+<tbody>
+<tr><td>Permissions on that key</td><td><code>AdministratorAccess</code>, no conditions</td></tr>
+<tr><td>Age</td><td><strong>46 days</strong>, never rotated</td></tr>
+<tr><td>Stored as</td><td>Plaintext. Mode <code>0600</code> is the only thing guarding it</td></tr>
+<tr><td>MFA on the user</td><td>Yes — and <strong>irrelevant to this file</strong></td></tr>
+<tr><td>What it can do</td><td>Everything. Delete the account's data, mint new users, run up a bill</td></tr>
+</tbody>
+</table>
+</div>
+<div class="call stop">
+<h3>No exploit is required</h3>
+<p>Nobody has to break anything to use this. It is a file, readable by your user, and so is readable by
+      every process you run: a <code>postinstall</code> script in some npm package, a compromised editor
+      extension, a curl-pipe-bash you trusted, an old laptop backup, a synced folder. Mode <code>0600</code>
+      stops other <em>people</em> on the machine. It does not stop code running <em>as you</em>.</p>
+<p>And per lesson 2.1, MFA does nothing here. There is no sign-in in an API call. Your phone is never
+      consulted.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The design</p>
+<h2>Two ways to fix it</h2>
+</div>
+<div class="tw">
+<table>
+<thead><tr><th></th><th>A — Deny-unless-MFA on the user</th><th>B — Move admin to a role</th></tr></thead>
+<tbody>
+<tr><td class="key">The key still holds</td><td>Admin, but denied unless MFA</td><td><strong>Almost nothing</strong></td></tr>
+<tr><td class="key">Daily command</td><td><code>sts:GetSessionToken</code></td><td><code>sts:AssumeRole</code></td></tr>
+<tr><td class="key">Max duration</td><td>up to 36 h</td><td>up to 12 h</td></tr>
+<tr><td class="key">CloudTrail shows</td><td><code>user/lisakalex</code></td><td><code>assumed-role/admin/…</code></td></tr>
+<tr><td class="key">Protects by</td><td>A <code>Deny</code> you must write correctly</td><td>The key simply not having the permission</td></tr>
+<tr><td class="key">Used in industry</td><td>Seen, and fine</td><td><strong>The standard pattern</strong></td></tr>
+</tbody>
+</table>
+</div>
+<p>Take <strong>B</strong>. Not because A is wrong, but because A protects you with a rule that has to be
+    written perfectly — and the next section shows how easy that is to get wrong. B protects you by
+    <em>not granting the permission in the first place</em>. A missing permission cannot be misconfigured.</p>
+<p>It is also the shape of every real environment you will work in: humans hold something that can only
+    assume roles, and the roles hold the power. AWS IAM Identity Center is this pattern with a login page in
+    front of it.</p>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="Today the credentials file grants full administrator directly. After the change it can only request a role assumption, which requires an MFA code before any admin credentials are issued." role="img" viewbox="0 0 900 348">
+<defs>
+<marker id="c" markerheight="7" markerwidth="7" orient="auto-start-reverse" refx="9" refy="5" viewbox="0 0 10 10">
+<path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+</marker>
+</defs>
+<text fill="var(--stop)" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.4" x="24" y="26">TODAY</text>
+<g fill="none" stroke="currentColor" stroke-width="1.4">
+<rect height="72" rx="5" width="204" x="24" y="38"></rect>
+<rect height="72" rx="5" width="228" x="648" y="38"></rect>
+</g>
+<g fill="currentColor" font-family="IBM Plex Sans, sans-serif">
+<text font-size="12.5" font-weight="600" text-anchor="middle" x="126" y="68">~/.aws/credentials</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="126" y="88">AKIA… plaintext</text>
+<text font-size="12.5" font-weight="600" text-anchor="middle" x="762" y="68">Full administrator</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="762" y="88">account 739489595894</text>
+</g>
+<line color="var(--stop)" fill="none" marker-end="url(#c)" stroke="var(--stop)" stroke-width="1.6" x1="228" x2="642" y1="74" y2="74"></line>
+<text fill="var(--stop)" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" x="435" y="64">any API call, nothing asked</text>
+<line opacity=".35" stroke="currentColor" stroke-dasharray="3 5" stroke-width="1" x1="24" x2="876" y1="140" y2="140"></line>
+<text fill="var(--good)" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.4" x="24" y="176">AFTER 2.5</text>
+<g fill="none" stroke="currentColor" stroke-width="1.4">
+<rect height="72" rx="5" width="204" x="24" y="188"></rect>
+<rect height="72" rx="5" width="228" x="648" y="188"></rect>
+</g>
+<polygon fill="none" points="428,196 486,224 428,252 370,224" stroke="var(--accent)" stroke-width="1.5"></polygon>
+<g fill="currentColor" font-family="IBM Plex Sans, sans-serif">
+<text font-size="12.5" font-weight="600" text-anchor="middle" x="126" y="218">~/.aws/credentials</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="126" y="238">the same file, unchanged</text>
+<text font-size="12.5" font-weight="600" text-anchor="middle" x="762" y="212">role/admin</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="762" y="232">ASIA… expires in 1 hour</text>
+<text font-size="11.5" opacity=".68" text-anchor="middle" x="762" y="250">then full administrator</text>
+</g>
+<text fill="var(--accent)" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" x="428" y="228">MFA?</text>
+<g fill="none" marker-end="url(#c)" stroke="currentColor" stroke-width="1.4">
+<line x1="228" x2="364" y1="224" y2="224"></line>
+</g>
+<line color="var(--good)" fill="none" marker-end="url(#c)" stroke="var(--good)" stroke-width="1.6" x1="486" x2="642" y1="224" y2="224"></line>
+<line fill="none" stroke="var(--stop)" stroke-width="1.5" x1="428" x2="428" y1="252" y2="296"></line>
+<g stroke="var(--stop)" stroke-width="2.2">
+<line x1="421" x2="435" y1="298" y2="312"></line>
+<line x1="435" x2="421" y1="298" y2="312"></line>
+</g>
+<g font-family="IBM Plex Mono, monospace" font-size="11">
+<text fill="currentColor" opacity=".82" text-anchor="middle" x="296" y="214">sts:AssumeRole</text>
+<text fill="currentColor" opacity=".55" text-anchor="middle" x="296" y="246">and nothing else</text>
+<text fill="var(--good)" text-anchor="middle" x="564" y="214">6 digits from al-iphone</text>
+<text fill="var(--stop)" x="452" y="309">no code → AccessDenied</text>
+</g>
+</svg>
+</div>
+<figcaption>The file on disk does not change and is not encrypted. What changes is what it is
+      <em>permitted to ask for</em> — and the only thing it may ask for is guarded by something that
+      never leaves your pocket.</figcaption>
+</figure>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The subtlety · this is an interview question</p>
+<h2><code>Bool</code> vs <code>BoolIfExists</code></h2>
+</div>
+<p><code>aws:MultiFactorAuthPresent</code> has <strong>three</strong> states, not two — and the
+    third is the one that catches people:</p>
+<div class="tw">
+<table>
+<thead><tr><th>Request made with</th><th>Key value</th></tr></thead>
+<tbody>
+<tr><td>Temporary credentials minted <em>with</em> an MFA code</td><td><span class="chip ok">true</span></td></tr>
+<tr><td>Temporary credentials minted <em>without</em> one</td><td><span class="chip imp">false</span></td></tr>
+<tr><td>A long-term <code>AKIA</code> key</td><td><span class="chip exp">absent — the key is not in the request at all</span></td></tr>
+</tbody>
+</table>
+</div>
+<p>Now watch what that does to a Deny written the obvious way:</p>
+<div class="code"><span class="c">// BROKEN - the exact case you are trying to block sails straight through</span>
+{ "Effect": "Deny", "Action": "*", "Resource": "*",
+  "Condition": { <span class="r">"Bool"</span>: { "aws:MultiFactorAuthPresent": "false" } } }
+
+<span class="c">// CORRECT - "false, OR not present at all"</span>
+{ "Effect": "Deny", "Action": "*", "Resource": "*",
+  "Condition": { <span class="g">"BoolIfExists"</span>: { "aws:MultiFactorAuthPresent": "false" } } }</div>
+<p>With plain <code>Bool</code>, a raw <code>AKIA</code> request carries no such key, so the condition
+    never matches, so the <code>Deny</code> <strong>never fires</strong>. You would have written a policy that
+    blocks exactly the credentials that were already safe and permits the ones you were afraid of.
+    <code>BoolIfExists</code> means <em>"if the key is there compare it; if it is absent, count that as a
+    match"</em>.</p>
+<div class="call">
+<h3>Why your 2.2 role was right anyway</h3>
+<p>Your <code>learning-mfa-demo</code> trust policy uses plain <code>Bool</code> with
+      <code>"true"</code>, and that is correct — because it is an <strong>Allow</strong>. An absent key
+      fails to match, so the Allow does not apply, and per lesson 2.3 you land on <em>implicit deny</em>. Safe
+      by default.</p>
+<p>The rule: <strong><code>Bool</code> + <code>true</code> in an Allow is safe.
+      <code>Bool</code> + <code>false</code> in a Deny is a hole.</strong> A positive test fails closed; a
+      negative test fails open.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The build</p>
+<h2>Six steps, in this order</h2>
+</div>
+<div class="call stop">
+<h3>Step 0 — prove the escape hatch before you touch anything</h3>
+<p>You are about to remove your own admin rights from the only key you have. If it goes wrong, the way
+      back is the <strong>root user</strong>, which can always repair IAM. Your account is in good shape for
+      this — root MFA is enabled and root has <strong>no access keys</strong> — but do not take
+      that on trust. <strong>Log into the console as root, right now, in a browser, and confirm the MFA
+      prompt works.</strong> Then log out. Do not continue until you have.</p>
+</div>
+<p><strong>1. Create the role.</strong> Same trust policy shape as the one you already built in 2.2, with
+    <code>AdministratorAccess</code> attached instead of one S3 action.</p>
+<div class="code"><span class="c"># trust: only this user, only with MFA</span>
+{ "Version": "2012-10-17", "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "AWS": "arn:aws:iam::739489595894:user/lisakalex" },
+    "Action": "sts:AssumeRole",
+    "Condition": { "Bool": { "aws:MultiFactorAuthPresent": "true" } } }] }</div>
+<p><strong>2. Add the profile</strong> to <code>~/.aws/config</code>. This is what makes the whole thing
+    survivable day to day — the CLI prompts for the code, then caches the temporary credentials until
+    they expire.</p>
+<div class="code">[profile admin]
+role_arn         = arn:aws:iam::739489595894:role/admin
+source_profile   = default
+mfa_serial       = arn:aws:iam::739489595894:mfa/al-iphone
+duration_seconds = 3600</div>
+<p><strong>3. Test it while you are still admin</strong> — this is the point of doing it in this
+    order.</p>
+<div class="code"><span class="c">$ aws sts get-caller-identity --profile admin</span>
+Enter MFA code for arn:aws:iam::739489595894:mfa/al-iphone: <span class="w">______</span>
+
+"Arn": "arn:aws:iam::739489595894:<span class="g">assumed-role/admin/botocore-session-…</span>"</div>
+<p><strong>4. Swap the user's permissions</strong> — detach <code>AdministratorAccess</code>, attach
+    a policy that permits one action on one resource. Do this <em>from the admin role session</em>, so that
+    session stays alive as a second way back.</p>
+<div class="code">{ "Version": "2012-10-17", "Statement": [{
+    "Sid": "KnockOnly",
+    "Effect": "Allow",
+    "Action": "sts:AssumeRole",
+    "Resource": "arn:aws:iam::739489595894:role/admin" }] }</div>
+<p><strong>5. Prove the key is now worthless on its own.</strong></p>
+<div class="code"><span class="c">$ aws s3 ls</span> <span class="c"># naked AKIA key</span>
+<span class="r">AccessDenied</span>
+<span class="c">$ aws s3 ls --profile admin</span> <span class="c"># same key + your phone</span>
+2026-08-18 …  tfstate bucket</div>
+<p><strong>6. Rotate the key.</strong> It is 46 days old and it has been sitting in plaintext the whole
+    time. It is far less valuable now, which is exactly why this is the right moment — do it calmly
+    rather than during an incident.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Consequences</p>
+<h2>What breaks, and what does not</h2>
+</div>
+<div class="split">
+<div class="card">
+<p class="tag">unaffected</p>
+<h3>GitHub Actions</h3>
+<p>Your pipeline authenticates by OIDC and assumes its own role — it never touches this user or
+        this key. Nothing to change. That is lesson 2.4 paying for itself.</p>
+</div>
+<div class="card">
+<p class="tag">needs the profile</p>
+<h3>Terraform, Docker, ECR</h3>
+<p>Anything you run locally now needs <code>AWS_PROFILE=admin</code> in the environment, including
+        <code>terraform plan</code> against the S3 backend and <code>aws ecr get-login-password</code>.</p>
+</div>
+<div class="card">
+<p class="tag">new habit</p>
+<h3>One code per hour</h3>
+<p>The CLI caches the session in <code>~/.aws/cli/cache/</code>, so you type six digits at most once
+        an hour, not once a command.</p>
+</div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Honesty</p>
+<h2>What this does not fix</h2>
+</div>
+<ul>
+<li><strong>The cache is plaintext too.</strong> While a session is live, <code>~/.aws/cli/cache/</code>
+      holds working admin credentials, readable by anything running as you. The difference is that they
+      <em>expire</em> — you have narrowed an unlimited window to about an hour.</li>
+<li><strong>Malware that waits.</strong> Code running as you can simply sit there until you type your
+      next code, then ride the session. MFA raises the cost and forces the attacker to be present; it does not
+      make the machine trustworthy.</li>
+<li><strong>The key still identifies you.</strong> <code>sts:GetCallerIdentity</code> needs no
+      permission at all, so a thief still learns your account ID and username. Minor, but true.</li>
+<li><strong>Root is now load-bearing.</strong> You have made root your recovery path, so its MFA device
+      matters more than it did yesterday. Know where it is.</li>
+</ul>
+<p>The honest summary: you have converted <em>"one file, forever, everything"</em> into <em>"one file plus
+    a physical device you hold, for an hour at a time"</em>. That is not perfect security. It is the
+    difference between a leak being a catastrophe and a leak being a nuisance.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check yourself</p>
+<h2>Three questions</h2>
+</div>
+<details>
+<summary>Why did step 4 come after step 3, and not before?</summary>
+<div class="answer"><p>Ask what you would still have been able to do if the role or the profile had been wrong — in each of the two orderings.</p></div>
+</details>
+<details>
+<summary>You write the <code>Deny</code> policy from design A using <code>Bool</code> instead of <code>BoolIfExists</code>, and test it with credentials from <code>get-session-token</code>. It appears to work. Why is that test worthless?</summary>
+<div class="answer"><p>Which of the three states did your test actually exercise — and which one was the whole point?</p></div>
+</details>
+<details>
+<summary>Your teammate says "just encrypt <code>~/.aws/credentials</code> instead, it is simpler." What is wrong with that?</summary>
+<div class="answer"><p>Follow the sequence through: the AWS CLI has to send a usable secret. Where does the plaintext have to exist, and who can read it there?</p></div>
+</details>
+</section>
+<footer>
+<p>Module 02, Lesson 2.5 · syllabus, progress log and full revision Q&amp;A in <code>docs/AWS_COURSE.md</code></p>
+<p>This closes <strong>Module 2 — IAM</strong>. Next: <strong>Module 3 — S3</strong>, where the
+    resource-based policies from 2.3 stop being a diagram and start holding your data.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

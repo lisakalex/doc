@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Say Again?</title>
+<link rel="icon" href="../../assets/img/favicon-reference.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/00-say-again.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Reference sheet · AWS + DevOps course</p>
+<h1>Say Again?</h1>
+<p class="lede">The English an interviewer actually uses — idioms, hedges and engineering
+    slang, in plain words. None of it is technical, all of it will be said to you, and none of
+    it is in the abbreviations sheet.</p>
+<div class="facts">
+<span class="fact">plain meanings only</span>
+<span class="fact">no idiom explained with another idiom</span>
+<span class="fact">type to filter</span>
+</div>
+</header>
+<div class="filter">
+<input aria-label="Filter the phrases" id="q" placeholder="filter — try deploy, incident, disagree, meeting…" type="search"/>
+<span class="count" id="count"></span>
+</div>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">In the interview</p><h2>What they say, and what they want</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">walk me through</span><span class="ex"><b>explain it step by step, in order</b> — <i>they want the sequence and your reasoning at each step, not a summary. Start at the beginning and do not skip.</i></span></div>
+<div class="gi"><span class="ab">at a high level</span><span class="ex"><b>the short version, no detail</b> — <i>two or three sentences. If you start naming config options you have misread the question.</i></span></div>
+<div class="gi"><span class="ab">deep dive / drill down / dig into</span><span class="ex"><b>go deeper on one specific part</b> — <i>they are interested, not unhappy. Stay on the one thing they named.</i></span></div>
+<div class="gi"><span class="ab">off the top of your head</span><span class="ex"><b>guess now, from memory, no checking</b> — <i>they accept that it may be wrong. Refusing to answer is worse than an approximate answer.</i></span></div>
+<div class="gi"><span class="ab">ballpark / back of the envelope</span><span class="ex"><b>a rough number, right order of size</b> — <i>"a few hundred dollars a month" is a good answer. "I would need to calculate it" is not.</i></span></div>
+<div class="gi"><span class="ab">sanity check</span><span class="ex"><b>a quick test that something is not obviously wrong</b> — <i>not a full test. "Let me sanity check that" = "let me confirm the basics".</i></span></div>
+<div class="gi"><span class="ab">red flag</span><span class="ex"><b>a warning sign; something that would worry them</b> — <i>"what would be a red flag in that code review?" = what would make you refuse to approve it.</i></span></div>
+<div class="gi"><span class="ab">low-hanging fruit</span><span class="ex"><b>the easy wins you would do first</b> — <i>cheap changes with obvious benefit. From fruit you can pick without a ladder.</i></span></div>
+<div class="gi"><span class="ab">trade-off</span><span class="ex"><b>what you lose in exchange for what you gain</b> — <i>the most common interview question shape. Every answer should name both sides.</i></span></div>
+<div class="gi"><span class="ab">talk me through your thinking</span><span class="ex"><b>say the reasoning out loud, including the wrong turns</b> — <i>they are grading the process, not only the answer.</i></span></div>
+<div class="gi"><span class="ab">what would you do differently</span><span class="ex"><b>criticise your own past work</b> — <i>a test of honesty. "Nothing" is the wrong answer.</i></span></div>
+<div class="gi"><span class="ab">tell me about a time when…</span><span class="ex"><b>a behavioural question — give one real story</b> — <i>one specific incident with a beginning and an end. Not "usually I would…".</i></span></div>
+<div class="gi"><span class="ab">STAR</span><span class="ex"><b>Situation, Task, Action, Result</b> — <i>the structure expected for the question above. Say what was happening, what you had to do, what you did, how it ended.</i></span></div>
+<div class="gi"><span class="ab">does that make sense?</span><span class="ex"><b>usually "was my explanation clear?"</b> — <i>it is rarely a test of you. "Yes" or "not quite — can you repeat the part about X" are both fine.</i></span></div>
+<div class="gi"><span class="ab">let's park that / take it offline</span><span class="ex"><b>stop discussing this now, maybe later</b> — <i>not a criticism. Move on without arguing.</i></span></div>
+<div class="gi"><span class="ab">any questions for us?</span><span class="ex"><b>a scored part of the interview, not politeness</b> — <i>have two ready. Ask about on-call, deploy frequency, or how decisions get made.</i></span></div>
+<div class="gi"><span class="ab">nice to have vs must have</span><span class="ex"><b>optional versus required</b> — <i>useful in your own answers: "versioning is a must-have on state, a nice-to-have on avatars".</i></span></div>
+<div class="gi"><span class="ab">in anger</span><span class="ex"><b>in real production use, under real load</b> — <i>British. "I have not used Kubernetes in anger" = only in tutorials, never for real. A very useful honest phrase.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Saying you do not know</p><h2>How to be honest without sounding weak</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">"it depends"</span><span class="ex"><b>correct only if you immediately say what it depends on</b> — <i>alone it sounds evasive. "It depends on whether the bucket is overwritten or append-only" is a strong answer.</i></span></div>
+<div class="gi"><span class="ab">"my instinct is X, but I would verify"</span><span class="ex"><b>commit to an answer and name how you would check it</b> — <i>this is what senior sounds like. Guessing with no check sounds careless; refusing to guess sounds timid.</i></span></div>
+<div class="gi"><span class="ab">"I have not hit that in practice"</span><span class="ex"><b>honest admission of a gap, without apology</b> — <i>follow with what you would read or test first.</i></span></div>
+<div class="gi"><span class="ab">"I would push back on that"</span><span class="ex"><b>I disagree, and I would say so at work</b> — <i>interviewers often want to see this. Disagreeing politely is a skill they are testing.</i></span></div>
+<div class="gi"><span class="ab">"that is a fair point"</span><span class="ex"><b>you are right and I am changing my answer</b> — <i>safe to use. Changing your mind on evidence scores well.</i></span></div>
+<div class="gi"><span class="ab">hand-wave / hand-wavy</span><span class="ex"><b>vague, skipping the hard part</b> — <i>if someone says your answer is hand-wavy, they want the specific mechanism, not more description.</i></span></div>
+<div class="gi"><span class="ab">straw man</span><span class="ex"><b>a rough first proposal, offered to be attacked</b> — <i>"here is a straw man" = "this is not my final answer, criticise it". A genuinely useful thing to offer.</i></span></div>
+<div class="gi"><span class="ab">devil's advocate</span><span class="ex"><b>arguing the opposite on purpose, not sincerely</b> — <i>"let me play devil's advocate" means the next thing they say is a test, not their real opinion.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Engineering slang</p><h2>Words used as if everyone knows them</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">blast radius <span class="seen">taught</span></span><span class="ex"><b>how much breaks if this one thing fails</b> — <i>from explosives. "Separate accounts limit the blast radius" = a mistake in one cannot reach the other.</i></span></div>
+<div class="gi"><span class="ab">happy path</span><span class="ex"><b>the run where nothing goes wrong</b> — <i>"it works on the happy path" is a criticism: the error cases were not handled.</i></span></div>
+<div class="gi"><span class="ab">edge case / corner case</span><span class="ex"><b>a rare input or state that breaks the normal logic</b> — <i>empty list, zero, a name with an apostrophe, a leap second.</i></span></div>
+<div class="gi"><span class="ab">foot-gun</span><span class="ex"><b>a feature that makes it easy to hurt yourself</b> — <i>from "shoot yourself in the foot". <code>force_destroy = true</code> is a foot-gun.</i></span></div>
+<div class="gi"><span class="ab">tech debt</span><span class="ex"><b>shortcuts taken earlier that cost you time now</b> — <i>like a loan: you borrowed speed and you are paying interest.</i></span></div>
+<div class="gi"><span class="ab">greenfield / brownfield</span><span class="ex"><b>building new from nothing / working inside an existing system</b> — <i>from construction: empty land versus a site with old buildings on it.</i></span></div>
+<div class="gi"><span class="ab">yak shaving</span><span class="ex"><b>a long chain of unrelated tasks before the real one</b> — <i>you wanted to fix a bug, so you upgraded a library, which needed a new runtime, which needed… none of it was the bug.</i></span></div>
+<div class="gi"><span class="ab">bikeshedding</span><span class="ex"><b>arguing at length about something trivial</b> — <i>a committee approves a nuclear plant quickly and spends hours on the colour of the bike shed, because everyone has an opinion about sheds.</i></span></div>
+<div class="gi"><span class="ab">rubber ducking</span><span class="ex"><b>explaining a problem out loud to find your own mistake</b> — <i>traditionally to a toy duck. Explaining forces the gap into the open.</i></span></div>
+<div class="gi"><span class="ab">cattle, not pets</span><span class="ex"><b>servers should be replaceable, not repaired by hand</b> — <i>you name a pet and nurse it when sick; you number cattle and replace them.</i></span></div>
+<div class="gi"><span class="ab">snowflake</span><span class="ex"><b>a server or environment configured by hand, unique, impossible to recreate</b> — <i>"no two snowflakes are alike". The thing Infrastructure as Code exists to prevent.</i></span></div>
+<div class="gi"><span class="ab">drift <span class="seen">taught</span></span><span class="ex"><b>reality no longer matches the declared config</b> — <i>someone changed it in the console. <code>terraform plan</code> is how you detect it.</i></span></div>
+<div class="gi"><span class="ab">bus factor</span><span class="ex"><b>how many people must disappear before the project stops</b> — <i>"bus factor of one" = only one person understands it. A risk, not a compliment.</i></span></div>
+<div class="gi"><span class="ab">toil</span><span class="ex"><b>manual repetitive work that grows with scale and adds no lasting value</b> — <i>a precise SRE term, not just "boring work". The thing you are meant to automate away.</i></span></div>
+<div class="gi"><span class="ab">shift left</span><span class="ex"><b>catch problems earlier in the process</b> — <i>from a left-to-right diagram of build → test → deploy. Security scanning in CI instead of before release.</i></span></div>
+<div class="gi"><span class="ab">paved road / golden path</span><span class="ex"><b>the supported, easy way to do something</b> — <i>you may leave it, but then you support yourself.</i></span></div>
+<div class="gi"><span class="ab">dogfooding</span><span class="ex"><b>using your own product internally</b> — <i>from "eat your own dog food".</i></span></div>
+<div class="gi"><span class="ab">noisy neighbour</span><span class="ex"><b>another tenant on shared hardware consuming what you needed</b> — <i>your performance drops and nothing you did caused it.</i></span></div>
+<div class="gi"><span class="ab">thundering herd</span><span class="ex"><b>everything retries at the same moment and overwhelms the thing recovering</b> — <i>fixed with jitter: random delay so retries spread out.</i></span></div>
+<div class="gi"><span class="ab">cold start</span><span class="ex"><b>the slow first request, before anything is warm</b> — <i>Lambda spinning up, a cache that is empty, a JIT that has not compiled yet.</i></span></div>
+<div class="gi"><span class="ab">back pressure</span><span class="ex"><b>a system telling its caller to slow down instead of collapsing</b> — <i>queue full, request rejected. Healthier than accepting work you cannot do.</i></span></div>
+<div class="gi"><span class="ab">graceful degradation <span class="seen">taught</span></span><span class="ex"><b>losing a feature instead of the whole service</b> — <i>avatars fail to load but login still works.</i></span></div>
+<div class="gi"><span class="ab">flaky test</span><span class="ex"><b>a test that passes and fails without the code changing</b> — <i>worse than a failing test, because people learn to ignore it.</i></span></div>
+<div class="gi"><span class="ab">smoke test</span><span class="ex"><b>a tiny check that the thing basically works after a change</b> — <i>from electronics: power it on and see whether smoke comes out.</i></span></div>
+<div class="gi"><span class="ab">canary</span><span class="ex"><b>release to a small share of traffic first and watch</b> — <i>from caged birds taken into coal mines to detect gas before it reached the miners.</i></span></div>
+<div class="gi"><span class="ab">blue / green</span><span class="ex"><b>two full environments; switch traffic between them</b> — <i>rollback is switching back, not redeploying.</i></span></div>
+<div class="gi"><span class="ab">big bang</span><span class="ex"><b>changing everything at once</b> — <i>always said as a warning.</i></span></div>
+<div class="gi"><span class="ab">single pane of glass</span><span class="ex"><b>one screen showing everything</b> — <i>usually something a vendor is selling you.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Incidents and on-call</p><h2>The vocabulary of things going wrong</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">on call</span><span class="ex"><b>the person responsible for responding if it breaks, right now</b> — <i>usually a weekly rota. "Who is on call?" = who gets woken up.</i></span></div>
+<div class="gi"><span class="ab">paged / got paged</span><span class="ex"><b>automatically alerted, often at night</b> — <i>from the old pager device. "It paged at 3am" = an alert fired and woke someone.</i></span></div>
+<div class="gi"><span class="ab">SEV1 / P1</span><span class="ex"><b>the most serious incident level</b> — <i>numbers go down as severity goes up. SEV1 usually means customer-visible and total.</i></span></div>
+<div class="gi"><span class="ab">incident commander</span><span class="ex"><b>the person coordinating the response, not fixing it</b> — <i>they decide and communicate; others type. A deliberate separation.</i></span></div>
+<div class="gi"><span class="ab">war room</span><span class="ex"><b>the call or room where an incident is handled</b> — <i>increasingly avoided as a term; "incident channel" is the calmer modern word.</i></span></div>
+<div class="gi"><span class="ab">mitigate vs fix</span><span class="ex"><b>stop the bleeding now vs remove the cause later</b> — <i>a restart mitigates; the code change fixes. In an incident you mitigate first, always.</i></span></div>
+<div class="gi"><span class="ab">rollback / roll forward</span><span class="ex"><b>return to the previous version / ship a new version that fixes it</b> — <i>the choice is usually about which is faster and safer, not which is tidier.</i></span></div>
+<div class="gi"><span class="ab">post-mortem</span><span class="ex"><b>the written review after an incident</b> — <i>Latin for "after death". A <b>blameless</b> post-mortem deliberately excludes who to blame, so people tell the truth.</i></span></div>
+<div class="gi"><span class="ab">RCA</span><span class="ex"><b>Root Cause Analysis</b> — <i>finding the underlying cause. Modern SRE is sceptical that there is exactly one.</i></span></div>
+<div class="gi"><span class="ab">runbook / playbook</span><span class="ex"><b>step-by-step instructions for a known situation</b> — <i>written so a tired person at 3am can follow it without thinking.</i></span></div>
+<div class="gi"><span class="ab">escalate</span><span class="ex"><b>hand it to someone more senior or more specialised</b> — <i>not an admission of failure. Escalating early is usually correct.</i></span></div>
+<div class="gi"><span class="ab">change freeze</span><span class="ex"><b>no deploys during a risky period</b> — <i>Black Friday, year end, during an incident.</i></span></div>
+<div class="gi"><span class="ab">game day / fire drill</span><span class="ex"><b>a practice incident, deliberately caused</b> — <i>to test whether the runbooks and the people actually work.</i></span></div>
+<div class="gi"><span class="ab">chaos engineering</span><span class="ex"><b>breaking production on purpose, in controlled ways</b> — <i>the discipline that grew out of game days. Netflix's Chaos Monkey is the origin.</i></span></div>
+<div class="gi"><span class="ab">firefighting</span><span class="ex"><b>constantly reacting to problems, never preventing them</b> — <i>said with frustration. "We are firefighting" = nothing planned is getting done.</i></span></div>
+<div class="gi"><span class="ab">KTLO</span><span class="ex"><b>Keep The Lights On</b> — <i>the work required just to stay running. Budget discussions separate KTLO from new work.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Team and process</p><h2>Meeting words</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">stand-up</span><span class="ex"><b>a short daily status meeting</b> — <i>historically held standing so it stays short. What you did, what you will do, what is blocking you.</i></span></div>
+<div class="gi"><span class="ab">blocked / blocker</span><span class="ex"><b>cannot continue until something else happens</b> — <i>saying you are blocked early is expected, not a complaint.</i></span></div>
+<div class="gi"><span class="ab">retro</span><span class="ex"><b>retrospective — a team meeting about how the work went</b> — <i>about process, not about an incident.</i></span></div>
+<div class="gi"><span class="ab">sprint / backlog / refinement</span><span class="ex"><b>a fixed work period / the list of not-yet-done work / the meeting where that list is clarified</b> — <i>"grooming" is the older word for refinement.</i></span></div>
+<div class="gi"><span class="ab">RFC / design doc / ADR</span><span class="ex"><b>a written proposal circulated before building</b> — <i>ADR = Architecture Decision Record: what was decided, and why, kept in the repo.</i></span></div>
+<div class="gi"><span class="ab">LGTM</span><span class="ex"><b>Looks Good To Me</b> — <i>code review approval.</i></span></div>
+<div class="gi"><span class="ab">nit / nitpick</span><span class="ex"><b>a small comment that should not block approval</b> — <i>"nit: typo in the comment". Prefixing with "nit:" is a courtesy that says "fix if you like, I am not blocking you".</i></span></div>
+<div class="gi"><span class="ab">WIP</span><span class="ex"><b>Work In Progress</b> — <i>on a pull request it means "do not review or merge yet".</i></span></div>
+<div class="gi"><span class="ab">ping</span><span class="ex"><b>send a short message to get attention</b> — <i>"ping me when it is done". From the network tool.</i></span></div>
+<div class="gi"><span class="ab">loop in</span><span class="ex"><b>add someone to the conversation</b> — <i>"looping in the security team".</i></span></div>
+<div class="gi"><span class="ab">circle back / touch base</span><span class="ex"><b>talk again later</b> — <i>often means "not now". If nobody sets a time, it may mean never.</i></span></div>
+<div class="gi"><span class="ab">buy-in</span><span class="ex"><b>agreement and support from the people who matter</b> — <i>"we need buy-in from the platform team" = they must agree before this can work.</i></span></div>
+<div class="gi"><span class="ab">stakeholder</span><span class="ex"><b>anyone affected by the decision</b> — <i>not only managers.</i></span></div>
+<div class="gi"><span class="ab">EOD / COB / EOW</span><span class="ex"><b>End Of Day / Close Of Business / End Of Week</b> — <i>a deadline. Check which time zone.</i></span></div>
+<div class="gi"><span class="ab">OOO</span><span class="ex"><b>Out Of Office</b> — <i>away, not working.</i></span></div>
+<div class="gi"><span class="ab">heads-up</span><span class="ex"><b>advance warning</b> — <i>"a heads-up: I am deploying at 4". Informational, not a request.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Disagreement in disguise</p><h2>Phrases that mean the opposite of how they sound</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">"interesting…"</span><span class="ex"><b>often "I disagree" or "I do not believe that"</b> — <i>tone decides. If it is followed by a pause, expect a challenge.</i></span></div>
+<div class="gi"><span class="ab">"I am not sure I follow"</span><span class="ex"><b>usually "I think you are wrong", said politely</b> — <i>British especially. Treat it as a request to justify, not to repeat.</i></span></div>
+<div class="gi"><span class="ab">"with respect…"</span><span class="ex"><b>disagreement is coming immediately</b> — <i>the phrase warns you; it does not soften much.</i></span></div>
+<div class="gi"><span class="ab">"have you considered…"</span><span class="ex"><b>"you have missed something"</b> — <i>a gentle way to point out a gap. Take it seriously.</i></span></div>
+<div class="gi"><span class="ab">"that is one way to do it"</span><span class="ex"><b>"I would not do it that way"</b> — <i>ask what they would do instead.</i></span></div>
+<div class="gi"><span class="ab">"let us agree to disagree"</span><span class="ex"><b>the discussion is over without agreement</b> — <i>usually ends the topic. If the decision still matters, escalate instead.</i></span></div>
+<div class="gi"><span class="ab">"the elephant in the room"</span><span class="ex"><b>the obvious problem nobody is mentioning</b> — <i>naming it is usually welcome.</i></span></div>
+<div class="gi"><span class="ab">"boil the ocean"</span><span class="ex"><b>attempt something impossibly large</b> — <i>"let us not boil the ocean" = reduce the scope.</i></span></div>
+<div class="gi"><span class="ab">"kick the can down the road"</span><span class="ex"><b>delay a decision that will only get harder</b> — <i>always a criticism.</i></span></div>
+<div class="gi"><span class="ab">"moving the goalposts"</span><span class="ex"><b>changing the requirements after work started</b> — <i>a complaint about unfairness.</i></span></div>
+<div class="gi"><span class="ab">"a hill to die on"</span><span class="ex"><b>an argument worth losing your position over</b> — <i>"that is not a hill to die on" = concede this one.</i></span></div>
+<div class="gi"><span class="ab">"in the weeds"</span><span class="ex"><b>lost in detail, having missed the larger point</b> — <i>"we are in the weeds" = step back up.</i></span></div>
+<div class="gi"><span class="ab">"scope creep"</span><span class="ex"><b>the work quietly growing beyond what was agreed</b> — <i>each addition is small; the total is not.</i></span></div>
+<div class="gi"><span class="ab">"closed book"</span><span class="ex"><b>from memory, without looking anything up</b> — <i>from exams. "Open book" means you may use your notes. The phrase that sent you here.</i></span></div>
+</div>
+</section>
+<footer>
+<p>Reference sheet · companion to <code>lessons/reference/00-alphabet-soup.html</code> (abbreviations)
+    · interview questions and model answers in <code>docs/INTERVIEW_PRACTICE.md</code></p>
+<p>Rule used throughout: no idiom is explained using another idiom. If a definition here still
+    contains a phrase you do not know, that is a bug — say so and it gets rewritten.</p>
+</footer>
+</div>
+<script src="../../assets/js/00-say-again.js"></script>
+</body>
+</html>

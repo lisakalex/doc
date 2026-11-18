@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Python That Survives Leaving Your Laptop</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/p0-5-python-that-survives.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Phase 0 · Lesson 0.5 · AWS + DevOps course</p>
+<h1>Python That Survives Leaving Your Laptop</h1>
+<p class="lede">Your Python scripts run unattended in Jenkins, and other engineers depend on them.
+  Every "it worked on my laptop" failure in Python comes down to one of three things: the wrong
+  interpreter, a missing package, or a different version of a package. This lesson shows the
+  mechanism behind each one, and the files that stop it happening: a virtualenv, a lock file, and
+  a wheel.</p>
+<div class="facts">
+<span class="fact">~3 hours</span>
+<span class="fact">week 2</span>
+<span class="fact">laptop only, no AWS</span>
+<span class="fact">uv 0.9.10 · Python 3.14</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The mechanism</p>
+<h2>What <code>import requests</code> actually does</h2>
+</div>
+<p>Python does not "know" which packages are installed. When it meets an <code>import</code>, it
+  searches a list of directories, in order, and loads the first match. That list is
+  <code>sys.path</code>, and it belongs to <strong>one interpreter</strong>. This is the whole
+  mechanism:</p>
+<div class="ladder">
+<div class="rung"><span class="s">1</span><p><span class="who">Which python</span>The shell finds
+  <code>python3</code> on <code>PATH</code>, or a shebang line names an interpreter directly. That
+  choice fixes everything after it.</p></div>
+<div class="rung"><span class="s">2</span><p><span class="who">Its sys.path</span>That interpreter
+  builds its search list: the standard library first, then its own
+  <code>site-packages</code> (Debian and Ubuntu call it <code>dist-packages</code>).</p></div>
+<div class="rung"><span class="s">3</span><p><span class="who">First match wins</span>It walks the
+  list and loads the first <code>requests</code> it finds. If none of the directories has one, you
+  get <code>ModuleNotFoundError</code>.</p></div>
+</div>
+<p>Here is the list on the laptop this lesson was written on, Ubuntu 26.04:</p>
+<div class="code"><code>$ python3 -c 'import sys; print(sys.executable); print(*sys.path, sep="\n")'
+/usr/bin/python3
+/usr/lib/python314.zip
+/usr/lib/python3.14
+/usr/lib/python3.14/lib-dynload
+/usr/local/lib/python3.14/dist-packages
+/usr/lib/python3/dist-packages
+/usr/lib/python3.14/dist-packages
+
+$ python3 -c 'import requests; print(requests.__file__)'
+<span class="w">/usr/lib/python3/dist-packages/requests/__init__.py</span></code></div>
+<p><code>requests</code> works on this laptop because <strong>Ubuntu installed it</strong>, as the
+  apt package <code>python3-requests</code>, for its own tools. Nobody on the project asked for it.
+  A script that imports it works here by accident, and nothing written down says it needs it.</p>
+<div class="call">
+<h3><code>pip</code> and <code>python3</code> can be two different Pythons</h3>
+<p><code>pip install</code> installs into the interpreter that <code>pip</code> itself belongs to.
+  On a server with several Pythons, that is often not the one Jenkins runs. Always install with
+  <code>python -m pip</code>, using the same <code>python</code> that will run the script. Then
+  the install and the run use the same <code>sys.path</code>.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The fix for "which packages"</p>
+<h2>A virtualenv is just a directory</h2>
+</div>
+<p>A virtual environment is a folder with three things in it: a link to a real interpreter, an
+  empty <code>site-packages</code>, and a small config file that tells the interpreter to use that
+  folder instead of the system one:</p>
+<div class="code"><code>$ python3 -m venv .venv
+$ cat .venv/pyvenv.cfg
+home = /usr/bin
+include-system-site-packages = false
+version = 3.14.4
+executable = /usr/bin/python3.14
+$ ls -l .venv/bin/python
+.venv/bin/python -&gt; python3
+
+$ .venv/bin/python -c 'import requests'
+<span class="r">ModuleNotFoundError: No module named 'requests'</span></code></div>
+<p>Same laptop, same Python 3.14, and <code>requests</code> is gone, because
+  <code>include-system-site-packages = false</code> takes Ubuntu's
+  <code>dist-packages</code> off the list. That is the point. Inside the venv, only what you
+  install exists, so anything missing from your project's dependency list fails <em>here</em>,
+  on your laptop, and not on the server.</p>
+
+<h3>You don't need <code>activate</code></h3>
+<p><code>source .venv/bin/activate</code> does three small things: it puts
+  <code>.venv/bin</code> at the front of <code>PATH</code>, sets <code>VIRTUAL_ENV</code>, and
+  changes your prompt. It is a convenience for typing. In a Jenkins job, call the interpreter by
+  its path instead: <code>.venv/bin/python script.py</code>. It's shorter, and you can see in the
+  log which Python ran.</p>
+
+<h3>A venv cannot be moved</h3>
+<p>When pip installs a command into a venv, it writes the venv's full path into the command's
+  first line. Copy the venv somewhere else, and every command in it points at a Python that is no
+  longer there:</p>
+<div class="code"><code>$ head -1 server/app/bin/check-release
+#!/…/labs/p0-5/server/app/bin/python
+$ mv server/app server/moved
+$ server/moved/bin/check-release release.toml
+<span class="r">bash: server/moved/bin/check-release: /…/server/app/bin/python: bad interpreter:
+No such file or directory</span>          <span class="c"># exit 126</span></code></div>
+<p class="note">So a venv is not something you build in Jenkins and copy to a server. You build it
+  on the machine that runs it, from files that pin exactly what goes in. The rest of this lesson
+  is those files.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Seen on a real run</p>
+<h2>Why it failed on the server</h2>
+</div>
+<p>A script you might really write: before a deploy, check that every artifact the release needs
+  is in the repository. It reads a list from <code>release.toml</code> and asks Maven Central for
+  each one. The second artifact is a version that doesn't exist, so the script exits 1 on
+  purpose:</p>
+<div class="code"><code>"""Check that every artifact a release needs exists before the deploy starts."""
+import sys
+import tomllib
+
+import requests
+
+with open(sys.argv[1], "rb") as f:
+    release = tomllib.load(f)
+
+missing = 0
+for artifact in release["artifact"]:
+    status = requests.head(artifact["url"], timeout=10).status_code
+    print(status, artifact["url"].rsplit("/", 1)[-1])
+    missing += status != 200
+
+sys.exit(1 if missing else 0)</code></div>
+<p>Run it on three Pythons:</p>
+<div class="code"><code><span class="c"># the laptop: works</span>
+$ python3 check_release.py release.toml
+200 camel-spring-boot-bom-4.20.0.pom
+404 camel-spring-boot-bom-9.9.9.pom
+
+<span class="c"># a server whose python3 is 3.9 (RHEL 9 and Amazon Linux 2023 both ship 3.9)</span>
+$ uv run --no-project --python 3.9 check_release.py release.toml
+  File "check_release.py", line 3, in &lt;module&gt;
+    import tomllib
+<span class="r">ModuleNotFoundError: No module named 'tomllib'</span>
+
+<span class="c"># a clean server with a new enough Python, and nothing installed</span>
+$ uv run --no-project --python 3.12 check_release.py release.toml
+  File "check_release.py", line 5, in &lt;module&gt;
+    import requests
+<span class="r">ModuleNotFoundError: No module named 'requests'</span></code></div>
+<div class="tw"><table>
+<thead><tr><th>Failure</th><th>Cause</th><th>What prevents it</th></tr></thead>
+<tbody>
+<tr><td class="key">Wrong interpreter</td><td><code>tomllib</code> joined the standard library in Python 3.11. Nothing in the script says it needs 3.11</td><td><code>requires-python</code> in <code>pyproject.toml</code></td></tr>
+<tr><td class="key">Missing package</td><td><code>requests</code> came from Ubuntu, not from the project</td><td>A venv, plus a dependency list</td></tr>
+<tr><td class="key">Different version</td><td>The server installs whatever is newest on the day of the install</td><td>A lock file, with hashes</td></tr>
+</tbody></table></div>
+<p>The obvious fix on a modern Debian or Ubuntu server doesn't work any more, and that is
+  deliberate:</p>
+<div class="code"><code>$ python3 -m pip install requests
+<span class="r">error: externally-managed-environment</span>
+
+× This environment is externally managed
+╰─&gt; To install Python packages system-wide, try apt install
+    python3-xyz, where xyz is the package you are trying to
+    install.
+
+    If you wish to install a non-Debian-packaged Python package,
+    create a virtual environment using python3 -m venv path/to/venv.</code></div>
+<div class="call warn">
+<h3>Don't reach for <code>--break-system-packages</code></h3>
+<p>This guard (PEP 668) exists because the system Python belongs to the operating system.
+  <code>apt</code>, cloud-init and other system tools import from it. Upgrade
+  <code>requests</code> there for your script, and you can break a tool the OS needs. The error
+  message already names the right fix: a venv.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Pinning</p>
+<h2>Same commit, different bytes, again</h2>
+</div>
+<p>Lesson 0.1a showed a jar changing between two builds of one commit. Python dependencies do the
+  same thing, and the reason is a real difference from Maven.</p>
+<p>A Maven pom names <em>exact</em> versions, and Maven Central never changes a published file. So
+  the same <code>pom.xml</code> resolves the same tree next year, unless you use ranges or
+  SNAPSHOTs. A Python package declares <em>ranges</em>. <code>requests</code> 2.34.2 says
+  <code>urllib3&gt;=1.26,&lt;3</code>, and pip picks the newest version in the range on the day
+  you install. Here is a one-line requirements file, <code>requests</code>, resolved as of
+  1 January 2023 and as of today:</p>
+<div class="code"><code>$ uv pip compile --exclude-newer 2023-01-01 requirements.in -o lock-2023.txt
+$ uv pip compile requirements.in -o lock-today.txt
+$ diff lock-2023.txt lock-today.txt
+&lt; certifi==2022.12.7             &gt; certifi==2026.10.23
+&lt; charset-normalizer==2.1.1      &gt; charset-normalizer==3.5.2
+&lt; idna==3.4                      &gt; idna==3.20
+&lt; requests==2.28.1               &gt; requests==2.34.2
+&lt; urllib3==1.26.13               <span class="r">&gt; urllib3==2.8.0</span>          <span class="c"># a new major version</span></code></div>
+<p class="note"><code>--exclude-newer</code> tells uv to ignore anything published after that
+  date. It replays the resolve someone would have got on 1 January 2023, so you can see drift
+  without waiting for it. The output above is set side by side to fit; <code>diff</code> prints
+  the two columns one above the other.</p>
+<p>Five packages, five different versions. Now pin the one you asked for,
+  <code>requests==2.28.1</code>, and resolve again:</p>
+<div class="code"><code>$ diff p-2023.txt p-today.txt
+&lt; certifi==2022.12.7             &gt; certifi==2026.10.23
+&lt; idna==3.4                      &gt; idna==3.20
+&lt; urllib3==1.26.13               &gt; urllib3==1.26.20</code></div>
+<p>The package you pinned stayed put, and <strong>three of the four you didn't name still
+  changed</strong>. Those are <em>transitive</em> dependencies, the dependencies of your
+  dependencies. A requirements file that pins only what you import pins less than half of what
+  runs.</p>
+<div class="tw"><table>
+<thead><tr><th>What the file says</th><th>What it pins</th><th>Same install next year?</th></tr></thead>
+<tbody>
+<tr><td><code>requests</code></td><td>Nothing</td><td><span class="chip exp">no</span></td></tr>
+<tr><td><code>requests==2.28.1</code></td><td>The one package you named</td><td><span class="chip exp">no</span></td></tr>
+<tr><td><code>pip freeze</code> output</td><td>Every package in the venv, exact</td><td><span class="chip imp">mostly</span> no hashes, and includes whatever anyone installed by hand</td></tr>
+<tr><td>A lock file: <code>uv.lock</code>, or <code>pip-compile --generate-hashes</code> output</td><td>Every package, exact, with a hash of each file</td><td><span class="chip ok">yes</span></td></tr>
+</tbody></table></div>
+<p class="note"><code>pip freeze</code> also loses the difference between "we need this" and "this
+  came along with something we need". Six months later nobody knows which lines are safe to
+  delete, so upgrades stop happening.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The project shape</p>
+<h2>Two files: what works, and what ships</h2>
+</div>
+<p>A modern Python project has the same split as a Maven build. <code>pyproject.toml</code> says
+  which versions <em>work</em>. The lock file records exactly which versions you
+  <em>tested</em>, so CI and every server install exactly those. <code>uv init --package</code>
+  creates the layout, and <code>uv add</code> fills in both files:</p>
+<div class="pair">
+<div><p class="lab">pyproject.toml: what works</p>
+<div class="code"><code>[project]
+name = "check-release"
+version = "0.1.0"
+<span class="g">requires-python = "&gt;=3.11"</span>
+dependencies = [
+    "requests&gt;=2.34.2",
+]
+
+[project.scripts]
+check-release = "check_release:main"
+
+[build-system]
+requires = ["uv_build&gt;=0.9.10,&lt;0.10.0"]
+build-backend = "uv_build"</code></div></div>
+<div><p class="lab">uv.lock: what ships (one entry of six)</p>
+<div class="code"><code>[[package]]
+name = "requests"
+version = "2.34.2"
+dependencies = [
+    { name = "certifi" },
+    { name = "charset-normalizer" },
+    { name = "idna" },
+    { name = "urllib3" },
+]
+sdist = { url = "…/requests-2.34.2.tar.gz",
+  hash = "sha256:f288924c…60b9ed" }</code></div></div>
+</div>
+<p><code>[project.scripts]</code> makes <code>check-release</code> a real command when the package
+  is installed, so nobody needs to know where the <code>.py</code> file lives. Three things now
+  fail early, with a clear message, on the laptop or in CI:</p>
+<div class="code"><code><span class="c"># the old server's Python is refused before anything runs</span>
+$ uv run --python 3.9 check-release release.toml
+<span class="r">error: The requested interpreter resolved to Python 3.9.25, which is incompatible with
+the project's Python requirement: `&gt;=3.11` (from `project.requires-python`)</span>   <span class="c"># exit 2</span>
+
+<span class="c"># someone added a dependency to pyproject.toml and didn't re-lock</span>
+$ uv sync --locked
+<span class="r">The lockfile at `uv.lock` needs to be updated, but `--locked` was provided.
+To update the lockfile, run `uv lock`.</span>                                      <span class="c"># exit 1</span>
+
+<span class="c"># a downloaded file whose hash doesn't match (certifi's hashes altered by hand)</span>
+$ .venv/bin/python -m pip install --require-hashes -r bad.txt
+<span class="r">ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE.</span>
+    certifi==2026.10.23 from https://files.pythonhosted.org/…/certifi-2026.10.23-py3-none-any.whl
+        Expected sha256 09895e6e…aaf36cd
+             Got        e9b54de7…ba2f61d1</code></div>
+<div class="call">
+<h3><code>uv sync --locked</code> belongs in CI</h3>
+<p>It is the Python equivalent of failing the build when the pom and the resolved tree disagree.
+  Without <code>--locked</code>, uv quietly updates the lock to match, and CI tests a set of
+  versions nobody reviewed.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Build once, deploy many</p>
+<h2>The wheel is the artifact</h2>
+</div>
+<p>A <strong>wheel</strong> (<code>.whl</code>) is Python's jar: a zip file with your code and a
+  metadata file, ready to install without building anything. <code>uv build</code> makes one:</p>
+<div class="code"><code>$ uv build
+Successfully built dist/check_release-0.1.0.tar.gz
+Successfully built dist/check_release-0.1.0-py3-none-any.whl
+
+$ unzip -l dist/check_release-0.1.0-py3-none-any.whl
+      475  <span class="g">1980-01-01 00:00</span>   check_release/__init__.py
+       54  <span class="g">1980-01-01 00:00</span>   check_release-0.1.0.dist-info/entry_points.txt
+      278  <span class="g">1980-01-01 00:00</span>   check_release-0.1.0.dist-info/METADATA
+      …
+
+$ sha256sum dist/*.whl; rm -rf dist; uv build -q; sha256sum dist/*.whl
+34dfa967a51cd5b4…9a22830d  dist/check_release-0.1.0-py3-none-any.whl
+34dfa967a51cd5b4…9a22830d  dist/check_release-0.1.0-py3-none-any.whl</code></div>
+<p>Every timestamp is 1980, so two builds of one commit give <strong>the same bytes</strong>. That
+  is the property you had to switch on for the jar in Lesson 0.1a. The build backend gives it to
+  you here.</p>
+<div class="call warn">
+<h3>The wheel does not carry your lock</h3>
+<p>Look inside its <code>METADATA</code>: <code>Requires-Dist: requests&gt;=2.34.2</code>. That is
+  the range from <code>pyproject.toml</code>, not the lock. Run
+  <code>pip install check_release-0.1.0-py3-none-any.whl</code> on a server next year, and pip
+  resolves fresh versions on the day: the drift from the previous section, back again. So ship
+  two things: the wheel, and the lock exported with hashes.</p>
+</div>
+<p>On the server, that is four commands, and none of them resolves anything:</p>
+<div class="code"><code><span class="c"># in CI, once: export the lock as a hashed requirements file</span>
+$ uv export --format requirements-txt --no-dev --no-emit-project -o requirements.lock.txt
+
+<span class="c"># on the server: a venv, the locked dependencies, then the wheel without its own resolve</span>
+$ python3.12 -m venv /opt/check-release
+$ /opt/check-release/bin/python -m pip install --require-hashes -r requirements.lock.txt
+$ /opt/check-release/bin/python -m pip install --no-deps check_release-0.1.0-py3-none-any.whl
+$ /opt/check-release/bin/check-release release.toml
+200 camel-spring-boot-bom-4.20.0.pom
+404 camel-spring-boot-bom-9.9.9.pom</code></div>
+<p>The wheel and the requirements file are the artifacts. Publish them to JFrog the same way you
+  publish jars today: Artifactory has PyPI repositories, and pip installs from them with
+  <code>--index-url</code>. Build once, promote the same files, install them everywhere.</p>
+<p class="note">Phase 2 makes this simpler. A container image holds the interpreter, the venv and
+  the code as one artifact with one digest, so "which Python is on the server" stops being a
+  question.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Small scripts</p>
+<h2>One file that declares what it needs</h2>
+</div>
+<p>Not every Jenkins helper deserves a package. For a single script, put the requirements inside
+  the script, in a comment block that tools read (PEP 723), and give it a lock file of its own:</p>
+<div class="code"><code>$ uv add --script check_release.py requests  <span class="c"># then set requires-python to &gt;=3.11 by hand</span>
+$ uv lock --script check_release.py          <span class="c"># writes check_release.py.lock</span>
+$ head -6 check_release.py
+# /// script
+# requires-python = "&gt;=3.11"
+# dependencies = [
+#     "requests",
+# ]
+# ///
+
+$ uv run --locked check_release.py release.toml
+200 camel-spring-boot-bom-4.20.0.pom
+404 camel-spring-boot-bom-9.9.9.pom</code></div>
+<p><code>uv run</code> builds a private, cached venv for the script, from the lock. The Jenkins
+  step becomes one line, and the script can't silently pick up Ubuntu's <code>requests</code>.
+  The audit script that checks these lesson pages, <code>assets/scripts/audit.py</code>, is
+  written this way.</p>
+<p class="note">One more thing for scripts other people depend on: a Python crash also exits
+  with 1. In this script, "an artifact is missing" and "the script is broken" look the same to
+  Jenkins. Give real outcomes their own codes, and document them.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Build it</p>
+<h2>Break it on three Pythons, then make it survive</h2>
+</div>
+<p>Everything runs on your laptop. uv downloads the extra Pythons it needs into your home
+  directory, and nothing touches the system Python. Work in
+  <code>devops-course/labs/p0-5/</code>.</p>
+
+<h3>Part 1: see the mechanism</h3>
+<div class="code"><code>mkdir -p ~/IdeaProjects/devops-course/labs/p0-5 &amp;&amp; cd $_
+python3 -c 'import sys; print(sys.executable); print(*sys.path, sep="\n")'
+python3 -c 'import requests; print(requests.__file__)'
+python3 -m venv .venv
+cat .venv/pyvenv.cfg
+.venv/bin/python -c 'import sys; print(*sys.path, sep="\n")'
+.venv/bin/python -c 'import requests'</code></div>
+<p>Which directory did the laptop's <code>requests</code> come from? What disappeared from
+  <code>sys.path</code> inside the venv?</p>
+
+<h3>Part 2: why it failed on the server</h3>
+<p>This block writes two files into <code>labs/p0-5</code>: the Python script from
+  "Why it failed on the server" above, as <code>check_release.py</code>, and its list of
+  artifacts, as <code>release.toml</code>. Paste it whole:</p>
+<div class="code"><code>cd ~/IdeaProjects/devops-course/labs/p0-5
+cat &gt; check_release.py &lt;&lt;'EOF'
+"""Check that every artifact a release needs exists before the deploy starts."""
+import sys
+import tomllib
+
+import requests
+
+with open(sys.argv[1], "rb") as f:
+    release = tomllib.load(f)
+
+missing = 0
+for artifact in release["artifact"]:
+    status = requests.head(artifact["url"], timeout=10).status_code
+    print(status, artifact["url"].rsplit("/", 1)[-1])
+    missing += status != 200
+
+sys.exit(1 if missing else 0)
+EOF
+cat &gt; release.toml &lt;&lt;'EOF'
+# Artifacts the Interchange release needs. The check fails if any is missing.
+[[artifact]]
+url = "https://repo1.maven.org/maven2/org/apache/camel/springboot/camel-spring-boot-bom/4.20.0/camel-spring-boot-bom-4.20.0.pom"
+
+[[artifact]]
+url = "https://repo1.maven.org/maven2/org/apache/camel/springboot/camel-spring-boot-bom/9.9.9/camel-spring-boot-bom-9.9.9.pom"
+EOF
+ls</code></div>
+<p class="note"><code>cat &gt; file &lt;&lt;'EOF'</code> writes every line that follows into
+  <code>file</code>, up to the line <code>EOF</code>. The quotes around <code>'EOF'</code> stop the
+  shell from changing anything inside, such as <code>$</code> signs.</p>
+<ol class="todo">
+<li>Run it with <code>python3 check_release.py release.toml</code>, then with
+  <code>uv run --no-project --python 3.9 check_release.py release.toml</code>, then the same with
+  <code>--python 3.12</code>. Write down which line fails each time, and why.</li>
+<li>Try <code>python3 -m pip install requests</code>. Read the whole error message, not just
+  its first line.</li>
+</ol>
+
+<h3>Part 3: watch drift happen</h3>
+<div class="code"><code>echo requests &gt; requirements.in
+uv pip compile -q --no-header --exclude-newer 2023-01-01 requirements.in -o lock-2023.txt
+uv pip compile -q --no-header requirements.in -o lock-today.txt
+diff lock-2023.txt lock-today.txt</code></div>
+<p>Then change <code>requirements.in</code> to <code>requests==2.28.1</code> and run all three
+  again. How many packages still changed, and which ones?</p>
+
+<h3>Part 4: package it</h3>
+<div class="code"><code>uv init --package --name check-release pkg &amp;&amp; cd pkg
+uv add requests</code></div>
+<ol class="todo">
+<li>In <code>pyproject.toml</code>, change <code>requires-python</code> to
+  <code>"&gt;=3.11"</code>, the oldest Python that has <code>tomllib</code>.</li>
+<li>Replace the contents of <code>src/check_release/__init__.py</code> with the script, with its
+  body moved inside <code>def main() -&gt; None:</code>. <code>[project.scripts]</code> calls
+  <code>main</code>.</li>
+<li>Run <code>uv run check-release ../release.toml</code>, then the same with
+  <code>--python 3.9</code>. Compare the 3.9 error with the one from Part 2.</li>
+<li>Add <code>"pyyaml",</code> to <code>dependencies</code> by hand, without
+  <code>uv add</code>, and run <code>uv sync --locked</code>. Then remove it again.</li>
+<li>Run <code>uv build</code> twice, with <code>sha256sum dist/*.whl</code> after each, deleting
+  <code>dist</code> in between. Same hash?</li>
+</ol>
+
+<h3>Part 5: install it like a server</h3>
+<div class="code"><code>uv export --format requirements-txt --no-dev --no-emit-project -o requirements.lock.txt
+$(uv python find 3.12) -m venv ../server/app
+../server/app/bin/python -m pip install --require-hashes -r requirements.lock.txt
+../server/app/bin/python -m pip install --no-deps dist/check_release-0.1.0-py3-none-any.whl
+../server/app/bin/check-release ../release.toml
+head -1 ../server/app/bin/check-release
+mv ../server/app ../server/moved &amp;&amp; ../server/moved/bin/check-release ../release.toml</code></div>
+<p><strong>Done when:</strong> the server venv runs <code>check-release</code> and prints one 200
+  and one 404, and you can explain the "bad interpreter" error after the move from the
+  <code>head -1</code> line.</p>
+
+<h3>Part 6: your own scripts</h3>
+<p>Pick one Python script you run in Jenkins at work. From memory, write down three things: which
+  interpreter runs it (and how you know), how its packages get onto the agent, and what is
+  pinned. That is the CV line and the interview story for this lesson. Leave out hostnames,
+  customer names, and anything that looks like a password or a token.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check</p>
+<h2>Five questions</h2>
+</div>
+<p>Out loud first, and end each one with "because…" and the consequence.</p>
+<details><summary>Someone ran <code>pip install requests</code> on the Jenkins agent, and the job still fails with <code>No module named 'requests'</code>. Give two ways that happens.</summary><div class="answer"><p><strong>The install and the run used different interpreters.</strong> <code>pip</code> belongs to one Python, for example 3.12, and the job runs <code>python3</code>, which is 3.9. Each has its own <code>sys.path</code>, so the package is in a directory the job never searches.</p><p>Or it was installed with <code>--user</code> as a different user. User installs go under that user's home directory, and the Jenkins agent runs as <code>jenkins</code>. The fix for both: a venv for the job, installed with <code>.venv/bin/python -m pip</code> and run with <code>.venv/bin/python</code>.</p></div></details>
+<details><summary><code>requirements.txt</code> says <code>requests==2.28.1</code>. The same commit is deployed a year apart and installs different code. How?</summary><div class="answer"><p><strong>Only the direct dependency is pinned.</strong> <code>requests</code> declares ranges for its own dependencies, and pip picks the newest version in each range on the day. In the lab, three of four transitive packages changed while <code>requests</code> stayed put.</p><p>Fix: a lock file that pins every package, transitive ones included, with hashes, such as <code>uv.lock</code> exported with <code>uv export</code>, or <code>pip-compile --generate-hashes</code>. Install it with <code>--require-hashes</code>.</p></div></details>
+<details><summary>What does <code>source .venv/bin/activate</code> actually do, and does a Jenkins job need it?</summary><div class="answer"><p><strong>It puts <code>.venv/bin</code> first on <code>PATH</code></strong>, sets <code>VIRTUAL_ENV</code>, and changes the prompt. Nothing else: the venv works because of <code>pyvenv.cfg</code> next to the interpreter, not because of <code>activate</code>.</p><p>A job doesn't need it. Call <code>.venv/bin/python</code> directly. It is explicit in the log, and it doesn't depend on shell state surviving between steps.</p></div></details>
+<details><summary>Your team runs <code>pip freeze &gt; requirements.txt</code> and calls it a lock file. What's weak about it?</summary><div class="answer"><p><strong>It records the environment, not the project.</strong> Anything someone installed by hand to debug, a linter or <code>ipython</code>, gets frozen in and shipped to production. It has no hashes, so a changed file on the index isn't caught.</p><p>And it mixes direct and transitive dependencies with no record of which is which, so nobody can tell which lines are safe to remove or upgrade. Upgrades stop, and the pinned versions slowly collect known vulnerabilities.</p></div></details>
+<details><summary>You build a wheel in CI and install it on each server with <code>pip install check_release-0.1.0-py3-none-any.whl</code>. Is that build once, deploy many?</summary><div class="answer"><p><strong>Only half of it.</strong> Your code is built once, but the wheel's metadata lists ranges (<code>requests&gt;=2.34.2</code>), so each install resolves dependencies on the day. Two servers installed a week apart can run different <code>urllib3</code>.</p><p>Fix: ship the hashed lock export with the wheel. On each server, install <code>-r requirements.lock.txt --require-hashes</code> first, then the wheel with <code>--no-deps</code>. Nothing is resolved at deploy time, and both files are promoted through JFrog like a jar.</p></div></details>
+</section>
+
+<footer>
+<p>Sources: Python documentation for <code>sys.path</code>, the <code>site</code> module and
+  <code>venv</code>; PEP 668 (externally managed environments), PEP 621
+  (<code>[project]</code> in <code>pyproject.toml</code>), PEP 723 (inline script metadata); pip
+  documentation for hash-checking mode; uv documentation for projects, locking, scripts,
+  <code>uv export</code> and <code>uv build</code>; the published dependency metadata of
+  <code>requests</code> 2.28.1 and 2.34.2 on PyPI. Every output on this page comes from a real run
+  on Ubuntu 26.04 with Python 3.14.4, uv 0.9.10 and uv-managed Python 3.9.25 and 3.12.12, checked
+  3 November 2026. Paths are shortened with <code>…</code>.</p>
+<p>Next: update the CV with what Phase 0 gave you, then Phase 1, Lesson 1.1: processes and file
+  descriptors.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

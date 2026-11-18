@@ -1,0 +1,11 @@
+/* lesson 0.1: naming a practice the learner already follows */
+.chip{color:var(--muted);background:var(--surface-2);border-color:var(--rule-strong);}
+.chip.ok{color:var(--good);background:var(--good-soft);border-color:var(--good-rule);}
+.ladder{display:flex;flex-direction:column;gap:0;border:1px solid var(--rule);border-radius:7px;
+  overflow:hidden;background:var(--surface);}
+.rung{display:grid;grid-template-columns:auto 1fr;gap:.9rem;padding:.85rem 1rem;
+  border-bottom:1px solid var(--rule);}
+.rung:last-child{border-bottom:none;}
+.rung .s{font-family:"IBM Plex Mono",monospace;font-size:.72rem;font-weight:600;color:var(--accent);
+  white-space:nowrap;padding-top:.15rem;}
+.rung p{font-size:.93rem;color:var(--ink-2);}

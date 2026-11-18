@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The AWS Mental Model</title>
+<link rel="icon" href="../../assets/img/favicon-module-1.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/01-aws-mental-model.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Module 01 · AWS + DevOps course</p>
+<h1>The AWS Mental Model</h1>
+<p class="lede">One signed API, three coordinates, and the exceptions that catch people out. Everything on this page was verified against a live account rather than quoted from documentation.</p>
+<div class="facts">
+<span class="fact">account 739489595894</span>
+<span class="fact">us-east-1</span>
+<span class="fact">verified 2026-08-29</span>
+<span class="fact">repo aws-sre</span>
+</div>
+</header>
+<!-- ============ 1. ONE API ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">The core idea</p>
+<h2>AWS is one API. Everything else is a client.</h2>
+</div>
+<p>Running <code>aws sts get-caller-identity</code> produces exactly this on the wire — an authenticated HTTPS POST and nothing more:</p>
+<div class="code"><span class="k">POST</span> / HTTP/1.1
+<span class="k">Host:</span> sts.us-east-1.amazonaws.com
+<span class="k">Content-Type:</span> application/x-www-form-urlencoded
+<span class="k">X-Amz-Date:</span> 20260829T033611Z
+<span class="k">Authorization:</span> AWS4-HMAC-SHA256
+    Credential=AKIA2YLI…LYFS/20260829/us-east-1/sts/aws4_request,
+    SignedHeaders=content-type;host;x-amz-date,
+    Signature=23b05ef0f714…
+
+Action=GetCallerIdentity&amp;Version=2011-06-15</div>
+<p>Creating a server, deleting a database, uploading a file — all of it is this same shape, sent to <code>&lt;service&gt;.&lt;region&gt;.amazonaws.com</code>. There is no other channel into AWS.</p>
+<div class="tw"><table>
+<thead><tr><th>Client</th><th>What it actually is</th></tr></thead>
+<tbody>
+<tr><td class="key">Console</td><td>A JavaScript app making these calls for you</td></tr>
+<tr><td class="key">AWS CLI</td><td>The same calls from a terminal</td></tr>
+<tr><td class="key">SDK (boto3)</td><td>The same calls from your code — <code>app/services/s3.py</code></td></tr>
+<tr><td class="key">Terraform</td><td>Diffs your <code>.tf</code> files against reality, then makes these calls</td></tr>
+</tbody>
+</table></div>
+<div class="call">
+<h3>The consequence people miss</h3>
+<p>The console has no privileged back door, because the API <em>is</em> the internals. Console and CLI used by the same identity can do <strong>exactly the same set of things</strong> — both are bounded by that identity's IAM policy. The difference is surface area exposed, not authority granted.</p>
+<p>“Lock down the CLI, let everyone use the console, it's safer” is therefore false, and it causes real breaches. <strong>Permissions are the control. The tool is not.</strong></p>
+</div>
+</section>
+<!-- ============ 2. SIGV4 ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">Authentication</p>
+<h2>SigV4: the secret never leaves your machine</h2>
+</div>
+<p>The <code>Authorization</code> header does three jobs at once. Read left to right:</p>
+<div class="record">
+<div class="seg-row">
+<div class="seg"><span class="seg-tok">AKIA2YLI…LYFS</span><span class="seg-lab">who is calling</span></div>
+<span class="colon">/</span>
+<div class="seg"><span class="seg-tok">20260829</span><span class="seg-lab">date scope</span></div>
+<span class="colon">/</span>
+<div class="seg"><span class="seg-tok">us-east-1</span><span class="seg-lab">region scope</span></div>
+<span class="colon">/</span>
+<div class="seg"><span class="seg-tok">sts</span><span class="seg-lab">service scope</span></div>
+<span class="colon">/</span>
+<div class="seg"><span class="seg-tok">aws4_request</span><span class="seg-lab">version</span></div>
+</div>
+</div>
+<p>The access key ID is public-ish, like a username. The <strong>signature</strong> is an HMAC computed over the request itself — method, host, headers, body, timestamp — using your secret key. So:</p>
+<div class="call">
+<h3>Get this the right way round</h3>
+<p>The secret key is <strong>not the thing being hashed</strong>. It is the key you hash <em>with</em>. Message = the request. Key = your secret. Output = the signature. Because the scope pins a date, region, and service, a captured signature cannot be replayed against another service or on another day.</p>
+</div>
+<p>Proof, from three real calls made seconds apart:</p>
+<div class="code"><span class="c"># identical request, same second — identical signature (deterministic)</span>
+call 1  …/us-east-1/<span class="k">sts</span>/aws4_request  SignedHeaders=content-type;host;x-amz-date         Signature=fda774725b127aee
+call 2  …/us-east-1/<span class="k">sts</span>/aws4_request  SignedHeaders=content-type;host;x-amz-date         Signature=fda774725b127aee
+
+<span class="c"># different service — different scope, different signed headers, different signature</span>
+call 3  …/us-east-1/<span class="w">s3</span>/aws4_request   SignedHeaders=host;<span class="w">x-amz-content-sha256</span>;x-amz-date  Signature=922c65f2b74e9adf</div>
+<p class="note">Note that S3 adds <code>x-amz-content-sha256</code> — it signs a hash of the request <em>body</em> too, so an upload cannot be tampered with in flight.</p>
+<h3>Where the SSH analogy breaks</h3>
+<div class="split">
+<div class="card">
+<span class="tag">SSH — asymmetric</span>
+<p>You keep the <strong>private</strong> key; the server holds only your <strong>public</strong> key. The server can verify your signature but <strong>cannot produce one</strong>. A leak of the server's key database is harmless.</p>
+</div>
+<div class="card">
+<span class="tag">SigV4 — symmetric</span>
+<p>There is no keypair. <strong>AWS holds a copy of your secret.</strong> Both sides compute the same HMAC and compare. AWS <em>could</em> sign as you.</p>
+</div>
+</div>
+<div class="call warn">
+<h3>Three consequences of that</h3>
+<p><strong>1.</strong> You can only ever see a secret key <em>once</em>, at creation. Lose it and you rotate, you don't recover.</p>
+<p><strong>2.</strong> A leaked secret key is total account compromise — no public/private split to save you. Keys committed to public repos get found in minutes; miners follow.</p>
+<p><strong>3.</strong> Long-lived secrets are the thing to engineer away. That is what OIDC and IRSA exist for.</p>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Prefix</th><th>Credential type</th><th>Lifetime</th></tr></thead>
+<tbody>
+<tr><td class="key">AKIA</td><td>IAM <strong>user</strong> access key</td><td><strong>Forever</strong>, until manually deleted</td></tr>
+<tr><td class="key">ASIA</td><td><strong>Temporary</strong> credentials from STS</td><td>Minutes to hours, then dead</td></tr>
+</tbody>
+</table></div>
+<p class="note">Memorise these two prefixes. Every AWS credential announces its own type in its first four characters.</p>
+</section>
+<!-- ============ 3. COORDINATES ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">Addressing</p>
+<h2>Three coordinates: account, region, AZ</h2>
+</div>
+<div class="split">
+<div class="card">
+<span class="tag">Account</span>
+<h3>Blast radius and bill</h3>
+<p>Resources in one account are invisible to another unless explicitly granted. Companies run many accounts — prod, staging, dev — precisely so a mistake in one cannot reach another.</p>
+</div>
+<div class="card">
+<span class="tag">Region</span>
+<h3>Geography</h3>
+<p>A physical cluster of datacentres. Regions are near-independent: different endpoints, separate resources. Chosen on latency, data-residency law, price, and service availability.</p>
+</div>
+<div class="card">
+<span class="tag">Availability Zone</span>
+<h3>Failure domain</h3>
+<p>Independent power and cooling, linked by private fibre. How you survive a datacentre fire without going multi-region.</p>
+</div>
+</div>
+<h3>Latency is a design input, not a footnote</h3>
+<p>Measured from a UK machine to each region's S3 endpoint — the argument for choosing a region that no lawyer needs to be involved in:</p>
+<div class="tw"><table>
+<thead><tr><th>Region</th><th>TCP connect</th><th>TLS handshake</th></tr></thead>
+<tbody>
+<tr><td class="key">us-east-1</td><td class="num">126 ms <span class="bar far u-width-5-0rem"></span></td><td class="num">242 ms</td></tr>
+<tr><td class="key">eu-south-1 <span class="u-color-var-muted">(Milan)</span></td><td class="num">71 ms <span class="bar u-width-2-8rem"></span></td><td class="num">118 ms</td></tr>
+<tr><td class="key">eu-west-1 <span class="u-color-var-muted">(Ireland)</span></td><td class="num">49 ms <span class="bar u-width-1-9rem"></span></td><td class="num">92 ms</td></tr>
+<tr><td class="key">eu-central-1 <span class="u-color-var-muted">(Frankfurt)</span></td><td class="num">43 ms <span class="bar u-width-1-7rem"></span></td><td class="num">83 ms</td></tr>
+</tbody>
+</table></div>
+<p class="note">Roughly 2–3× the round trip — and that is <em>per</em> round trip. One HTTPS request already needs several, before your app makes its own calls to S3 and DynamoDB.</p>
+<div class="call warn">
+<h3>GDPR does not say what most people think</h3>
+<p>GDPR (<strong>General Data Protection Regulation</strong> — data protection, not “digital rights”) does <strong>not</strong> require EU personal data to stay in the EU. Transfer to the US is lawful with Standard Contractual Clauses or the EU–US Data Privacy Framework, which AWS is certified under.</p>
+<p>The honest argument for staying in-region: transfers are legal but carry a compliance workstream — Transfer Impact Assessments, SCC paperwork — and standing legal risk. That ground has already shifted twice, with Safe Harbour struck down in 2015 and Privacy Shield in 2020.</p>
+<p>For a regulated sector the stronger levers are elsewhere: <strong>DORA</strong>, <strong>EIOPA</strong> cloud-outsourcing guidelines, and the national supervisor (<strong>IVASS</strong> for Italian insurance).</p>
+</div>
+</section>
+<!-- ============ 4. ARNs ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">Identifiers</p>
+<h2>Reading an ARN</h2>
+</div>
+<p>Every resource has a globally unique Amazon Resource Name. The empty field below is a clue, not a typo:</p>
+<div class="record">
+<div class="seg-row">
+<div class="seg"><span class="seg-tok">arn</span><span class="seg-lab">always</span></div>
+<span class="colon">:</span>
+<div class="seg"><span class="seg-tok">aws</span><span class="seg-lab">partition</span></div>
+<span class="colon">:</span>
+<div class="seg"><span class="seg-tok">iam</span><span class="seg-lab">service</span></div>
+<span class="colon">:</span>
+<div class="seg"><span class="seg-tok empty"> empty </span><span class="seg-lab hi">region — global!</span></div>
+<span class="colon">:</span>
+<div class="seg"><span class="seg-tok">739489595894</span><span class="seg-lab">account</span></div>
+<span class="colon">:</span>
+<div class="seg"><span class="seg-tok">user/lisakalex</span><span class="seg-lab">resource</span></div>
+</div>
+</div>
+<div class="record u-margin-top-35rem">
+<div class="seg-row">
+<div class="seg"><span class="seg-tok">arn</span><span class="seg-lab">always</span></div>
+<span class="colon">:</span>
+<div class="seg"><span class="seg-tok">aws</span><span class="seg-lab">partition</span></div>
+<span class="colon">:</span>
+<div class="seg"><span class="seg-tok">kms</span><span class="seg-lab">service</span></div>
+<span class="colon">:</span>
+<div class="seg"><span class="seg-tok">us-east-1</span><span class="seg-lab">region — regional</span></div>
+<span class="colon">:</span>
+<div class="seg"><span class="seg-tok">739489595894</span><span class="seg-lab">account</span></div>
+<span class="colon">:</span>
+<div class="seg"><span class="seg-tok">key/85618890…</span><span class="seg-lab">resource</span></div>
+</div>
+</div>
+<p>Proved at the endpoint level — IAM has <em>one</em> endpoint no matter which region you ask from; KMS has one per region:</p>
+<div class="code"><span class="c"># IAM — region ignored entirely</span>
+from eu-west-1       → https://<span class="k">iam.amazonaws.com</span>/
+from ap-southeast-2  → https://<span class="k">iam.amazonaws.com</span>/
+
+<span class="c"># KMS — one endpoint per region</span>
+from eu-west-1       → https://<span class="w">kms.eu-west-1</span>.amazonaws.com/
+from ap-southeast-2  → https://<span class="w">kms.ap-southeast-2</span>.amazonaws.com/
+
+<span class="c"># same key id, wrong region:</span>
+NotFoundException: Key 'arn:aws:kms:<span class="w">eu-west-1</span>:…:key/85618890-…' does not exist</div>
+<h3>The global services, in full</h3>
+<p>A short list worth memorising. Everything not on it is regional.</p>
+<div class="tw"><table>
+<thead><tr><th>Global service</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td class="key">IAM</td><td>Identity and permissions</td></tr>
+<tr><td class="key">Route 53</td><td>DNS</td></tr>
+<tr><td class="key">CloudFront</td><td>CDN</td></tr>
+<tr><td class="key">Organizations</td><td>Multi-account management</td></tr>
+<tr><td class="key">WAF</td><td>Web firewall (CloudFront scope)</td></tr>
+<tr><td class="key">Billing / Cost Explorer</td><td>Spend</td></tr>
+</tbody>
+</table></div>
+<div class="call warn">
+<h3>“Global” means one control plane, not a replicated one</h3>
+<p>Those services' control planes physically run in <strong>us-east-1</strong>. When us-east-1 has a bad day, IAM changes stall worldwide — even for companies running entirely in Europe. The October 2025 outage began as a DNS failure in front of DynamoDB in us-east-1 and cascaded far beyond it for exactly this reason.</p>
+<p>Related: <strong>IAM is eventually consistent.</strong> A role you just created may not be usable for a few seconds. Terraform hits this constantly — an apply fails with “role does not exist” on a role it created moments earlier, then succeeds on retry.</p>
+</div>
+</section>
+<!-- ============ 5. S3 EXCEPTION ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">The exception</p>
+<h2>S3 breaks the region rule</h2>
+</div>
+<p>The general rule — <em>look in the wrong region and you see nothing</em> — holds for EC2, DynamoDB, Lambda, RDS, VPC. It is the number one cause of “my resource disappeared.” S3 splits the difference in a way nothing else does:</p>
+<div class="tw"><table>
+<thead><tr><th>Aspect of S3</th><th>Scope</th></tr></thead>
+<tbody>
+<tr><td>Bucket <strong>name</strong></td><td>Globally unique — across every AWS account on Earth</td></tr>
+<tr><td>Bucket <strong>data</strong></td><td>Regional — objects physically live in one region</td></tr>
+<tr><td><code>ListBuckets</code></td><td>Global — returns every bucket in every region</td></tr>
+</tbody>
+</table></div>
+<div class="code"><span class="c"># same account, same credentials, same moment</span>
+S3 buckets   region=us-east-1       → prima-tech-challenge-lisakalex-tfstate
+S3 buckets   region=eu-west-1       → prima-tech-challenge-lisakalex-tfstate   <span class="k">← still visible</span>
+S3 buckets   region=ap-southeast-2  → prima-tech-challenge-lisakalex-tfstate   <span class="k">← still visible</span>
+
+DynamoDB     region=us-east-1       → prima-tech-challenge-lisakalex-tfstate-lock
+DynamoDB     region=eu-west-1       → <span class="w">(nothing)</span> <span class="w">← invisible</span></div>
+<p>Why the namespace is global: buckets are addressable as DNS hostnames, and DNS is globally unique.</p>
+<div class="code">https://<span class="k">prima-tech-challenge-lisakalex-tfstate</span>.s3.amazonaws.com/…
+        <span class="c">└─────── the bucket name is a subdomain ───────┘</span>
+<span class="c"># AWS says so itself:</span>
+BucketAlreadyExists: The requested bucket name is not available.
+<span class="w">The bucket namespace is shared by all users of the system.</span></div>
+<p class="note">This is why real bucket names look like <code>prima-tech-challenge-lisakalex-tfstate</code> — org prefix, purpose, account suffix. Not verbosity for its own sake; <code>avatars</code> was claimed fifteen years ago. It is also why names must be lowercase and DNS-safe.</p>
+<div class="call warn">
+<h3>Two S3 warts that bite in code</h3>
+<p><strong><code>get-bucket-location</code> returns <code>null</code> for us-east-1.</strong> It was the original region, predating the concept, so it has no location constraint string. Code doing <code>if location == "us-east-1"</code> breaks.</p>
+<p><strong>Region is not an access barrier for S3.</strong> Reading a bucket while configured for another region just works — the SDK follows the redirect. Region governs where bytes sit, which matters for latency, cost, and residency; not for permission.</p>
+</div>
+</section>
+<!-- ============ 6. KEEPERS ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">Retain these</p>
+<h2>The six keepers</h2>
+</div>
+<div class="keepers">
+<div class="keeper"><span class="dot"></span><p><b>AWS is one signed HTTPS API.</b> Console, CLI, SDK, and Terraform are four clients of it. What you may do comes from IAM, not from which tool you picked.</p></div>
+<div class="keeper"><span class="dot"></span><p><b>SigV4 never transmits your secret.</b> The secret is the key you HMAC <em>with</em>; the message is the request. Scoped to date, region, and service so it cannot be replayed elsewhere.</p></div>
+<div class="keeper"><span class="dot"></span><p><b>It is symmetric, unlike SSH.</b> AWS holds a copy. Hence: you see it once, a leak is total compromise, short-lived credentials are the goal. <code>AKIA</code> permanent, <code>ASIA</code> temporary.</p></div>
+<div class="keeper"><span class="dot"></span><p><b>Account → Region → AZ.</b> Account is blast radius and bill. Region is geography. AZ is failure domain.</p></div>
+<div class="keeper"><span class="dot"></span><p><b>Empty region in an ARN means a global service.</b> IAM, Route 53, CloudFront, Organizations, WAF, Billing — control planes all in us-east-1, which is why a bad day there is felt worldwide.</p></div>
+<div class="keeper"><span class="dot"></span><p><b>S3 is the exception to region-scoping.</b> Global name, global listing, regional data.</p></div>
+</div>
+</section>
+<!-- ============ 7. SELF TEST ============ -->
+<section>
+<div class="sec-head">
+<p class="eyebrow">Revision</p>
+<h2>Test yourself</h2>
+<p class="note">Answer out loud before opening. Recalling is what moves this into long-term memory; re-reading does not.</p>
+</div>
+<details>
+<summary>A colleague says the S3 console has special access to AWS internals the CLI doesn't. Are they right?</summary>
+<div class="answer">
+<p>No. The console is a JavaScript app making the same signed API calls. There are no internals behind the API — the API <em>is</em> the internals.</p>
+<p>Stronger point: the same identity has the <strong>identical</strong> permitted action set in both. The console merely exposes a curated subset of what the API offers. Surface area, not authority.</p>
+</div>
+</details>
+<details>
+<summary>Was your secret access key sent to AWS? What was sent instead?</summary>
+<div class="answer">
+<p>No. An <strong>HMAC signature over the request</strong> was sent — computed using the secret as the key. Also sent: the access key ID, so AWS knows which secret to look up.</p>
+<p>But unlike SSH, AWS <em>does</em> hold a copy of that secret. Symmetric, not asymmetric.</p>
+</div>
+</details>
+<details>
+<summary>You create a bucket in us-east-1. A teammate in the eu-west-1 console can't find it. Broken?</summary>
+<div class="answer">
+<p>Neither — <strong>they can see it.</strong> <code>ListBuckets</code> is global and the S3 console's bucket list is region-agnostic, showing all buckets with a Region column.</p>
+<p>For almost anything else — EC2, DynamoDB, Lambda — “check your region” would be the right answer.</p>
+</div>
+</details>
+<details>
+<summary>Why does an IAM ARN have an empty region field when a KMS ARN doesn't?</summary>
+<div class="answer">
+<p>IAM is global — one endpoint, <code>iam.amazonaws.com</code>, for the whole account. KMS is regional, one endpoint per region, and a key exists in exactly one of them.</p>
+<p>Practical consequence: a KMS key <strong>cannot cross regions</strong>. Move an encrypted bucket to another region and you need a new key and a re-encrypt.</p>
+</div>
+</details>
+<details>
+<summary>Italian insurer, running in us-east-1. Argue both sides.</summary>
+<div class="answer">
+<p><strong>Move:</strong> latency is 2–3× better from Europe, and sector rules — DORA, EIOPA, IVASS — push harder on residency than GDPR does.</p>
+<p><strong>Stay:</strong> us-east-1 is cheapest and gets features first. Quantify it: the S3 storage gap is a few percent, with real deltas in compute, NAT, and data transfer.</p>
+<p><strong>The senior answer:</strong> it depends which system you mean. For a demo project with no personal data, GDPR doesn't engage and latency is theoretical, so staying is fine <em>if documented</em>. For real production, the decision flips. Recognising that the question has two different answers is the thing being tested — as is knowing that us-east-1 is also AWS's least reliable region.</p>
+</div>
+</details>
+</section>
+<footer>
+<p>Module 01 of the AWS + DevOps course · syllabus and progress log in <code>docs/AWS_COURSE.md</code></p>
+<p>Next: <strong>Module 02 — IAM.</strong> Root vs user vs role, how a policy is actually evaluated, STS and temporary credentials, OIDC federation, and replacing that <code>AKIA</code> key with something that expires.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

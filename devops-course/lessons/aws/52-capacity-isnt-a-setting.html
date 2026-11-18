@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Capacity Isn&#x27;t a Setting</title>
+<link rel="icon" href="../../assets/img/favicon-module-5.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/52-capacity-isnt-a-setting.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Module 05 · Lesson 5.2 · AWS + DevOps course</p>
+<h1>Capacity Isn't a Setting</h1>
+<p class="lede">One line of your Terraform decides how the table is billed. Nothing in your Terraform
+      decides how much throughput it can actually deliver — that comes from the keys, one partition at a
+      time, and the ceiling is identical in both billing modes.</p>
+<div class="facts">
+<span class="fact">terraform/main.tf:114</span>
+<span class="fact">PAY_PER_REQUEST</span>
+<span class="fact">3,000 read / 1,000 write units per partition</span>
+<span class="fact">no maximum set</span>
+</div>
+</header>
+<section>
+<p class="eyebrow">Start with the line you already wrote</p>
+<h2>The billing mode is the easy half, and yours is right</h2>
+<div class="code"><span class="c"># terraform/main.tf:112</span>
+resource <span class="g">"aws_dynamodb_table"</span> <span class="g">"users"</span> {
+  name         = local.dynamodb_table
+  billing_mode = <span class="w">"PAY_PER_REQUEST"</span>
+  hash_key     = <span class="g">"email"</span>
+}</div>
+<p><code>PAY_PER_REQUEST</code> is on-demand mode: you are billed per request unit consumed, and
+      nothing at all for an idle table. The alternative is <code>PROVISIONED</code>, where you declare a
+      number of capacity units per second and pay for that number every hour of the month whether you
+      consume it or not. The Terraform provider's default is <code>PROVISIONED</code>; this table
+      overrides it.</p>
+<p>Since 1 November 2024 that override is the right one for most tables, and AWS says so in its own
+      words: <em>"most provisioned capacity workloads on DynamoDB today will achieve a lower price with
+      on-demand mode."</em> On-demand is now the documented default and the documented recommendation.</p>
+<div class="call">
+<h3>So we can stop looking at it</h3>
+<p>The billing line in this repo is correct. Two other things about this table's throughput are not,
+        and neither of them is a capacity setting.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The economics, exactly</p>
+<h2>The whole provisioned-versus-on-demand argument is one ratio</h2>
+</div>
+<p>List price, us-east-1, standard table class:</p>
+<div class="tw"><table>
+<thead><tr><th></th><th>On-demand</th><th>Provisioned</th></tr></thead>
+<tbody>
+<tr><td class="key">Writes</td><td>$0.625 per million write request units</td><td>$0.00065 per WCU-hour</td></tr>
+<tr><td class="key">Reads</td><td>$0.125 per million read request units</td><td>$0.00013 per RCU-hour</td></tr>
+<tr><td class="key">Storage</td><td>$0.25 per GB-month</td><td>$0.25 per GB-month</td></tr>
+</tbody>
+</table></div>
+<p>One capacity unit held for one hour buys 3,600 request units of work. That is the only conversion
+      needed to compare them:</p>
+<div class="code">write   3,600 × $0.625/1,000,000  =  $0.00225   on-demand
+                                    $0.00065   provisioned
+                                    <span class="c">---------</span>
+<span class="w">3.46×</span>
+
+read    3,600 × $0.125/1,000,000  =  $0.00045   on-demand
+                                    $0.00013   provisioned
+                                    <span class="c">---------</span>
+<span class="w">3.46×</span></div>
+<p>The two ratios are the same to three figures — AWS priced all four numbers off one multiple. And
+      eventual consistency halves the units consumed in both modes equally, so it cancels out and does not
+      move the comparison. Which means the entire mode question collapses to one number:</p>
+<div class="call">
+<h3>The only number in it</h3>
+<p>On-demand costs <strong>3.46×</strong> per unit of work. Provisioned is cheaper if you consume
+        more than <strong>1 ÷ 3.46 = 28.9%</strong> of what you provision, averaged over the month.
+        Below that, on-demand wins. Everything else is detail.</p>
+</div>
+<p class="note">Before 1 November 2024, on-demand writes were $1.25 per million — a ratio of 6.92× and a
+      break-even of 14.4%. The price cut doubled the break-even utilisation overnight. Advice written before
+      that date, in books or blog posts or your own notes, was computed against a number that is no longer
+      true, and the error always points the same way: it recommends provisioned for workloads that are now
+      cheaper on-demand.</p>
+<p>Reserved capacity is the third option, and it only sharpens the same ratio: up to 54% off for a
+      one-year term and 77% for three years, which moves the break-even to roughly 13% and 6.6%. The
+      commitment is on a capacity <em>number</em>, so you are forecasting the shape of your traffic three
+      years out, and an over-bought reservation is billed in full.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Why the default moved</p>
+<h2>Almost nobody runs at 29%</h2>
+</div>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="One day of writes to a table: a curve peaking at 800 writes a second in the evening and falling to 60 overnight, with a flat provisioned ceiling of 1,000 capacity units above it. The area under the curve is what on-demand bills; the full rectangle under the ceiling is what provisioned bills." role="img" viewbox="0 0 760 320">
+<line stroke="var(--rule)" stroke-width="1" x1="78" x2="734" y1="250.0" y2="250.0"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="end" x="70" y="253.5">0</text>
+<line stroke="var(--rule)" stroke-width="1" x1="78" x2="734" y1="200.0" y2="200.0"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="end" x="70" y="203.5">250</text>
+<line stroke="var(--rule)" stroke-width="1" x1="78" x2="734" y1="150.0" y2="150.0"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="end" x="70" y="153.5">500</text>
+<line stroke="var(--rule)" stroke-width="1" x1="78" x2="734" y1="100.0" y2="100.0"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="end" x="70" y="103.5">750</text>
+<line stroke="var(--rule)" stroke-width="1" x1="78" x2="734" y1="50.0" y2="50.0"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="end" x="70" y="53.5">1,000</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="end" x="70" y="28">writes/s</text>
+<rect fill="var(--warn-soft)" height="200.0" width="656" x="78" y="50.0"></rect>
+<path d="M 78.0,250.0 L 78.0,226.0 L 105.3,232.0 L 132.7,236.0 L 160.0,238.0 L 187.3,238.0 L 214.7,236.0 L 242.0,228.0 L 269.3,210.0 L 296.7,182.0 L 324.0,164.0 L 351.3,156.0 L 378.7,154.0 L 406.0,146.0 L 433.3,150.0 L 460.7,154.0 L 488.0,156.0 L 515.3,150.0 L 542.7,134.0 L 570.0,112.0 L 597.3,94.0 L 624.7,90.0 L 652.0,110.0 L 679.3,154.0 L 706.7,198.0 L 734.0,226.0 L 734.0,250.0 Z" fill="var(--accent-soft)"></path>
+<polyline fill="none" points="78.0,226.0 105.3,232.0 132.7,236.0 160.0,238.0 187.3,238.0 214.7,236.0 242.0,228.0 269.3,210.0 296.7,182.0 324.0,164.0 351.3,156.0 378.7,154.0 406.0,146.0 433.3,150.0 460.7,154.0 488.0,156.0 515.3,150.0 542.7,134.0 570.0,112.0 597.3,94.0 624.7,90.0 652.0,110.0 679.3,154.0 706.7,198.0 734.0,226.0" stroke="var(--accent)" stroke-linejoin="round" stroke-width="2.2"></polyline>
+<line stroke="var(--warn)" stroke-dasharray="6 4" stroke-width="2" x1="78" x2="734" y1="50.0" y2="50.0"></line>
+<line stroke="var(--accent-ink)" stroke-dasharray="2 3" stroke-width="1.4" x1="78" x2="734" y1="172.8" y2="172.8"></line>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="78.0" x2="78.0" y1="250" y2="255"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="78.0" y="269">00:00</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="242.0" x2="242.0" y1="250" y2="255"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="242.0" y="269">06:00</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="406.0" x2="406.0" y1="250" y2="255"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="406.0" y="269">12:00</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="570.0" x2="570.0" y1="250" y2="255"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="570.0" y="269">18:00</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="734.0" x2="734.0" y1="250" y2="255"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="734.0" y="269">24:00</text>
+<line stroke="var(--rule-strong)" stroke-width="1.2" x1="78" x2="734" y1="250" y2="250"></line>
+<text fill="var(--warn)" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600" x="88" y="42.0">provisioned 1,000 WCU · billed every hour of the month · $474.50</text>
+<text fill="var(--accent-ink)" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600" x="88" y="165.8">average 386 writes/s — 39% of the ceiling</text>
+<text fill="var(--accent-ink)" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600" text-anchor="middle" x="406.0" y="220.0">on-demand bills this area · $633.73</text>
+<text fill="var(--warn)" font-family="IBM Plex Sans, sans-serif" font-size="11" text-anchor="end" x="724" y="74.0">paid for, never used</text>
+<text fill="var(--ink-2)" font-family="Archivo, sans-serif" font-size="12" font-weight="600" x="14" y="298">Break-even is 28.9% average utilisation. This table runs at 39%, so provisioned is cheaper — by $159.23 a month.</text>
+</svg>
+</div>
+<figcaption>One day of writes to a single table: 60/s overnight, 800/s at 20:00, 386/s on average.
+      Provisioning for the peak with modest headroom means 1,000 WCU, held every hour of the month.
+      On-demand bills the area under the curve; provisioned bills the whole rectangle.</figcaption>
+</figure>
+<p>That is an ordinary web application, and it lands just above the line at 39% utilisation. This is
+      why the price cut flipped the default: a normal diurnal curve sits near 29%, so halving the on-demand
+      price moved most workloads of this shape across it.</p>
+<p>Now read the second number in that figure. Provisioned wins by <strong>$159.23 a month</strong>,
+      and that is the entire prize. To collect it you take on a provisioned number somebody has to choose,
+      auto scaling to adjust it, alarms to tell you when the choice was wrong, and a throttling risk every
+      morning at 09:00. On a $634 table that trade is bad. On a $63,400 table the same 25% is $15,900 a
+      month and you hire someone to do nothing else.</p>
+<div class="call">
+<h3>The rule</h3>
+<p>Size the effort against the bill, not against the percentage. The mode decision is worth between
+        0% and 71% of your DynamoDB spend, and 71% only for traffic that never varies.</p>
+</div>
+<h3>Auto scaling is not on-demand</h3>
+<p>The standard move here is to keep provisioned, switch on auto scaling and claim both. It does not
+      work that way, and the documentation is unusually explicit about why. Target utilisation is settable
+      between 20% and 90%, and the console offers 70%. Then:</p>
+<div class="tw"><table>
+<thead><tr><th>Stage</th><th>What the docs say</th></tr></thead>
+<tbody>
+<tr><td class="key">metric</td><td>consumed capacity is published in one-minute periods</td></tr>
+<tr><td class="key">trigger</td><td>auto scaling fires when consumption breaches the target for <strong>two consecutive minutes</strong></td></tr>
+<tr><td class="key">alarm</td><td>the CloudWatch alarm "might have a short delay of up to a few minutes before triggering auto scaling"</td></tr>
+<tr><td class="key">apply</td><td><code>UpdateTable</code> "takes several minutes to update the provisioned capacity"</td></tr>
+<tr><td class="key">meanwhile</td><td>"any requests that exceed the previous provisioned capacity of the tables are throttled"</td></tr>
+<tr><td class="key">scale down</td><td>needs <strong>15 consecutive data points</strong> below target</td></tr>
+<tr><td class="key">decreases</td><td>4 available at the start of each UTC day, +1 per hour, maximum 27 a day</td></tr>
+</tbody>
+</table></div>
+<p>So auto scaling follows a trend over several minutes. It cannot absorb a spike. What absorbs
+      spikes is <strong>burst capacity</strong>: DynamoDB retains up to five minutes — 300 seconds — of
+      your unused capacity and lets you spend it faster than your provisioned rate. That is real and it
+      saves you often. It is also not a budget you can plan with: the same page says DynamoDB spends burst
+      capacity "for background maintenance and other tasks without prior notice", and that "these burst
+      capacity details might change in the future".</p>
+<div class="call warn">
+<h3>What a 70% target actually buys</h3>
+<p>Holding a 70% target means choosing to pay for 1.43× your consumption on the days everything
+        works. Against on-demand's 3.46× that is still a 59% saving — on the days the target holds.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The limit with no mode</p>
+<h2>3,000 and 1,000, whichever mode you chose</h2>
+</div>
+<p>From the partition key best-practices page, with no billing mode anywhere in the sentence:
+      <em>"Every partition in a DynamoDB table is designed to deliver a maximum capacity of 3,000 read
+      units per second and 1,000 write units per second."</em> On-demand does not raise it. Provisioning
+      40,000 WCU does not raise it. It is a property of a partition, and your partition key decides which
+      items have to share one.</p>
+<p>Item size counts twice here, because the limit is in units and not in operations. The docs' own
+      example: a 20 KB item costs 5 read units per strongly consistent read, so a single such item serves
+      <strong>600</strong> reads a second — not 3,000 — before its partition throttles.</p>
+<p>Which means four different things throttle a DynamoDB request, and they are not interchangeable:</p>
+<div class="tw"><table>
+<thead><tr><th>What was exceeded</th><th>Mode</th><th>Exception</th><th>CloudWatch metric</th></tr></thead>
+<tbody>
+<tr><td>partition (key range) throughput</td><td><strong>both</strong></td><td class="key">ThrottlingException</td><td class="key">ReadKeyRangeThroughputThrottleEvents</td></tr>
+<tr><td>the table's provisioned capacity</td><td>provisioned</td><td class="key">ProvisionedThroughputExceededException</td><td class="key">WriteThrottleEvents</td></tr>
+<tr><td>the account's 40,000/s table quota</td><td>on-demand</td><td class="key">RequestLimitExceeded</td><td class="key">WriteAccountLimitThrottleEvents</td></tr>
+<tr><td>a maximum you configured</td><td>on-demand</td><td class="key">ThrottlingException</td><td class="key">WriteMaxOnDemandThroughputThrottleEvents</td></tr>
+</tbody>
+</table></div>
+<p>All three exceptions now carry a <code>ThrottlingReason</code> list, formatted
+      <code>ResourceType + OperationType + LimitType</code> with the ARN of the affected resource — so the
+      error itself tells you table or index, read or write, and which of the four limits:
+      <code class="brk">TableReadKeyRangeThroughputExceeded</code>,
+      <code class="brk">TableWriteAccountLimitExceeded</code>,
+      <code class="brk">IndexWriteMaxOnDemandThroughputExceeded</code>. Read it before you change a
+      capacity number. Three of the four are not fixed by capacity.</p>
+<div class="call stop">
+<h3>The metric that lies to you</h3>
+<p><code>ThrottledRequests</code> increments <strong>once per request</strong>, no matter how many
+        of the events inside it were throttled. A <code>PutItem</code> that writes the base table and
+        three indexes counts as one throttle even if all four were refused. Alarm on the cause-specific
+        metrics or you will systematically underestimate what is happening.</p>
+</div>
+<p>And a throttle is usually not an error you get to see. The SDKs retry both
+      <code>ThrottlingException</code> and <code>ProvisionedThroughputExceededException</code>
+      automatically, with exponential backoff. The first symptom of a hot partition is p99 latency, not a
+      400 — by the time your application logs an error, the retry queue has already given up.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The bill comes due in Lesson 5.1</p>
+<h2>You designed a hot partition last lesson</h2>
+</div>
+<p>In 5.1 we invented <code>signup_month</code> so a date-range query would have something to aim
+      at, and keyed a GSI on (<code>signup_month</code>, <code>created_at</code>). That index is the right
+      answer to the read question <em>and</em> a textbook write anti-pattern. Both are true at once.</p>
+<p><code>signup_month</code> takes twelve values a year, and every new signup belongs to exactly one
+      of them: the current month. So each <code>put_user()</code> writes two items — one to the base table,
+      spread across its partitions by <code>hash(email)</code>, and one to the index, on a single partition
+      key, for thirty days at a stretch.</p>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="One PutItem writes two items. On the base table, keyed by email, the write is spread thinly across every partition. On the by-signup-month index it lands on a single partition — the current month — which fills to the 1,000 write-unit ceiling while the other eleven months take nothing." role="img" viewbox="0 0 760 340">
+<text fill="var(--ink)" font-family="Archivo, sans-serif" font-size="13" font-weight="600" x="14" y="20">1,000 signups a second, arriving as one PutItem each</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" x="14" y="52">base table · hash(email)</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="11" x="232" y="52">125 write units/s per partition — 12% of the ceiling</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="76" x="60" y="62"></rect>
+<rect fill="var(--good-soft)" height="8.0" stroke="var(--good-rule)" width="76" x="60" y="118.0"></rect>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="76" x="146" y="62"></rect>
+<rect fill="var(--good-soft)" height="8.0" stroke="var(--good-rule)" width="76" x="146" y="118.0"></rect>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="76" x="232" y="62"></rect>
+<rect fill="var(--good-soft)" height="8.0" stroke="var(--good-rule)" width="76" x="232" y="118.0"></rect>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="76" x="318" y="62"></rect>
+<rect fill="var(--good-soft)" height="8.0" stroke="var(--good-rule)" width="76" x="318" y="118.0"></rect>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="76" x="404" y="62"></rect>
+<rect fill="var(--good-soft)" height="8.0" stroke="var(--good-rule)" width="76" x="404" y="118.0"></rect>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="76" x="490" y="62"></rect>
+<rect fill="var(--good-soft)" height="8.0" stroke="var(--good-rule)" width="76" x="490" y="118.0"></rect>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="76" x="576" y="62"></rect>
+<rect fill="var(--good-soft)" height="8.0" stroke="var(--good-rule)" width="76" x="576" y="118.0"></rect>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="76" x="662" y="62"></rect>
+<rect fill="var(--good-soft)" height="8.0" stroke="var(--good-rule)" width="76" x="662" y="118.0"></rect>
+<line stroke="var(--good)" stroke-dasharray="5 4" stroke-width="1.6" x1="52" x2="746" y1="62" y2="62"></line>
+<text fill="var(--good)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="14" y="141">8 partitions</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" x="14" y="180">by-signup-month · hash(signup_month)</text>
+<text fill="var(--stop)" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600" x="302" y="180">1,000 write units/s on one key — the ceiling</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="50" x="52" y="190"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" text-anchor="middle" x="77" y="268">2026-11</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="50" x="110" y="190"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" text-anchor="middle" x="135" y="268">2026-12</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="50" x="168" y="190"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" text-anchor="middle" x="193" y="268">2026-01</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="50" x="226" y="190"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" text-anchor="middle" x="251" y="268">2026-02</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="50" x="284" y="190"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" text-anchor="middle" x="309" y="268">2026-03</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="50" x="342" y="190"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" text-anchor="middle" x="367" y="268">2026-04</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="50" x="400" y="190"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" text-anchor="middle" x="425" y="268">2026-05</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="50" x="458" y="190"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" text-anchor="middle" x="483" y="268">2026-06</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="50" x="516" y="190"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" text-anchor="middle" x="541" y="268">2026-07</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="50" x="574" y="190"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" text-anchor="middle" x="599" y="268">2026-08</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="50" x="632" y="190"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" text-anchor="middle" x="657" y="268">2026-09</text>
+<rect fill="var(--surface-2)" height="64" rx="3" stroke="var(--rule-strong)" width="50" x="690" y="190"></rect>
+<rect fill="var(--stop-soft)" height="64.0" stroke="var(--stop-rule)" width="50" x="690" y="190.0"></rect>
+<text fill="var(--stop)" font-family="IBM Plex Mono, monospace" font-size="9.5" text-anchor="middle" x="715" y="268">2026-10</text>
+<line stroke="var(--stop)" stroke-dasharray="5 4" stroke-width="1.6" x1="44" x2="746" y1="190" y2="190"></line>
+<text fill="var(--stop)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="14" y="187">1,000</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="11" x="52" y="288">Eleven months of history take no writes at all. Every new signup belongs to the twelfth.</text>
+<text fill="var(--ink-2)" font-family="Archivo, sans-serif" font-size="12" font-weight="600" x="14" y="312">Adaptive capacity can move this key onto a partition of its own. It cannot split it.</text>
+</svg>
+</div>
+<figcaption>The box height is one partition's write ceiling. On the base table every partition is at
+      12% of it. On the index, eleven months of history take no writes at all and the twelfth takes
+      everything.</figcaption>
+</figure>
+<p>Adaptive capacity is not the escape hatch. It applies in both modes, it reacts by handing a hot
+      partition more of the table's throughput, and if traffic concentrates on one key it will go as far as
+      moving that single key onto a partition of its own — where, the docs say, DynamoDB "can deliver
+      throughput up to the partition maximum of 3,000 RCUs and 1,000 WCUs to that single item's primary
+      key". That is the end of the road. A key cannot be split. If the table has a local secondary index,
+      adaptive capacity will not split item collections at all.</p>
+<p>And the failure does not stay inside the index. As Lesson 5.1 noted, index write throttling pushes
+      back on the base table, so what actually breaks is <code>PutItem</code> on <code>users</code> — a
+      write to a table whose own key schema is perfect.</p>
+<p>The honest accounting for this repo: 1,000 writes a second is 86 million signups a day, so the
+      ceiling is nowhere near. It matters because the <em>shape</em> is the one that bites at scale, and
+      you now own one. When it does matter the fix is write sharding — make the key
+      <code>signup_month#&lt;0-9&gt;</code> with the suffix chosen at random, and the ceiling becomes
+      10,000 writes a second. You pay for it in reads: a month is now ten partition keys, so every query
+      becomes ten queries, and the shard count is part of the contract with every reader from then on.</p>
+<div class="call warn">
+<h3>One level down, the same shape</h3>
+<p><code>created_at</code> as the sort key means new items always land at the same end of the item
+        collection. It is harmless at this size, and it is why the docs warn against sharding by hand on
+        top of a sort key that increases monotonically.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The missing line</p>
+<h2>On-demand removes capacity planning, and the cost ceiling with it</h2>
+</div>
+<p>The only limit on <code>aws_dynamodb_table.users</code> today is the account's default table-level
+      quota: 40,000 request units a second.</p>
+<div class="code">40,000 write request units/s  ×  3,600 s  =  144,000,000 writes
+144,000,000  ×  $0.625 / 1,000,000        =  <span class="r">$90.00 per hour</span>
+<span class="r">$2,160 per day</span></div>
+<p>A brand-new table cannot reach that immediately — warm throughput starts a fresh on-demand table
+      at 4,000 writes and 12,000 reads a second, which caps a cold runaway at about $9 an hour. A table
+      that has already served a real peak has no such brake.</p>
+<p>Nothing in IAM prevents it either. <code>dynamodb:PutItem</code> is permission to write; there is
+      no permission to spend. The protection is a table setting, and this repo does not set it:</p>
+<div class="code"><span class="c"># terraform/main.tf — the line that is missing</span>
+resource <span class="g">"aws_dynamodb_table"</span> <span class="g">"users"</span> {
+  name         = local.dynamodb_table
+  billing_mode = <span class="g">"PAY_PER_REQUEST"</span>
+  hash_key     = <span class="g">"email"</span>
+<span class="k">on_demand_throughput</span> {
+    max_read_request_units  = <span class="w">500</span>
+    max_write_request_units = <span class="w">100</span>
+  }
+}</div>
+<p>The same block nests inside <code>global_secondary_index</code>, so an index gets its own ceiling.
+      The smallest value is 1 request unit per second, and <code>-1</code> removes the limit.</p>
+<p class="note">Two caveats, both from the docs. The maximum "is applied on a best-effort basis and
+      should be thought of as targets instead of guaranteed request ceilings", because burst capacity can
+      carry you past it. And requests over the maximum get <code>ThrottlingException</code>, which your SDK
+      retries silently — so the setting is a cost control, not a back-pressure signal, and it needs an alarm
+      on <code>WriteMaxOnDemandThroughputThrottleEvents</code> to be visible to a human.</p>
+<div class="call stop">
+<h3>You have seen this failure already</h3>
+<p>August 2026 in this account: $34.96 of credit spent on an idle EKS control plane, because nothing
+        capped it and nobody was watching. Same class of mistake. The capacity mode that removes the plan
+        also removes the plan's upper bound, and the upper bound was the part that protected you.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">What "elastic" means in practice</p>
+<h2>On-demand is elastic, not infinite</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Behaviour</th><th>The actual number</th></tr></thead>
+<tbody>
+<tr><td>Provisioned → on-demand</td><td>up to <strong>four times</strong> in a rolling 24 hours</td></tr>
+<tr><td>On-demand → provisioned</td><td>any time</td></tr>
+<tr><td>A brand-new on-demand table</td><td>sustains <strong>4,000 writes/s and 12,000 reads/s</strong> immediately</td></tr>
+<tr><td>Afterwards</td><td>absorbs up to <strong>double the previous peak</strong>, instantly</td></tr>
+<tr><td>Past double, inside 30 minutes</td><td>can throttle; AWS advises spreading growth over at least 30 minutes, or pre-warming</td></tr>
+<tr><td>Warm throughput</td><td>visible on every table, rises by itself with use, can be raised deliberately — and <strong>never decreases</strong></td></tr>
+</tbody>
+</table></div>
+<div class="call">
+<h3>Which makes the load test a trap</h3>
+<p>A cold table stepped from zero to 20,000 writes a second throttles. The same table ramped over
+        half an hour does not. If your load test proves the table is ready, check whether it proved
+        something about the ramp instead.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The method</p>
+<h2>Four steps, in this order</h2>
+</div>
+<div class="steps">
+<div class="step"><div class="n">1</div><div>
+<h3>Get the ratio, not the opinion</h3>
+<p><code>ConsumedWriteCapacityUnits</code> with the <code>Sum</code> statistic, divided by the period
+        in seconds, gives consumed units per second. Mean ÷ peak over a representative month is your
+        utilisation. Below 28.9%, stay on-demand and stop here. Above it, keep going — and compare the
+        saving in dollars against the cost of managing it.</p>
+</div></div>
+<div class="step"><div class="n">2</div><div>
+<h3>Divide the peak by the hottest key</h3>
+<p>Find the partition key taking the largest share of traffic; CloudWatch Contributor Insights names
+        it for you. If that one key needs more than 1,000 write units or 3,000 read units a second, no
+        billing mode helps and no capacity number helps. Shard the key, and do it before the data
+        exists.</p>
+</div></div>
+<div class="step"><div class="n">3</div><div>
+<h3>Give whichever mode you chose an upper bound</h3>
+<p>On-demand: <code>on_demand_throughput</code>. Provisioned: auto scaling's maximum, which is the
+        same control wearing a different hat. A table with no maximum is a table with no worst case, and
+        "no worst case" is how the August bill happened.</p>
+</div></div>
+<div class="step"><div class="n">4</div><div>
+<h3>Alarm on the cause, not the total</h3>
+<p><code class="brk">ReadKeyRangeThroughputThrottleEvents</code> and its write twin for the partition
+        ceiling; the <code>*AccountLimit*</code> and <code>*MaxOnDemandThroughput*</code> pair for
+        on-demand; <code>WriteThrottleEvents</code> for provisioned. <code>ThrottledRequests</code> is the
+        summary, and it rounds four different incidents down to one.</p>
+</div></div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Today's bill</p>
+<h2>What yours costs while the stack is down</h2>
+</div>
+<p>The application stack is destroyed, so <code>aws_dynamodb_table.users</code> does not exist. One
+      DynamoDB table in this account is still running: the Terraform state lock table in
+      <code>terraform/state-backend/</code>, on-demand, holding at most one <code>LockID</code> item.</p>
+<p>An apply takes the lock, writes the state digest and deletes the lock. Call it three write request
+      units and a read:</p>
+<div class="code">3 write request units  ×  $0.625 / 1,000,000  =  $0.0000019 per apply
+1 item of ~100 bytes   ×  $0.25 / GB-month     =  $0.000000023 per month</div>
+<p>Which is the good side of the metered model, and worth holding next to the complaint from Lesson
+      5.1 about rounding every charge in the vendor's direction. Both are true. A table nobody uses costs
+      nothing, a table with the right key schema costs what the work costs, and a table with the wrong one
+      costs what the whole table costs — every time somebody loads a page.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check yourself</p>
+<h2>Four questions</h2>
+</div>
+<details>
+<summary>A table takes a steady 500 writes a second, flat, around the clock — a sensor feed with no
+    diurnal shape at all. Which mode, and what is the choice worth?</summary>
+<div class="answer">
+<p><strong>Provisioned, by a lot.</strong> Flat traffic is the one shape that can run near 100%
+      utilisation, because there is no peak to leave headroom for.</p>
+<p>On-demand: 500 × 3,600 × 730 = 1,314,000,000 writes a month = <strong>$821.25</strong>.
+      Provisioned 500 WCU: 500 × $0.00065 × 730 = <strong>$237.25</strong>. The saving is $584 a month, or
+      71% — which is 1 − 1/3.46, the most the ratio can ever give you. A one-year reserved purchase takes
+      it further still.</p>
+<p>Notice what makes this case easy: no variance means no forecasting. The spikier the traffic, the
+      worse provisioned looks and the more work it takes to prove which side of 28.9% you are on.</p>
+</div>
+</details>
+<details>
+<summary>An on-demand table with no maximum configured. A deploy ships a bug that retries
+    <code>PutItem</code> in a tight loop, and it runs for twenty minutes before anyone notices. What is the
+    exposure, and what would have stopped it?</summary>
+<div class="answer">
+<p>The ceiling is the account's table-level quota, 40,000 write request units a second:
+      40,000 × 1,200 s = 48,000,000 writes = <strong>$30</strong>. If the table was cold, warm throughput
+      holds the first stretch to 4,000 writes/s and it is nearer $3. On a table that has already peaked
+      higher, the full $30 — and $90 an hour for as long as it runs.</p>
+<p>What stops it: <code class="brk">on_demand_throughput { max_write_request_units = … }</code>, plus
+      an alarm on <code>WriteMaxOnDemandThroughputThrottleEvents</code> so the throttling is visible rather
+      than just slow.</p>
+<p>What does <em>not</em> stop it: IAM, because there is no permission to spend; the SDK, which
+      retries throttles on your behalf; and a budget alarm, which tells you hours later. And one
+      uncomfortable observation — switching to provisioned would also have stopped it, because throttling is
+      the default state of a provisioned table under a runaway. That is the single safety property
+      provisioned has for free.</p>
+</div>
+</details>
+<details>
+<summary>You shard <code>signup_month</code> into ten keys to get past 1,000 writes a second. What did
+    you make more expensive, and what did you not fix?</summary>
+<div class="answer">
+<p><strong>More expensive: reads.</strong> One month is now ten partition keys, so "users who signed
+      up in September" becomes ten <code>Query</code> calls instead of one — ten round trips, each with its
+      own capacity rounding. Expensive a second way too: the shard count is now part of the contract with
+      every reader, and changing it means rewriting the key of every item.</p>
+<p><strong>Not fixed:</strong> the base table, which was never the problem —
+      <code>hash(email)</code> already spreads perfectly. Nor the monotonic <code>created_at</code> sort key
+      inside each shard. Nor anything about reads of the index, which were never concentrated; the index was
+      only ever write-hot.</p>
+<p>The general shape: sharding converts a throughput limit into a fan-out cost, and you can only do
+      it cheaply before the data exists.</p>
+</div>
+</details>
+<details>
+<summary>A provisioned table, auto scaling on, min 100 / max 4,000 WCU, target 70%. At 09:00 a
+    marketing email goes to 200,000 users and the writes arrive over about two minutes. Walk through 09:00
+    to 09:06.</summary>
+<div class="answer">
+<p>About 1,700 writes a second arriving at a table provisioned near 100–150 WCU.</p>
+<p>First, burst capacity: up to 300 seconds of unused capacity at 100 WCU is roughly 30,000 writes,
+      spent in the first twenty seconds. Then throttling, as
+      <code>ProvisionedThroughputExceededException</code> — which the SDK retries, so the application sees
+      latency and a growing queue rather than errors.</p>
+<p>Auto scaling needs two consecutive minutes of breach to trigger, then the CloudWatch alarm may
+      add a few minutes, then <code>UpdateTable</code> takes several more, and the docs say plainly that
+      requests above the old capacity are throttled throughout. So expect four to eight minutes of
+      degradation, finishing at about the time the campaign does. The capacity graph afterwards shows 4,000
+      WCU provisioned for a spike that is already over, and 15 consecutive data points before it comes
+      down.</p>
+<p>The fix is not a higher target or a lower minimum. It is knowing the spike is coming: scheduled
+      scaling before 09:00, or on-demand, where a table that has previously peaked at 1,700 absorbs 1,700
+      instantly. <strong>Auto scaling is for shapes that repeat slowly. A known event is a schedule, and an
+      unknown event is on-demand.</strong></p>
+</div>
+</details>
+</section>
+<footer>
+<p>Module 5, Lesson 5.2 · AWS + DevOps course · 4 October 2026</p>
+<p>Repo material: <code>terraform/main.tf:112</code> — <code>aws_dynamodb_table.users</code>
+      (<code>billing_mode = "PAY_PER_REQUEST"</code>, no <code>on_demand_throughput</code> block), the
+      <code>by-signup-month</code> GSI designed in Lesson 5.1, <code>put_user()</code> in
+      <code>app/services/dynamodb.py</code>, and <code>terraform/state-backend/</code> — the one DynamoDB
+      table in this account still running.</p>
+<p>Sources: the DynamoDB on-demand and provisioned pricing pages (us-east-1, standard table class);
+      the developer guide on on-demand capacity mode (initial throughput, double the previous peak, the
+      30-minute rule), on maximum throughput for on-demand tables, on auto scaling (target utilisation
+      20–90%, two consecutive minutes, the <code>UpdateTable</code> delay), on burst and adaptive capacity
+      (300 seconds, isolating a single key), on partition key design (3,000 read / 1,000 write units per
+      partition), the service quotas page (40,000 per table, 80,000 per account, 27 decreases a day), the
+      throttling troubleshooting and CloudWatch throttling metric pages, and the error reference for
+      <code>ThrottlingReason</code>; plus the AWS Database blog announcing the 1 November 2024 price
+      reduction.</p>
+<p>Every dollar figure on this page is us-east-1 list price at 730 hours a month, computed in the
+      page from the two rate tables above. Check the arithmetic — it is the point of the lesson.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

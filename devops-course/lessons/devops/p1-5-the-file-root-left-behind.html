@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The File Root Left Behind</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/p1-5-the-file-root-left-behind.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Phase 1 · Lesson 1.5 · AWS + DevOps course</p>
+<h1>The File Root Left Behind</h1>
+<p class="lede">On Friday night someone ran the app by hand with <code>sudo</code>, "just to check it
+  starts", and then stopped it. On Monday the service is restarted the normal way. It answers
+  <code>200</code>, the health check is green, and the log file hasn't had a line since Friday.
+  Nothing crashed. One file now belongs to root, and the app isn't root. This lesson is the
+  rule the kernel applies every time a program opens a file, from below: the
+  <code>owner</code>, <code>group</code> and <code>mode</code> your Ansible playbooks have been
+  setting for years.</p>
+<div class="facts">
+<span class="fact">~3 hours</span>
+<span class="fact">week 6</span>
+<span class="fact">laptop; sudo only for the Build</span>
+<span class="fact">Ubuntu 26.04 · Docker · Ansible 2.21</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Review · lesson 1.4</p>
+<h2>Two questions before you start</h2>
+</div>
+<p>These are the two 1.4 questions where the "because" was missing. Answer each one out
+  loud, without notes, before you open it. It's done when you get ¾ or better.</p>
+<details><summary>"Connection refused" against "connection timed out": what does each tell you, and where do you look for each?</summary><div class="answer"><p><strong>Refused means the machine answered and nobody was listening. Timed out means nothing answered at all.</strong> Refused comes back in a millisecond, as a reset (RST) from the target's kernel, so the network path is fine. Look at the server: is the program running, and is it listening on that port and that address (<code>ss -ltnp</code>)? Timed out takes the full timeout, because the packets were dropped on the way. Look at firewalls, security groups, routing, and whether the IP is right at all.</p></div></details>
+<details><summary><code>dig api.internal</code> returns the new IP, but the app keeps connecting to the old one. Give two reasons.</summary><div class="answer"><p><strong>The app doesn't ask DNS the way dig does.</strong> First, <code>/etc/hosts</code>. The app's lookups go through <code>nsswitch.conf</code>, which checks <code>files</code> first, so an old entry there wins. dig skips it. <code>getent hosts api.internal</code> shows what the app really gets. Second, caching. The JVM keeps lookups for 30 seconds by default, and longer if <code>networkaddress.cache.ttl</code> is set.</p></div></details>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The mechanism</p>
+<h2>A process carries numbers, a file carries numbers, and the kernel compares them</h2>
+</div>
+<p>Every process runs as a <strong>user ID</strong> (UID) and a <strong>group ID</strong>
+  (GID), plus a list of <strong>supplementary groups</strong>. Every file's inode, the
+  record you met in Lesson 1.1, stores an owner UID, a group GID and twelve mode bits. When a
+  process calls <code>open()</code>, the kernel compares the two sets of numbers and picks
+  <strong>one</strong> row of the mode to apply:</p>
+<div class="ladder">
+<div class="rung"><span class="s">1</span><p><span class="who">Is the process root (UID 0)?</span>Read
+  and write are allowed whatever the bits say. Execute still needs at least one
+  <code>x</code> bit set somewhere.</p></div>
+<div class="rung"><span class="s">2</span><p><span class="who">Is the process the file's owner?</span>Use
+  the <strong>owner</strong> bits, and stop. The group and other bits are never looked at, even
+  if they'd allow more.</p></div>
+<div class="rung"><span class="s">3</span><p><span class="who">Is the file's group one of the process's groups?</span>Use
+  the <strong>group</strong> bits, and stop.</p></div>
+<div class="rung"><span class="s">4</span><p><span class="who">Everyone else</span>Use the
+  <strong>other</strong> bits.</p></div>
+</div>
+<p>The first match decides, and nothing falls through to the next rung. If the chosen row says
+  no, the call fails with <code>EACCES</code>, which prints as <strong>"Permission
+  denied"</strong>.</p>
+<p>In the library: your UID is the number on your <strong>library card</strong>, and your
+  groups are the <strong>society memberships</strong> stamped on the back. Each book has a
+  slip inside the cover with three lines: what its owner may do, what members of one society
+  may do, and what everyone else may do. The librarian reads <em>one</em> line, the first that
+  applies to you, and doesn't read on.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Who the process is</p>
+<h2>Names are for people; the kernel only sees numbers</h2>
+</div>
+<div class="code"><code>$ id
+uid=1000(al) gid=1000(al) groups=1000(al),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),100(users),114(lpadmin),126(docker),995(input)
+$ grep -E '^(Uid|Gid|Groups|Umask)' /proc/self/status
+Umask:  0002
+Uid:    1000    1000    1000    1000          <span class="c"># real, effective, saved, filesystem</span>
+Gid:    1000    1000    1000    1000
+Groups: 4 24 27 30 46 100 114 126 995 1000
+$ getent passwd al root nobody | cut -d: -f1,3,4,6,7
+al:1000:1000:/home/al:/bin/bash               <span class="c"># name : UID : GID : home : shell</span>
+root:0:0:/root:/bin/bash
+nobody:65534:65534:/nonexistent:/usr/sbin/nologin</code></div>
+<p><code>/etc/passwd</code> and <code>/etc/group</code> only translate numbers into names for
+  people to read. Inside a container, which has its own <code>/etc/passwd</code>, your UID
+  still works but has no name:</p>
+<div class="code"><code>$ docker run --rm -u "$(id -u):$(id -g)" php:8.2-cli id
+uid=1000 gid=1000 groups=1000                 <span class="c"># the same number, no name for it in there</span></code></div>
+<p><code>/proc/PID/status</code> works for any process, not only your shell, so it's how you
+  ask what a <em>running</em> service is: <code>grep -E 'Uid|Groups|Umask' /proc/$(pidof
+  -s java)/status</code>. That matters below, because a running process's groups can differ from
+  what <code>id username</code> says now.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">What the file carries</p>
+<h2>Owner, group, and twelve bits</h2>
+</div>
+<div class="code"><code>$ stat -c '%A %a %U:%G %n' ~ /etc/passwd /etc/shadow /tmp /usr/bin/passwd /var/log/journal
+drwxr-x--- 750 al:al /home/al
+-rw-r--r-- 644 root:root /etc/passwd
+-rw-r----- 640 root:shadow /etc/shadow
+drwxrwxrwt 1777 root:root /tmp
+-rwsr-xr-x 4755 root:root /usr/bin/passwd
+drwxr-sr-x 2755 root:systemd-journal /var/log/journal</code></div>
+<p>Take the first one, <code>drwxr-x---</code>, apart:</p>
+<div class="bits">
+<span>d<small>type</small></span>
+<span class="o">rwx<small>owner al</small></span>
+<span class="g">r-x<small>group al</small></span>
+<span class="x">---<small>others</small></span>
+</div>
+<p>Each group of three is a sum: <code>r</code>&nbsp;=&nbsp;4, <code>w</code>&nbsp;=&nbsp;2,
+  <code>x</code>&nbsp;=&nbsp;1. So <code>rwx</code> is 7, <code>r-x</code> is 5,
+  <code>---</code> is 0, and the mode is <code>750</code>. The fourth, leading digit holds the
+  three special bits, covered below; it's the <code>1</code> in <code>1777</code> and the
+  <code>4</code> in <code>4755</code>.</p>
+<div class="tw"><table>
+<thead><tr><th>Mode</th><th>String</th><th>Typical use</th></tr></thead>
+<tbody>
+<tr><td class="num">644</td><td><code>-rw-r--r--</code></td><td>Config files, jars: the owner writes, everyone reads</td></tr>
+<tr><td class="num">640</td><td><code>-rw-r-----</code></td><td>Logs and secrets: the owner writes, one group reads, others nothing</td></tr>
+<tr><td class="num">600</td><td><code>-rw-------</code></td><td>SSH private keys, credentials files. <code>ssh</code> refuses a key that's more open than this</td></tr>
+<tr><td class="num">755</td><td><code>-rwxr-xr-x</code></td><td>Scripts and programs; ordinary directories</td></tr>
+<tr><td class="num">750</td><td><code>drwxr-x---</code></td><td>A directory only its owner and one group may enter</td></tr>
+</tbody></table></div>
+<h3>The owner's row wins, even when it's the worst row</h3>
+<div class="code"><code>$ echo secret &gt; mine; chmod 077 mine
+$ ls -l mine
+----rwxrwx 1 al al 7 Nov 18 17:10 mine       <span class="c"># group and others: everything. Owner: nothing</span>
+$ cat mine
+cat: mine: Permission denied</code></div>
+<p>You own the file and you're in its group, and everyone else could read it, but you can't.
+  Rung 2 matched, so the group and other bits were never consulted. You can still
+  <code>chmod</code> it back, because changing the mode depends on owning the file, not on the
+  bits.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Directories</p>
+<h2>A directory is a list of names, and its bits guard the list</h2>
+</div>
+<p>Lesson 1.1 showed that a directory is a table of names pointing to inodes. Its three bits
+  mean different things from a file's:</p>
+<div class="tw"><table>
+<thead><tr><th>Bit</th><th>On a directory it allows</th><th>Without it</th></tr></thead>
+<tbody>
+<tr><td class="key">r</td><td>Reading the list of names (<code>ls</code>)</td><td>You can't list it, but you can still open a file whose name you already know</td></tr>
+<tr><td class="key">w</td><td>Changing the list: create, <strong>delete</strong>, rename (needs <code>x</code> too)</td><td>No new files, and no deleting, even files you own</td></tr>
+<tr><td class="key">x</td><td>Passing through it to anything inside ("search")</td><td>Nothing inside can be opened, whatever the inside's own bits say</td></tr>
+</tbody></table></div>
+<div class="code"><code><span class="c"># r without x: you can read the names, nothing else</span>
+$ chmod 644 ronly; ls -l ronly
+-????????? ? ? ? ?            ? f
+$ cat ronly/f
+cat: ronly/f: Permission denied
+
+<span class="c"># x without r: no list, but a known name opens</span>
+$ chmod 311 xonly; ls xonly
+ls: cannot open directory 'xonly': Permission denied
+$ cat xonly/known
+b
+
+<span class="c"># deleting is a change to the directory, not to the file</span>
+$ chmod 444 d/locked; echo more &gt;&gt; d/locked
+bash: d/locked: Permission denied             <span class="c"># the file says no</span>
+$ rm -f d/locked &amp;&amp; echo "rm ok"
+rm ok                                         <span class="c"># the directory said yes</span>
+$ chmod 555 d; rm -f d/f2
+rm: cannot remove 'd/f2': Permission denied</code></div>
+<p>That's Lesson 1.1's <code>rm</code> again: it removes a name from a directory, so it's the
+  directory's <code>w</code> bit that counts. A read-only file in a directory you can write to
+  can be deleted, and a writable file in a read-only directory can't.</p>
+<h3>Every directory on the path needs x</h3>
+<p>To open <code>/a/b/c/file</code>, the kernel walks the path one name at a time, and each
+  directory on the way must give you <code>x</code>. <code>namei -l</code> shows the whole
+  walk in one command:</p>
+<div class="code"><code>$ namei -l ~/IdeaProjects/interchange/services/reference/target/reference-0.1.0-SNAPSHOT.jar
+drwxr-xr-x root root /
+drwxr-xr-x root root home
+drwxr-x--- al   al   al                       <span class="c"># others: no x. Nobody but al gets past here</span>
+drwxrwxr-x al   al   IdeaProjects
+drwxrwxr-x al   al   interchange
+…
+-rw-rw-r-- al   al   reference-0.1.0-SNAPSHOT.jar</code></div>
+<p>The jar itself is readable by everyone (<code>r</code> for others), and no other user can
+  read it, because <code>/home/al</code> is <code>750</code>. Ubuntu has created home
+  directories like this since 21.04 (<code>HOME_MODE 0750</code> in
+  <code>/etc/login.defs</code>). Java's message when it can't reach the jar doesn't mention
+  permissions at all:</p>
+<div class="code"><code>$ chmod 000 h; java -jar h/app.jar
+Error: Unable to access jarfile h/app.jar</code></div>
+<p>This is the first thing that goes wrong in this lesson's Build, so remember it.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">New files</p>
+<h2>umask: the bits a new file doesn't get</h2>
+</div>
+<p>A program creating a file asks for a mode, usually <code>666</code> for files and
+  <code>777</code> for directories. The kernel removes the bits set in the process's
+  <strong>umask</strong>. With the same <code>touch</code> and <code>mkdir</code>:</p>
+<div class="code"><code>umask 002   -rw-rw-r-- 664 u002     drwxrwxr-x 775 ud002     <span class="c"># Ubuntu's default for a login</span>
+umask 022   -rw-r--r-- 644 u022     drwxr-xr-x 755 ud022     <span class="c"># systemd's default for system units</span>
+umask 027   -rw-r----- 640 u027     drwxr-x--- 750 ud027     <span class="c"># services that write logs</span></code></div>
+<p>It isn't subtraction: a bit that was never requested can't be removed, so a file never gets
+  <code>x</code> from a umask. The umask belongs to the process and is inherited by its
+  children, which is why the same app creates <code>664</code> files when you start it from a
+  shell and <code>644</code> ones under a system unit. Your <code>reference</code> user unit
+  shows <code>Umask: 0002</code> in its <code>/proc</code> status, inherited from your login
+  session. A system unit sets it with <code>UMask=</code>.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Groups</p>
+<h2>Group membership is read once, at login</h2>
+</div>
+<p>A process gets its supplementary groups when the login program sets them up (a terminal, SSH,
+  <code>sudo</code>, a systemd service start), and keeps them until it exits. Its children
+  inherit them. Adding a user to a group changes <code>/etc/group</code>, and nothing that's
+  already running notices:</p>
+<div class="code"><code>$ sudo usermod -aG docker deploy
+$ id deploy                  <span class="c"># reads /etc/group now: docker is there</span>
+$ grep Groups /proc/$(pidof -s java)/status
+                             <span class="c"># the Jenkins agent, started last week: docker isn't</span></code></div>
+<p>So "I added the user to the group and it still says Permission denied" means the process
+  started before the change. Log in again, or restart the service. For a shell,
+  <code>newgrp docker</code> starts a new one with the group.</p>
+<div class="call warn">
+<h3>The -a in usermod -aG</h3>
+<p><code>usermod -G docker deploy</code>, without <code>-a</code>, <strong>replaces</strong>
+  the user's supplementary groups with just <code>docker</code>, so they drop out of
+  every other group. The Ansible <code>user</code> module does the same unless you set
+  <code>append: true</code>. A one-letter difference that takes someone out of
+  <code>sudo</code>.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The leading digit</p>
+<h2>setuid, setgid and the sticky bit</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Bit</th><th>Shown as</th><th>On a file</th><th>On a directory</th><th>Seen at</th></tr></thead>
+<tbody>
+<tr><td class="key">4 · setuid</td><td><code>rws</code> owner</td><td>Runs as the file's <strong>owner</strong>, not as the caller</td><td>Ignored on Linux</td><td><code>/usr/bin/passwd</code> 4755: you run it, it runs as root, so it can write <code>/etc/shadow</code></td></tr>
+<tr><td class="key">2 · setgid</td><td><code>rws</code> group</td><td>Runs with the file's group</td><td>New files inside get the <strong>directory's group</strong>, not the creator's</td><td><code>/var/log/journal</code> 2755: every journal file is group <code>systemd-journal</code>. Shared team directories</td></tr>
+<tr><td class="key">1 · sticky</td><td><code>t</code> others</td><td>Ignored</td><td>Only a file's owner (or the directory's owner, or root) may delete or rename it</td><td><code>/tmp</code> 1777: everyone can write there, and nobody can delete anyone else's files</td></tr>
+</tbody></table></div>
+<p>The sticky bit, with two container UIDs sharing a directory on the laptop:</p>
+<div class="code"><code><span class="c"># mode 777: uid 4242 creates a file, uid 4343 deletes it</span>
+777: uid 4343 deleted it
+<span class="c"># mode 1777: the same again</span>
+rm: cannot remove '/s/theirs': Operation not permitted</code></div>
+<p>Notice the message changed. "Permission denied" (<code>EACCES</code>) means the rwx bits
+  said no. "Operation not permitted" (<code>EPERM</code>) means a rule beyond the bits said
+  no: the sticky bit, or trying to <code>chown</code> a file without being root. The wording
+  tells you which kind of rule to look for.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">root</p>
+<h2>What root skips, and the files it leaves behind</h2>
+</div>
+<p>Root passes rung 1: it reads and writes anything, and needs just one <code>x</code> bit to
+  execute. Docker's default user is root, which makes it an easy way to try this
+  without <code>sudo</code>:</p>
+<div class="code"><code>$ chmod 000 zero s.sh                       <span class="c"># a text file and a script, no bits at all</span>
+$ docker run --rm -v "$PWD:/w" php:8.2-cli sh -c 'cat /w/zero; /w/s.sh; echo "exit $?"'
+top                                          <span class="c"># root read it</span>
+sh: 1: /w/s.sh: Permission denied            <span class="c"># root can't run it: no x anywhere</span>
+exit 126                                     <span class="c"># 126: found, not executable (137 was killed, Lesson 1.2)</span></code></div>
+<p>The real danger isn't what root can do. It's what root <strong>creates</strong>. A file
+  created by a root process is owned by root, with root's umask, and stays that way after the
+  process has gone. Here is this lesson's opening story, in five lines:</p>
+<div class="code"><code>$ docker run --rm -v "$PWD/logs:/logs" php:8.2-cli bash -c 'id; echo started &gt; /logs/app.log'
+uid=0(root) gid=0(root) groups=0(root)
+$ ls -l logs
+-rw-r--r-- 1 root root 8 Nov 18 17:10 app.log   <span class="c"># in your directory, owned by root</span>
+$ echo "appended" &gt;&gt; logs/app.log
+bash: logs/app.log: Permission denied           <span class="c"># your app can't write its own log</span>
+$ rm -f logs/app.log &amp;&amp; echo "rm ok"
+rm ok                                           <span class="c"># and yet you can delete it: your directory</span>
+
+$ docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/logs:/logs" php:8.2-cli bash -c 'echo started &gt; /logs/app.log'
+$ ls -l logs
+-rw-r--r-- 1 al al 8 Nov 18 17:10 app.log       <span class="c"># run as your UID: your file</span></code></div>
+<p>What does the app do when it can't open its log? Spring Boot's Logback, tested with a log
+  file the app's user can't write:</p>
+<div class="code"><code>|-ERROR in ch.qos.logback.core.rolling.RollingFileAppender[FILE] - openFile(…/reference.log,true) call failed. java.io.FileNotFoundException: …/reference.log (Permission denied)
+|-WARN in ch.qos.logback.core.rolling.RollingFileAppender[FILE] - Attempted to append to non started appender [FILE].
+… Tomcat started on port 8099 (http)
+… Started ReferenceApplication in 1.176 seconds
+$ curl -s -o /dev/null -w '%{http_code}\n' localhost:8099/customers/C001
+200
+$ stat -c '%A %s %n' reference.log
+---------- 0 reference.log                    <span class="c"># 0 bytes: the file log is dead, the app isn't</span></code></div>
+<p>The app keeps serving and only the file log goes dark, just as in Lesson 1.1's postmortem.
+  The one clue is a single ERROR at startup, on the console, which under systemd means the
+  journal.</p>
+<p class="note">Ports below 1024 are the other thing root is for:
+  <code>net.ipv4.ip_unprivileged_port_start = 1024</code> on this laptop. That's why Java apps
+  listen on 8080 or 8081 and a load balancer or nginx takes 443.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Ansible</p>
+<h2>The mode your playbook really set</h2>
+</div>
+<p>The <code>file</code>, <code>copy</code> and <code>template</code> modules all take
+  <code>owner</code>, <code>group</code> and <code>mode</code>. The mode is where a playbook
+  that "worked" sets the wrong bits. Three tasks, run against three empty files:</p>
+<div class="code"><code>- ansible.builtin.file: { path: a1, mode: 644 }      <span class="c"># unquoted</span>
+- ansible.builtin.file: { path: a2, mode: "644" }    <span class="c"># quoted</span>
+- ansible.builtin.file: { path: a3, mode: "0644" }   <span class="c"># quoted, leading zero</span>
+
+$ stat -c '%A %a %n' a1 a2 a3
+--w----r-T 1204 a1
+-rw-r--r-- 644 a2
+-rw-r--r-- 644 a3</code></div>
+<p>YAML reads an unquoted <code>644</code> as the decimal number six hundred and forty-four.
+  In octal that's <code>1204</code>: the sticky bit, write-only for the owner, nothing for the
+  group, read for others. All three tasks reported <code>changed</code> and none failed. An
+  unquoted <code>0644</code> happens to work, because YAML 1.1 reads a leading zero as octal,
+  which is the other form the Ansible docs accept. Quoting with the zero, <code>"0644"</code>, is the habit that's safe whichever YAML parser reads it.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">systemd</p>
+<h2>Running a service as its own user</h2>
+</div>
+<p>A service runs as root unless its unit says otherwise. These lines in the
+  <code>[Service]</code> section put the rules above together:</p>
+<div class="tw"><table>
+<thead><tr><th>Line</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td class="key">User=, Group=</td><td>The UID and GID the process runs as. In a <strong>user</strong> unit, the only allowed value is yourself, so a service with its own user needs a system unit in <code>/etc/systemd/system/</code></td></tr>
+<tr><td class="key">LogsDirectory=name</td><td>Creates <code>/var/log/name</code> before start, owned by <code>User=</code>. Also <code>StateDirectory=</code> (<code>/var/lib</code>) and <code>RuntimeDirectory=</code> (<code>/run</code>)</td></tr>
+<tr><td class="key">UMask=</td><td>The umask of the service. The default for system units is <code>0022</code>; <code>0027</code> keeps logs away from other users</td></tr>
+</tbody></table></div>
+<p>A detail from <code>systemd.exec(5)</code> that matters on Monday morning: if the directory
+  is owned by the wrong user, systemd changes the owner of everything inside it. If the
+  directory is already owned by the right user, "files and directories below of them are left
+  as-is, even if they do not match". So a root-owned file inside a correctly owned
+  <code>LogsDirectory</code> is <strong>not</strong> repaired. You'll see this happen in the Build.</p>
+<div class="call stop">
+<h3>Never link a system unit from your home</h3>
+<p>In Build 3 you ran <code>systemctl --user link</code> on the unit in the repo, and for a
+  user unit that's fine. A system unit runs as root, so whoever can edit the file can make root
+  run anything. A unit file that you can write, linked into <code>/etc/systemd/system</code>,
+  hands root to your account and to anything running as you. Install a root-owned copy
+  instead: <code>sudo install -m 0644</code>.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The method</p>
+<h2>"Permission denied": the order to check in</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Question</th><th>Command</th><th>What to look for</th></tr></thead>
+<tbody>
+<tr><td class="key">1 · which file?</td><td><code>journalctl -u app</code>, the exception text</td><td>The full path. Java's message usually has it; "Unable to access jarfile" is the exception</td></tr>
+<tr><td class="key">2 · who is asking?</td><td><code>ps -o user,group,pid,cmd -C java</code> and <code>grep -E 'Uid|Groups|Umask' /proc/PID/status</code></td><td>The <em>running</em> process's UID and groups, not what <code>id user</code> says now</td></tr>
+<tr><td class="key">3 · the path</td><td><code>namei -l /full/path</code></td><td>A directory on the way without <code>x</code> for that user</td></tr>
+<tr><td class="key">4 · the file</td><td><code>stat -c '%A %U:%G' file</code></td><td>Which rung matches: owner, group or other, and what that row says</td></tr>
+<tr><td class="key">5 · strays</td><td><code>find /dir ! -user app -ls</code></td><td>Files owned by someone else, usually root, left by a manual run</td></tr>
+<tr><td class="key">EPERM?</td><td>The message is "Operation not permitted"</td><td>Not the rwx bits: sticky bit, <code>chown</code>, or a security layer above them (AppArmor, SELinux)</td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Lab</p>
+<h2>Six parts, five of them on your laptop</h2>
+</div>
+<p>Write your prediction down before each run. Work in <code>labs/p1-5/</code>. Nothing in
+  Parts 1 to 5 needs <code>sudo</code>; Docker stands in for other users.</p>
+
+<h3>Part 1: who you are <span class="muted">· identity</span></h3>
+<div class="code"><code>id
+grep -E '^(Uid|Gid|Groups|Umask)' /proc/self/status
+getent passwd "$USER" root nobody
+stat -c '%A %a %U:%G %n' ~ /etc/shadow /tmp /usr/bin/passwd /var/log/journal
+cat /etc/shadow</code></div>
+<p>Predict first: can you read <code>/etc/shadow</code>? Name the rung of the ladder that
+  decides it, and why. You're in several groups; is <code>shadow</code> one of them?</p>
+
+<h3>Part 2: the owner's row, and directories <span class="muted">· the ladder, directory bits</span></h3>
+<div class="code"><code>echo secret &gt; mine; chmod 077 mine; cat mine
+mkdir -p ronly xonly d
+echo a &gt; ronly/f; chmod 644 ronly; ls -l ronly; cat ronly/f; chmod 755 ronly
+echo b &gt; xonly/known; chmod 311 xonly; ls xonly; cat xonly/known; chmod 755 xonly
+echo c &gt; d/locked; chmod 444 d/locked; echo more &gt;&gt; d/locked; rm -f d/locked &amp;&amp; echo "rm ok"
+echo e &gt; d/f2; chmod 555 d; rm -f d/f2; chmod 755 d
+namei -l "$PWD/mine"</code></div>
+<p>Predict each line before you run it: does it succeed? For each one that fails, say which
+  bit on which object said no.</p>
+
+<h3>Part 3: umask <span class="muted">· new files</span></h3>
+<div class="code"><code>umask
+(umask 022; touch u022; mkdir ud022)
+(umask 027; touch u027; mkdir ud027)
+stat -c '%A %a %n' u0* ud0*
+grep Umask /proc/$(systemctl --user show -p MainPID --value reference)/status</code></div>
+<p>Predict the four modes. Why does the file never get <code>x</code>? What umask does your
+  <code>reference</code> user unit have, and where did it come from?</p>
+
+<h3>Part 4: the file root left behind <span class="muted">· root, ownership</span></h3>
+<div class="code"><code>mkdir -p logs
+docker run --rm -v "$PWD/logs:/logs" php:8.2-cli bash -c 'id; echo started &gt; /logs/app.log'
+ls -l logs; ls -ln logs
+echo "appended" &gt;&gt; logs/app.log
+rm -f logs/app.log &amp;&amp; echo "rm ok"
+docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/logs:/logs" php:8.2-cli bash -c 'echo started &gt; /logs/app.log'
+ls -l logs</code></div>
+<p>Predict: who owns the file the container wrote? Can you append to it? Can you delete it?
+  The answers to the last two are different. Why?</p>
+
+<h3>Part 5: the playbook's mode <span class="muted">· Ansible</span></h3>
+<div class="code"><code>touch a1 a2 a3
+cat &gt; modes.yml &lt;&lt;'EOF'
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - ansible.builtin.file: { path: "{{ playbook_dir }}/a1", mode: 644 }
+    - ansible.builtin.file: { path: "{{ playbook_dir }}/a2", mode: "644" }
+    - ansible.builtin.file: { path: "{{ playbook_dir }}/a3", mode: "0644" }
+EOF
+ansible-playbook -i localhost, modes.yml
+stat -c '%A %a %n' a1 a2 a3
+python3 -c 'print(oct(644))'</code></div>
+<p>Predict: do all three files end up <code>644</code>? Does Ansible report a failure?</p>
+
+<h3>Part 6: your servers <span class="muted">· at work, look only</span></h3>
+<p>On a Mule server or Jenkins agent, and only looking. Which user does the Java process run as
+  (<code>ps -o user,group,pid,cmd -C java</code>)? Is it root? Read its <code>Uid</code>,
+  <code>Groups</code> and <code>Umask</code> from <code>/proc/PID/status</code>. Run
+  <code>namei -l</code> on its log file. Is there anything in its directories owned by a
+  different user (<code>find &lt;app dir&gt; ! -user &lt;app user&gt; | head</code>)? In
+  your Ansible repository, look for unquoted modes:
+  <code>grep -rnE 'mode: *[1-7][0-7]{2,3} *$' .</code> (an unquoted mode with no leading zero) Leave out hostnames, user names, paths
+  that name the customer, and anything that looks like a password.</p>
+<p><strong>Done when:</strong> you can say, without notes, the four rungs of the ladder, what
+  <code>x</code> means on a directory, why deleting a file depends on the directory, and why
+  a group you just added doesn't work for a running process.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check</p>
+<h2>Five questions</h2>
+</div>
+<p>Out loud first, and end each one with "because…" and the consequence. In 1.4 you had the
+  <em>what</em> every time and missed the <em>because</em>; that's what each of these is
+  scored on.</p>
+<details><summary>On Monday the app answers 200 but its log hasn't changed since Friday. <code>ls -l</code> shows <code>-rw-r--r-- root root reference.log</code> in a directory owned by the app's user. What happened, how do you prove it, and how do you fix it?</summary><div class="answer"><p><strong>Someone ran the app as root, and root created the log file.</strong> A file belongs to whoever created it, so the new log is root's, <code>644</code>. The app's user matches rung 4 (other), which has only <code>r</code>, so Logback's <code>open()</code> fails with Permission denied. Logback prints one ERROR at startup and the app carries on serving. Prove it with <code>journalctl -u app</code> (the <code>openFile … (Permission denied)</code> line) and <code>find /var/log/app ! -user app</code>. Fix: <code>chown app:app</code> the file and restart. Prevent it by never starting the app by hand as root: use <code>systemctl start</code>, or <code>sudo -u app</code>.</p></div></details>
+<details><summary>A file is <code>----rwxrwx</code>, owned by you, group is one of your groups. Can you read it? Why?</summary><div class="answer"><p><strong>No.</strong> The kernel uses the first rung that matches. You're the owner, so it applies the owner bits, <code>---</code>, and stops. The group and other bits are never consulted, even though they'd allow it. You can <code>chmod</code> it back, because changing the mode depends on being the owner, not on the bits.</p></div></details>
+<details><summary>You <code>chmod 444</code> a file so nobody can delete it, and another user deletes it anyway. Why, and what would have stopped them?</summary><div class="answer"><p><strong>Deleting changes the directory, not the file.</strong> <code>rm</code> removes a name from the directory's list, so it needs <code>w</code> and <code>x</code> on the directory, and the file's own bits don't matter. To stop it, remove <code>w</code> from the directory, or set the sticky bit (<code>chmod +t</code>, as on <code>/tmp</code>), which lets only the file's owner, the directory's owner or root delete it. The error is then "Operation not permitted".</p></div></details>
+<details><summary>You run <code>usermod -aG docker jenkins</code>, but builds on the agent still fail with "permission denied" on <code>/var/run/docker.sock</code>. <code>id jenkins</code> shows docker. Why, and what do you do?</summary><div class="answer"><p><strong>Groups are given to a process when it starts, and the agent started before the change.</strong> <code>id jenkins</code> reads <code>/etc/group</code> now; the running agent still has its old group list, which you can see in <code>/proc/PID/status</code> under <code>Groups</code>. Restart the agent so it starts with the new groups. And check that it was <code>-aG</code>: plain <code>-G</code> would have removed jenkins from every other group.</p></div></details>
+<details><summary>A playbook sets <code>mode: 644</code> on a config file, reports <code>changed</code>, and then the app can't read its config. What mode did the file get, and why?</summary><div class="answer"><p><strong><code>1204</code>, shown as <code>--w----r-T</code>.</strong> Unquoted, YAML reads <code>644</code> as a decimal number, and 644 in octal is 1204: the sticky bit, write-only for the owner, nothing for the group, read for others. If the app runs as the owner, rung 2 applies, and <code>-w-</code> has no read. Ansible doesn't fail, because 1204 is a valid mode. Fix: quote it, <code>mode: "0644"</code>, everywhere.</p></div></details>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Build 5 · Interchange</p>
+<h2>Run <code>reference</code> as its own user</h2>
+</div>
+<p>Today <code>reference</code> runs as you, from your home directory, so any bug in it can
+  do anything you can. After this build it runs as a system user that can read its jar, write
+  its log directory, and nothing else. This build needs <code>sudo</code>, so you run every
+  command yourself. Predict before each step.</p>
+<ol class="todo">
+<li><strong>Predict:</strong> if you only added <code>User=interchange</code> to the existing
+  user unit, what would happen? And if you moved it to a system unit but left
+  <code>ExecStart</code> pointing at the jar in <code>~/IdeaProjects</code>?</li>
+<li><strong>The user.</strong> A system account with no home and no login shell:
+  <code>sudo useradd --system --user-group --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin interchange</code>,
+  then <code>getent passwd interchange</code> and <code>id interchange</code>.</li>
+<li><strong>The artifact, owned by root.</strong> The service may read its code and not change
+  it: <code>./mvnw -pl services/reference -am package</code>, then
+  <code>sudo install -D -o root -g root -m 0644 services/reference/target/reference-0.1.0-SNAPSHOT.jar /opt/interchange/reference.jar</code>.
+  Check the walk with <code>namei -l /opt/interchange/reference.jar</code>.</li>
+<li><strong>The unit.</strong> Write <code>infra/systemd/interchange-reference.service</code>,
+  a system unit. Start from Build 3's unit and change: <code>User=</code> and
+  <code>Group=</code> <code>interchange</code>; <code>LogsDirectory=interchange</code>;
+  <code>Environment=LOGGING_FILE_NAME=/var/log/interchange/reference.log</code> (Spring reads
+  it as <code>logging.file.name</code>); <code>UMask=0027</code>; <code>ExecStart</code> on
+  <code>/opt/interchange/reference.jar</code>; no <code>WorkingDirectory</code> under your
+  home; <code>WantedBy=multi-user.target</code>. Keep <code>MemoryMax</code>,
+  <code>MemorySwapMax</code>, <code>Restart</code> and the JVM flags.</li>
+<li><strong>Swap over.</strong> Port 8081 can only have one listener:
+  <code>systemctl --user disable --now reference</code>, then
+  <code>sudo install -m 0644 infra/systemd/interchange-reference.service /etc/systemd/system/</code>,
+  <code>sudo systemctl daemon-reload</code>,
+  <code>sudo systemctl enable --now interchange-reference</code>.</li>
+<li><strong>Verify.</strong> <code>ps -o user,group,pid,cmd -C java</code>;
+  <code>curl localhost:8081/customers/C001</code>;
+  <code>sudo ls -l /var/log/interchange/</code> (predict the owner and mode first);
+  <code>sudo -u interchange touch /opt/interchange/x</code> (predict).</li>
+<li><strong>Read the log as yourself.</strong> Predict, then try
+  <code>tail /var/log/interchange/reference.log</code>. Add yourself to the group with
+  <code>sudo usermod -aG interchange $USER</code> and try again <em>in the same terminal</em>.
+  Then in a new login. Explain the difference.</li>
+<li><strong>Drill: the file root left behind.</strong>
+  <code>sudo systemctl stop interchange-reference</code>,
+  <code>sudo rm /var/log/interchange/reference.log</code>,
+  <code>sudo touch /var/log/interchange/reference.log</code>, then start it again. Predict:
+  does it start? Does systemd fix the file's owner? Does a request reach the log? Then find it
+  with the method table, fix it, and prove the fix.</li>
+<li><strong>Commit</strong> the unit file, with a comment on each line you added.</li>
+</ol>
+<p><strong>Done when:</strong> <code>ps</code> shows <code>interchange</code>, a request
+  appears in <code>/var/log/interchange/reference.log</code>, the service user can't write to
+  <code>/opt/interchange</code>, and you can explain each failure you hit on the way.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Interview answer · 60 seconds, spoken</p>
+<h2>"How would you run a service on Linux so that a bug in it can't damage the box?"</h2>
+</div>
+<p>Problem, mechanism, what you did. Use the Build: its own system user with no shell; code
+  owned by root and read-only to the service; the only writable place is its log directory,
+  created by systemd; <code>UMask=0027</code>; a port above 1024, so no root. Then one sentence
+  of mechanism (the kernel's owner, group, other check), and one failure you know how to find,
+  the file root left behind. Say it with a timer, then type what you said.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Review</p>
+<h2>At the start of the next lesson</h2>
+</div>
+<p>The two lowest-scored questions above are asked again, without notes, before the next
+  lesson starts. They count as done at ¾ or better.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Interchange</p>
+<h2>Where this comes back</h2>
+</div>
+<p>In Phase 2 every container image runs as root unless its Dockerfile says
+  <code>USER</code>, and a container running as root that writes to a bind mount leaves exactly
+  the files from Part 4 on the host. In Phase 5 Kubernetes asks the same questions in YAML:
+  <code>runAsUser</code>, <code>runAsNonRoot: true</code>, and <code>fsGroup</code>, which is
+  the setgid directory again: a volume whose files all get the pod's group. The UIDs are the
+  same numbers on both sides, and that's why they line up.</p>
+</section>
+
+<footer>
+<p>Sources: man pages <code>credentials(7)</code>, <code>path_resolution(7)</code>,
+  <code>capabilities(7)</code> (<code>CAP_DAC_OVERRIDE</code>), <code>inode(7)</code>,
+  <code>chmod(1)</code>, <code>stat(1)</code>, <code>umask(2)</code>, <code>namei(1)</code>,
+  <code>proc_pid_status(5)</code>, <code>useradd(8)</code>, <code>usermod(8)</code>,
+  <code>login.defs(5)</code>, <code>systemd.exec(5)</code> (<code>User=</code>,
+  <code>UMask=</code>, <code>LogsDirectory=</code>), <code>errno(3)</code>
+  (<code>EACCES</code>, <code>EPERM</code>); the Ansible <code>ansible.builtin.file</code>
+  module documentation (the <code>mode</code> note); <code>docker run --user</code>. Every
+  output on this page comes from a real run on Ubuntu 26.04 with Docker 29.9 and
+  ansible-core 2.21.5, checked 18 November 2026, except the <code>usermod</code> example in
+  the Groups section, which needs a second real user.</p>
+<p>Next: the Phase 1 reviews and interview answers, then Phase 2, containers, properly, starting
+  with Lesson 2.1, layers and copy-on-write.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

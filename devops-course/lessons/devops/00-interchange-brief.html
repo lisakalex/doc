@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Interchange Project</title>
+<link rel="icon" href="../../assets/img/favicon-reference.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/00-interchange-brief.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Project brief · runs weeks 3–24</p>
+<h1>The Interchange Project</h1>
+<p class="lede">An enterprise integration platform, built on the stack you already know and deployed on
+  the infrastructure you do not. Four services, one queue, one database, and eight failures you cause on
+  purpose — each one a question you got wrong, turned into an incident you fix and write up.</p>
+<div class="facts">
+<span class="fact">~70 hours</span>
+<span class="fact">4 services</span>
+<span class="fact">8 postmortems</span>
+<span class="fact">about $20 of AWS</span>
+</div>
+</header>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Why this and not the book's example</p>
+<h2>You have already read the books. That is the problem this solves</h2>
+</div>
+<p>Brikman and Burns are the two best books in print on Terraform and Kubernetes, they are both sitting
+  in your <code>read/</code> folder, and you scored 1/8 and 0/8 on those subjects. That is not a failure
+  of the books. It is what reading produces: the vocabulary arrives and the mechanisms do not. Working
+  through their examples would run the same experiment a third time.</p>
+<p>Their examples are also deliberately trivial — a Hello-World web server on an autoscaling group,
+  a toy frontend and backend — because the tool is meant to be the only thing you think about.
+  Excellent teaching. Worthless as portfolio, and every interviewer in the country has seen them.</p>
+<div class="call">
+<h3>What makes this one worth building instead</h3>
+<p><strong>All the difficulty is in the right layer.</strong> Apache Camel is the open-source cousin of
+  MuleSoft — routes, endpoints, transformations, the same enterprise integration patterns. You
+  already know the application. So no weekend disappears into a Java problem, and every hour of
+  confusion lands on Terraform, containers, EKS and observability, which is where the gaps are.</p>
+<p><strong>It is the migration your market is paying for.</strong> Java integration shops moving off
+  on-prem middleware onto Kubernetes is a live, well-funded, deeply unglamorous pattern — and it is
+  the agency-placed enterprise half where Jenkins sits at 29.5% and your CV already half-fits.</p>
+<p><strong>You can be interrogated about it.</strong> “Why Camel routes rather than a REST
+  service?” “What happened to in-flight exchanges during a rolling update?” Those are
+  questions you can answer from experience. That is the entire reason to have a project.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The system</p>
+<h2>Four services, deliberately more than one</h2>
+</div>
+<p>Everything you have operated has been one application and its database. Partial failure — one
+  thing down while another is up, a queue filling, a timeout cascading — only exists once services
+  talk to each other, and it is most of what makes this job hard.</p>
+<div aria-label="Order flow: HTTP and file inputs reach ingest, which publishes to an SQS queue; enrich consumes the queue, calls the reference service, and writes to Postgres; status-api reads Postgres and is fronted by an ALB." class="flow" role="img">
+<div class="node"><span class="nm">HTTP + file</span><span class="sub">two input channels</span></div>
+<span class="arrow">→</span>
+<div class="node"><span class="nm">ingest</span><span class="sub">Camel routes, validate, normalise</span></div>
+<span class="arrow">→</span>
+<div class="node store"><span class="nm">SQS</span><span class="sub">queue + DLQ</span></div>
+<span class="arrow">→</span>
+<div class="node"><span class="nm">enrich</span><span class="sub">consume, call, persist</span></div>
+<span class="arrow">→</span>
+<div class="node store"><span class="nm">Postgres</span><span class="sub">RDS</span></div>
+</div>
+<div class="flow u-margin-top-5rem">
+<div class="node weak"><span class="nm">reference</span><span class="sub">the weak dependency, called by enrich</span></div>
+<span class="arrow">→</span>
+<div class="node"><span class="nm">status-api</span><span class="sub">reads Postgres, behind the ALB</span></div>
+<span class="arrow">→</span>
+<div class="node store"><span class="nm">ALB</span><span class="sub">where your SLO is measured</span></div>
+</div>
+<div class="split u-margin-top-1-1rem">
+<div class="card">
+<span class="tag">Camel / Spring Boot</span>
+<h3><code>ingest</code></h3>
+<p>Accepts orders over HTTP and from a file drop. Validates, normalises, publishes to the queue. The Camel showcase: routes, endpoints, a transformation, a dead-letter channel.</p>
+<p class="note">Two input channels, because one of them will be awkward and that is the point.</p>
+</div>
+<div class="card">
+<span class="tag">Camel / Spring Boot</span>
+<h3><code>enrich</code></h3>
+<p>Consumes the queue, calls <code>reference</code> to fill in customer and product detail, writes the completed order to Postgres. Retries, backoff, and a dead-letter queue it cannot avoid.</p>
+<p class="note">Where idempotency lives. It will process the same message twice and you will have to make that safe.</p>
+</div>
+<div class="card">
+<span class="tag">Spring Boot, plain REST</span>
+<h3><code>reference</code></h3>
+<p>Holds customer and product reference data. Small, boring, and <strong>deliberately the weak dependency</strong> — most of the incident drills start by making this slow rather than making it fail.</p>
+<p class="note">Slow is harder than down. Down is obvious; slow takes everything with it.</p>
+</div>
+<div class="card">
+<span class="tag">Spring Boot, plain REST</span>
+<h3><code>status-api</code></h3>
+<p>Read-only API over the Postgres data, fronted by the ALB. The thing a user would actually hit, and the thing that returns 502s when a rollout goes wrong.</p>
+<p class="note">Your availability SLO is measured here, not on the internals.</p>
+</div>
+</div>
+<h3>What it runs on</h3>
+<div class="tw"><table>
+<thead><tr><th>Component</th><th>Choice, and why</th></tr></thead>
+<tbody><tr><td class="key">EKS</td><td>The cluster. Run <code>kind</code> locally for most of the course and stand EKS up only for the exercises that need it.</td></tr>
+<tr><td class="key">SQS</td><td>The queue between <code>ingest</code> and <code>enrich</code>. Nearly free, AWS-native, and has a visibility timeout that will teach you something.</td></tr>
+<tr><td class="key">RDS Postgres</td><td><code>db.t4g.micro</code>, single-AZ. Multi-AZ is a lesson, not a running cost.</td></tr>
+<tr><td class="key">ALB + ingress controller</td><td>Public entry to <code>status-api</code>, and the thing that sends traffic to a pod that is shutting down.</td></tr>
+<tr><td class="key">ECR</td><td>Image registry. The same role JFrog plays at work, which is the comparison to make.</td></tr>
+<tr><td class="key">Prometheus + Grafana</td><td>In-cluster, via kube-prometheus-stack. Spring Boot Actuator exposes the metrics.</td></tr>
+<tr><td class="key">Secrets Manager + KMS</td><td>Database credentials. Parameter Store is where you already read secrets; this is the comparison.</td></tr></tbody>
+</table></div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The point of the whole thing</p>
+<h2>Eight failures you cause on purpose</h2>
+</div>
+<p>Not bugs you happen to hit. Scheduled, deliberate breakage at the layer you have just finished
+  learning. Each one is a question from the placement that you got wrong — made to happen to a
+  system you built, so that the next time it happens you recognise it from the symptoms.</p>
+<div class="tw"><table>
+<thead><tr><th>#</th><th>When</th><th>Failure</th><th>How you cause it</th><th>Why this one</th></tr></thead>
+<tbody><tr><td>1</td><td>Phase 1</td><td>A disk that is full and empty at once</td><td>A log file is rotated by deleting it while <code>enrich</code> still holds it open. <code>df</code> says 100%, <code>du</code> says half that.</td><td>You answered “use <code>free</code> to clear cache”. This is the one that cost the first point.</td></tr>
+<tr><td>2</td><td>Phase 2</td><td>Exit code 137</td><td>Set a memory limit below what the JVM actually takes, deploy, watch it die. Then work out why the JVM ignored your limit until you told it about cgroups.</td><td>OOMKilled against throttled — the asymmetry you have not met yet.</td></tr>
+<tr><td>3</td><td>Phase 3</td><td>AccessDenied that names nothing</td><td><code>enrich</code> cannot read the database password. The IAM policy allows <code>secretsmanager:GetSecretValue</code>. It still fails, because the KMS key policy says nothing about this role.</td><td>You named three causes of AccessDenied. There are nine, and this is the one nobody guesses.</td></tr>
+<tr><td>4</td><td>Phase 4</td><td>Two applies, one state file</td><td>Disable locking, apply from two shells inside a minute, and find a resource that exists in AWS and not in state. Recover it with <code>import</code> rather than by deleting it.</td><td>You said Terraform is transactional and rolls back. It does neither.</td></tr>
+<tr><td>5</td><td>Phase 5</td><td>Green rollout, 502s for thirty seconds</td><td>Roll out a new <code>status-api</code>. Readiness passes, the deployment reports success, and users get errors anyway. Then do it to <code>ingest</code> and lose in-flight Camel exchanges.</td><td>This is the MuleSoft in-flight-message question, asked by Kubernetes instead.</td></tr>
+<tr><td>6</td><td>Phase 5</td><td>Flat median, tripled p99</td><td>Set <code>limits.cpu</code> too low on <code>enrich</code>. No errors. No restarts. Everything looks healthy and a minority of orders take eight seconds.</td><td>The question you did not know, made to happen to your own system.</td></tr>
+<tr><td>7</td><td>Phase 6</td><td>The dependency that got slow, not down</td><td>Add 3 seconds of latency to <code>reference</code>. Watch connection pools fill, the queue back up, and the failure arrive somewhere it did not start.</td><td>Cascading failure. There is no way to understand this from reading.</td></tr>
+<tr><td>8</td><td>Phase 6</td><td>The job that silently stopped</td><td>A nightly reconciliation job stops running entirely. No error, because nothing ran. Find out how long it took you to notice, then build the alarm that would have caught it.</td><td>Your 2am cron answer: Grafana cannot see what never reported.</td></tr></tbody>
+</table></div>
+<div class="call stop">
+<h3>Each one gets written up, and the write-up is the deliverable</h3>
+<p>Interviews ask you to walk through an incident. “I have been in the room” is a visibly
+  weaker answer than “I was paged at 2am, here is what I checked first, and here is what I got
+  wrong before I found it.” Eight written incidents about your own system is the closest honest
+  substitute for a pager you have never carried — and unlike a real one, you get to choose the
+  curriculum.</p>
+</div>
+<h3>The template, same every time</h3>
+<div class="pm">
+<b>What broke</b>      one sentence, in user terms, not system terms<br/>
+<b>Impact</b>         how many, how long, what they saw<br/>
+<b>Timeline</b>       detected → diagnosed → mitigated → resolved, with clock times<br/>
+<b>How I found it</b>  which signal, and which three I looked at first that were useless<br/>
+<b>Root cause</b>     the mechanism, not the trigger<br/>
+<b>What I got wrong</b> the hypothesis you chased for twenty minutes<br/>
+<b>Fix</b>            what changed, and how you know it worked<br/>
+<b>Prevention</b>     the alert, limit or test that catches it next time
+</div>
+<p class="note">“What I got wrong” is not there for humility. It is the line that proves you
+  were actually debugging rather than reciting, and it is the one an interviewer will follow up on.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Build order</p>
+<h2>What exists at the end of each phase</h2>
+</div>
+<p>The system is rebuilt at a higher level in each phase rather than assembled once. Phase 3 is
+  deliberately thrown away by phase 4 — clicking it together by hand first is what makes the
+  Terraform mean something.</p>
+<div class="steps">
+<div class="step">
+<span class="n">0</span>
+<div>
+<h3>Nothing yet <span class="chip">weeks 1–2</span></h3>
+<p>Write the brief and the architecture sketch. Pick the domain, name the four services, draw the boxes. Set up the repository with a sane layout. That is all — no code.</p>
+</div>
+</div>
+<div class="step">
+<span class="n">1</span>
+<div>
+<h3>It runs on one Linux box <span class="chip">weeks 3–6</span></h3>
+<p>Build <code>reference</code> and <code>status-api</code> as plain Spring Boot. Postgres on the same box. systemd units rather than cron. Deliberately break it at the filesystem and memory layers. <strong>No containers, no cloud.</strong> One machine you fully understand.</p>
+</div>
+</div>
+<div class="step">
+<span class="n">2</span>
+<div>
+<h3>It runs in containers <span class="chip">weeks 7–10</span></h3>
+<p>Containerise all four services. Multi-stage builds against your Maven stack. Compose for the whole system locally. Camel routes doing real work between them. First encounter with partial failure.</p>
+</div>
+</div>
+<div class="step">
+<span class="n">3</span>
+<div>
+<h3>It runs on AWS, built by hand <span class="chip">weeks 11–14</span></h3>
+<p>VPC, subnets, security groups, RDS, SQS, ECR — clicked together in the console on purpose, so that phase 4 has something to replace. Secrets in Secrets Manager. This is the phase you throw away.</p>
+</div>
+</div>
+<div class="step">
+<span class="n">4</span>
+<div>
+<h3>It is code <span class="chip">weeks 15–17</span></h3>
+<p>Rebuild all of phase 3 in Terraform. Remote state with locking. Modules, per-environment isolation, and <code>import</code> for the one resource you forgot to delete. Terratest on at least one module.</p>
+</div>
+</div>
+<div class="step">
+<span class="n">5</span>
+<div>
+<h3>It runs on Kubernetes <span class="chip">weeks 18–21</span></h3>
+<p>kind first, then EKS from your own Terraform. Deployments, services, ingress, probes, resource limits, ConfigMaps, IRSA so pods get AWS credentials without keys. The rollout drills land here.</p>
+</div>
+</div>
+<div class="step">
+<span class="n">6</span>
+<div>
+<h3>It is operable <span class="chip">weeks 22–24</span></h3>
+<p>Prometheus and Grafana, Actuator metrics, RED dashboards. An availability SLO on <code>status-api</code> with a real error budget. Alerts that are actionable and a dead man's switch. The last two drills, and all eight postmortems written up.</p>
+</div>
+</div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Money</p>
+<h2>Keeping it near $20, not near $400</h2>
+</div>
+<p>EKS costs <strong>$0.10 per cluster-hour with no free tier</strong>. Left running for six months that
+  is about $440 before a single node. This is a real constraint and the way around it is itself the
+  lesson.</p>
+<div class="split">
+<div class="card"><span class="tag">Rule 1</span><p><strong>kind is the default.</strong> Everything
+  that can be learned on a local cluster is learned on a local cluster. EKS is for the things only EKS
+  does: IRSA, the ALB controller, EBS CSI and zone affinity, node groups.</p></div>
+<div class="card"><span class="tag">Rule 2</span><p><strong>Destroy is a first-class workflow.</strong>
+  If <code>terraform destroy</code> and a 20-minute rebuild are routine, you will not leave a cluster
+  running over a weekend. Make the rebuild boring in phase 4 and the cost problem solves itself.</p></div>
+<div class="card"><span class="tag">Rule 3</span><p><strong>A budget alarm on day one.</strong> AWS
+  Budgets, $20 a month, alert at 50%. It costs nothing, it is five minutes, and FinOps appears in 3.6%
+  of adverts because everyone has a story about not having done it.</p></div>
+<div class="card"><span class="tag">Rule 4</span><p><strong>Small and single-AZ everywhere.</strong>
+<code>db.t4g.micro</code>, two small nodes, one NAT gateway or none. Multi-AZ, autoscaling and
+  cross-zone redundancy are things to <em>explain</em>, not things to run.</p></div>
+</div>
+<p class="note">Realistic total if you follow those: roughly 40–60 hours of EKS uptime across the
+  course, so about $5 of cluster fee, plus nodes, RDS and a little data transfer. Twenty dollars is
+  achievable. Four hundred is what happens if you forget once.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Done</p>
+<h2>What finished looks like, and what you say about it</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Artefact</th><th>Why it is on the list</th></tr></thead>
+<tbody>
+<tr><td class="key">One repository</td><td>Four services, the Terraform, the Kubernetes manifests and the pipeline definitions. Not four repositories — a reader should see the whole system in one place.</td></tr>
+<tr><td class="key">A README with the diagram</td><td>The thing an interviewer actually opens. Architecture, how to run it, and what each decision cost.</td></tr>
+<tr><td class="key">Eight postmortems</td><td>In the repository, in the same template. This is the differentiator and nothing else on the list is close.</td></tr>
+<tr><td class="key">A pipeline that deploys it</td><td>GitHub Actions with OIDC into AWS, no stored key. Your Jenkins experience, re-expressed in the thing adverts ask for.</td></tr>
+<tr><td class="key">An SLO with a real error budget</td><td>Measured on <code>status-api</code> at the ALB, with the arithmetic shown. 99.9% is 43 minutes a month.</td></tr>
+<tr><td class="key">A destroy that works</td><td>Proof the infrastructure is genuinely code and not a cluster you nursed by hand.</td></tr>
+</tbody>
+</table></div>
+<div class="call warn">
+<h3>The sentence this is all for</h3>
+<p>“I took an enterprise integration workload — the kind of thing I run on MuleSoft at work
+  — and rebuilt it on EKS with Terraform and GitHub Actions. Then I broke it eight times on
+  purpose to find out how it fails. The most interesting one was a rollout that reported success while
+  users got 502s, because readiness passing and endpoints converging are not the same event.”</p>
+<p>That is not a course certificate. It is thirty seconds that demonstrates every item on the advert and
+  cannot be bluffed, and it is reachable in twenty-four weeks from where the placement put you.</p>
+</div>
+</section>
+<footer>
+<p>Scoped against the placement of 9 October 2026 and curriculum v4. The failure ledger maps one to one
+  onto questions answered wrongly in that assessment, which is why it is eight items and not a round ten.</p>
+<p>Apache Camel is chosen over Spring Integration because it is the closer analogue to MuleSoft and
+  because <em>Camel in Action</em> is already on your shelf. Brikman and Burns are held as review
+  criteria for the Terraform and Kubernetes work — read the chapter after you hit the wall, not
+  before.</p>
+</footer>
+</div>
+</body>
+</html>

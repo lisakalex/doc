@@ -1,0 +1,57 @@
+/* Course progress: one board, summary first, then the stage grid, then the builds.
+   Colours come from lesson.css tokens; the four stage states reuse good / warn / muted. */
+
+.now{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem;}
+.now-card{background:var(--surface);border:1px solid var(--rule);border-left:4px solid var(--accent);
+  border-radius:6px;padding:1rem 1.15rem;display:flex;flex-direction:column;gap:.35rem;min-width:0;}
+.now-card .k{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.68rem;font-weight:600;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--muted);}
+.now-card .v{font-family:Archivo,"IBM Plex Sans",system-ui,sans-serif;font-weight:700;font-size:1.12rem;line-height:1.25;}
+.now-card .d{font-size:.9rem;color:var(--ink-2);}
+
+.counts{display:flex;flex-wrap:wrap;gap:.6rem;}
+.count{display:flex;align-items:baseline;gap:.45rem;background:var(--surface-2);border:1px solid var(--rule);
+  border-radius:999px;padding:.3rem .8rem;font-size:.88rem;color:var(--ink-2);}
+.count b{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;color:var(--ink);}
+
+/* the grid: scrolls sideways in its own box on a phone, lesson column stays put */
+.grid-box{overflow-x:auto;border:1px solid var(--rule);border-radius:6px;background:var(--surface);}
+table.stages{border-collapse:collapse;width:100%;min-width:44rem;font-size:.88rem;}
+.stages th,.stages td{padding:.6rem .55rem;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top;}
+.stages thead th{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.66rem;font-weight:600;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--muted);background:var(--surface-2);white-space:nowrap;}
+.stages tbody tr:last-child td,.stages tbody tr:last-child th{border-bottom:0;}
+.stages th[scope="row"]{position:sticky;left:0;background:var(--surface);font-weight:600;min-width:9.5rem;
+  border-right:1px solid var(--rule);z-index:1;}
+.stages th[scope="row"] .n{font-family:"IBM Plex Mono",ui-monospace,monospace;color:var(--accent-ink);margin-right:.35rem;}
+.stages thead th:first-child{position:sticky;left:0;z-index:2;border-right:1px solid var(--rule);}
+.stages tr.current th[scope="row"]{box-shadow:inset 4px 0 0 var(--accent);}
+.stages tr.current td,.stages tr.current th[scope="row"]{background:var(--accent-soft);}
+.stages tr.phase td{background:var(--paper);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.66rem;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--muted);padding:.4rem .55rem;}
+
+.s{display:inline-flex;align-items:center;gap:.35rem;line-height:1.3;}
+.s::before{flex:none;width:1.15rem;height:1.15rem;border-radius:4px;display:inline-grid;place-items:center;
+  font-size:.75rem;font-weight:700;border:1px solid transparent;}
+.s.done::before{content:"✓";background:var(--good-soft);color:var(--good);border-color:var(--good-rule);}
+.s.part::before{content:"◐";background:var(--warn-soft);color:var(--warn);border-color:var(--warn-rule);}
+.s.todo::before{content:"";background:transparent;border-color:var(--rule-strong);}
+.s.na::before{content:"–";color:var(--muted);}
+.s small{font-size:.8rem;color:var(--ink-2);font-variant-numeric:tabular-nums;}
+
+.legend{display:flex;flex-wrap:wrap;gap:1rem;font-size:.85rem;color:var(--ink-2);}
+
+/* builds: a short ordered list, because the builds really are a sequence */
+.builds{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border:1px solid var(--rule);
+  border-radius:6px;background:var(--surface);}
+.builds li{display:grid;grid-template-columns:3.2rem minmax(0,1fr) auto;gap:.8rem;align-items:start;
+  padding:.8rem 1rem;border-bottom:1px solid var(--rule);}
+.builds li:last-child{border-bottom:0;}
+.builds .b{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.78rem;font-weight:600;color:var(--accent-ink);padding-top:.1rem;}
+.builds .what{display:flex;flex-direction:column;gap:.2rem;min-width:0;}
+.builds .what span{font-size:.86rem;color:var(--ink-2);}
+.builds .c{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.76rem;color:var(--muted);white-space:nowrap;}
+@media (max-width:30rem){
+  .builds li{grid-template-columns:2.6rem minmax(0,1fr);}
+  .builds .c{grid-column:2;}
+}
