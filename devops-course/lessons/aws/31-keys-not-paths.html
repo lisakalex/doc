@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Keys, Not Paths</title>
+<link rel="icon" href="../../assets/img/favicon-module-3.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/31-keys-not-paths.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Module 03 · Lesson 3.1 · AWS + DevOps course</p>
+<h1>Keys, Not Paths</h1>
+<p class="lede">S3 looks like a filesystem in every screenshot and behaves like one in almost
+    no way that matters. This replaces the folder picture with the real one, using the two buckets
+    already defined in your repository.</p>
+<div class="facts">
+<span class="fact">account 739489595894</span>
+<span class="fact">us-east-1</span>
+<span class="fact">verified 2026-09-10</span>
+<span class="fact">repo aws-sre</span>
+</div>
+</header>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The core idea</p>
+<h2>A bucket is a flat map from one string to a pile of bytes</h2>
+</div>
+<p>Everything else — folders, trees, paths — is presentation. This is the return
+    value of <code>upload_avatar</code> in <code>app/services/s3.py</code>, taken apart the same way
+    Module 1 took apart an ARN:</p>
+<div class="code">https://<span class="k">prima-tech-challenge-lisakalex</span>.s3.<span class="w">us-east-1</span>.amazonaws.com/<span class="g">avatars/9f2c….png</span>
+<span class="c">└─────────────┬──────────────┘    └────┬────┘        └───────┬───────┘</span>
+<span class="c">        bucket name              region              the key, entire</span>
+<span class="c">      globally unique        where bytes live     no folder in sight</span></div>
+<p>Three separate facts, and beginners routinely merge them. The bucket name is unique across
+    <em>every AWS account on Earth</em>. The region says which data centres hold the bytes. The key
+    is one flat string — and the slash in it is just a character.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Vocabulary</p>
+<h2>Three words, used precisely</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Term</th><th>What it actually is</th></tr></thead>
+<tbody>
+<tr><td class="key">bucket</td><td>A named container in one region. The name is <strong>global</strong> — <code>prima-tech-challenge-lisakalex</code> is yours and nobody else can ever have it. That is why your Terraform appends a workspace suffix: two environments cannot share one name.</td></tr>
+<tr><td class="key">key</td><td>The <strong>whole</strong> string identifying an object in the bucket. Not a filename, not a path — <code>avatars/9f2c….png</code> is the key, slash included. Maximum 1,024 UTF-8 bytes.</td></tr>
+<tr><td class="key">object</td><td>The bytes plus their metadata: content type, size, ETag, storage class, encryption. Up to 5 TB. Written whole, replaced whole — there is no “open the file and seek to byte 400”.</td></tr>
+</tbody>
+</table></div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The prefix illusion</p>
+<h2>There are no directories, and your code proves it</h2>
+</div>
+<p>Your uploader never creates a folder, never checks whether one exists, and never fails
+    because one is missing:</p>
+<div class="code"><span class="c"># app/services/s3.py</span>
+key = f"<span class="g">avatars/</span>{uuid.uuid4()}.{extension}"
+self._client.upload_fileobj(file, self._bucket, key, …)</div>
+<p>It builds one string and hands it over. If <code>avatars/</code> had to exist first, that
+    code would be broken — and it isn't. The console draws a folder icon because it groups
+    keys sharing a prefix up to the next <code>/</code>. That grouping is a display convention,
+    computed on read.</p>
+<div class="code"><span class="c">rename a "folder"   </span>→  copy every object to new keys, delete the originals
+<span class="c">move an object      </span>→  same thing: copy, then delete. There is no move.
+<span class="c">an empty folder     </span>→  cannot exist. No keys, nothing to group, nothing shown.
+<span class="c">list "inside" a dir </span>→  ListObjectsV2 with <span class="g">Prefix=avatars/</span> — a string filter</div>
+<div class="call">
+<h3>Where the prefix is genuinely load-bearing</h3>
+<p>Policy and configuration, where it filters by string match. Your lifecycle rule targets
+      <code>prefix = "avatars/"</code>; your IAM policy grants object actions on
+      <code>arn:…:prima-tech-challenge-lisakalex/*</code>. Both are string matching, not directory
+      traversal.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Scope · callback to Module 1, Q3</p>
+<h2>Global name, regional bytes</h2>
+</div>
+<p>You met this exception once already and got it half right: you applied the correct general
+    rule — resources are regional — and S3 broke it. The precise version:</p>
+<div class="tw"><table>
+<thead><tr><th>Aspect</th><th>Scope</th><th>Consequence</th></tr></thead>
+<tbody>
+<tr><td class="key">the namespace</td><td><span class="chip ok">global</span></td><td>Names claimed across all of AWS, first come first served. <code>ListBuckets</code> answers from anywhere and returns every bucket you own in every region.</td></tr>
+<tr><td class="key">the bytes</td><td><span class="chip imp">regional</span></td><td>Objects live in the bucket's region and never silently leave it. That is what makes S3 usable under data-residency rules — and why the region appears in the URL your code returns.</td></tr>
+</tbody>
+</table></div>
+<p>Say it in an interview as: <em>“the namespace is global, the data is regional.”</em>
+    Short, exactly right, and it shows you know S3 is the odd one out.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Design · your repo already contains the argument</p>
+<h2>Two buckets, opposite choices, both correct</h2>
+</div>
+<div class="split">
+<div class="card">
+<span class="tag">destroyed in the August teardown</span>
+<h3>aws_s3_bucket.avatars</h3>
+<p><strong>No versioning.</strong> KMS CMK · public access block, all four ·
+        lifecycle rules · <code>force_destroy = true</code></p>
+<p>Every upload mints a fresh UUID key, so nothing is ever overwritten — versioning
+        would guard against a danger the design already removed. And it is disposable teaching
+        infrastructure, so it must tear down cleanly.</p>
+</div>
+<div class="card">
+<span class="tag">live right now</span>
+<h3>aws_s3_bucket.state</h3>
+<p><strong>Versioning enabled.</strong> KMS CMK · public access block, all four
+        · no lifecycle rules · no <code>force_destroy</code></p>
+<p>Holds exactly one hot object — your Terraform state — rewritten on every
+        apply. A corrupt write with no previous version means hand-rebuilding the map of everything
+        you own. Terraform refusing to delete this bucket easily is the point.</p>
+</div>
+</div>
+<div class="call">
+<h3>The rule underneath</h3>
+<p><strong>Versioning protects against overwrite and deletion, not against loss of the
+      disk.</strong> S3 already handles the disk. Ask “what happens if the current version is
+      wrong?” — if the answer is expensive, turn versioning on and pay for the extra
+      copies.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Proved on your own account</p>
+<h2>The undo button you have never looked at</h2>
+</div>
+<p><code>list-object-versions</code> on your live state bucket returns your August teardown,
+    recorded in three frames — read bottom to top:</p>
+<div class="code">latest     size   modified          version id
+  <span class="g">*</span>         181   2026-08-18 07:14  aEKsFiMJODJ8MS0v…   <span class="c">← current: "resources": []</span>
+           1733   2026-08-18 07:13  zG9_rEJhHNQYh0y_…   <span class="c">← mid-destroy</span>
+<span class="w">26545</span>   2026-08-18 05:56  KQIXWzVkIdmMmxtd…   <span class="c">← the full stack, 16 resources</span>
+
+delete markers: 0</div>
+<p>Fetching that 26 KB version with <code>get-object --version-id</code> returns the exact
+    description of everything you owned on 18 August — every resource id and ARN, enough to
+    <code>terraform import</code> your way home. It cost one API call and nothing in dollars.</p>
+<div class="call">
+<h3>Three things follow</h3>
+<p><strong>Old versions were never deleted.</strong> <code>IsLatest</code> is just a pointer at
+      the newest one. Overwriting an object in a versioned bucket adds a version and moves the
+      pointer. <code>delete markers: 0</code> confirms nothing here was deleted, only superseded.</p>
+<p><strong>You are billed for 28,459 bytes, not 181.</strong> Every version is a stored object.
+      Trivial here; on a bucket where a large file is rewritten nightly it is how people accidentally
+      store the same data three hundred times.</p>
+<p><strong><code>serial</code> went 1 → 3.</strong> Terraform's own write counter, with
+      <code>lineage</code> unchanged — that pair is how Terraform detects that two people have
+      diverged, and why the DynamoDB lock table sits beside this bucket.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Durability</p>
+<h2>Eleven nines, and what it does not mean</h2>
+</div>
+<p>S3 Standard is designed for 99.999999999% annual durability. Store ten million objects and
+    you would expect to lose one roughly every ten thousand years. AWS achieves it by replicating
+    across at least three physically separate Availability Zones before acknowledging your write.</p>
+<p>What it does <strong>not</strong> cover, and this is the interview trap: durability is about
+    AWS losing your bytes. It says nothing about <em>you</em> losing them. A bad deploy that deletes
+    the wrong keys, a wrong prefix in a lifecycle rule, credentials in a public repo — all
+    fully durable operations. S3 will preserve the consequences with eleven nines of fidelity.</p>
+<p>Availability is a separate, lower number: 99.99% for Standard. <strong>Durable</strong> means
+    the bytes still exist; <strong>available</strong> means you can reach them today.</p>
+<div class="call warn">
+<h3>Where the money leaks</h3>
+<p>A multipart upload that never finishes leaves its uploaded parts in the bucket, billed as
+      storage, invisible in a normal object listing, with nothing to ever delete them. Your
+      <code>abort-incomplete-multipart-uploads</code> rule at 7 days exists for exactly this. It is
+      the most common silent S3 bill in the wild, and you fixed it before it happened.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Hands-on · ~10 minutes · costs nothing</p>
+<h2>Run it against your own bucket</h2>
+<p class="note">Warm the session first — <code>aws sts get-caller-identity --profile admin</code>
+      in your own terminal — then read the output rather than skimming it.</p>
+</div>
+<div class="steps">
+<div class="step"><span class="n">1</span><div>
+<h3>Confirm the global listing</h3>
+<p><code>aws s3 ls --profile admin</code> — no region flag, yet it answers. That is the global half.</p>
+</div></div>
+<div class="step"><span class="n">2</span><div>
+<h3>Find the region of the bytes</h3>
+<p><code>aws s3api get-bucket-location --bucket prima-tech-challenge-lisakalex-tfstate --profile admin</code>
+        — returns <code>null</code>, which <em>means</em> <code>us-east-1</code>. That region predates the
+        concept of a location constraint, so it is encoded as the absence of one.</p>
+</div></div>
+<div class="step"><span class="n">3</span><div>
+<h3>Read a real key as a string</h3>
+<p><code>aws s3 ls s3://prima-tech-challenge-lisakalex-tfstate --recursive --profile admin</code>
+        — <code>senior-sre-tech-challenge/terraform.tfstate</code> looks like a folder and a file. It is
+        43 characters.</p>
+</div></div>
+<div class="step"><span class="n">4</span><div>
+<h3>Watch versioning work</h3>
+<p><code>aws s3api list-object-versions --bucket prima-tech-challenge-lisakalex-tfstate --profile admin</code>
+        — every past state file, each with its own version id.</p>
+</div></div>
+<div class="step"><span class="n">5</span><div>
+<h3>Create a fake folder without creating one</h3>
+<p>Upload any small file to key <code>demo/a/b/c.txt</code>. No directory was made, because there is no
+        such thing. Then delete it — and in a versioned bucket, watch <code>delete markers</code> go from
+        0 to 1 while the object stays recoverable.</p>
+</div></div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check yourself</p>
+<h2>Four questions</h2>
+<p class="note">Same rules as the Module 2 check: your own words, closed book, “not sure”
+      is a real answer. Hints only inside.</p>
+</div>
+<details>
+<summary>A colleague says "I'll just rename the <code>avatars/</code> folder to <code>photos/</code>, it's one click in the console." What actually happens, and what would it cost on two million objects?</summary>
+<div class="answer"><p>There is no rename operation in the API. Work out what the console must therefore do on your behalf, then count the requests.</p></div>
+</details>
+<details>
+<summary>The state bucket has versioning on; the avatars bucket does not. Give the reason for each — and name a disaster versioning would <em>not</em> have saved the state bucket from.</summary>
+<div class="answer"><p>The first half is on this page. For the second, ask what versioning protects and what it does not: something that removes the bucket, or the key that decrypts it.</p></div>
+</details>
+<details>
+<summary>A teammate wants to name a bucket <code>backups</code>. Predict the error, and say which of the three words — bucket, key, object — is the reason.</summary>
+<div class="answer"><p>One of the three has a scope the other two do not. The error message says so out loud.</p></div>
+</details>
+<details>
+<summary>Someone claims "S3 is eleven nines durable, so we don't need backups." Where exactly is that wrong? Name one failure it does nothing about.</summary>
+<div class="answer"><p>Eleven nines describes one party's failure mode. Ask whose — and who else is in a position to destroy the data.</p></div>
+</details>
+</section>
+<footer>
+<p>Module 03, Lesson 3.1 · syllabus, progress log and full revision Q&amp;A in <code>docs/AWS_COURSE.md</code></p>
+<p>Next: <strong>3.2</strong> — encryption &amp; access: SSE-KMS vs SSE-S3, <code>bucket_key_enabled</code>,
+    bucket policies, and the four public-access switches. Then <strong>3.3</strong>: storage classes and lifecycle
+    economics.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

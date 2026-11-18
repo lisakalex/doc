@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Where the Memory Went</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/p1-2-where-the-memory-went.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Phase 1 · Lesson 1.2 · AWS + DevOps course</p>
+<h1>Where the Memory Went</h1>
+<p class="lede">A Jenkins agent alerts: "free memory 3%". Someone asks for more RAM. Nothing was
+  wrong. On another box, a Java service vanishes overnight: no stack trace, no error in its log,
+  just exit code 137. That one was wrong. This lesson is about telling the two apart: what
+  <code>free</code> actually counts, why a process can ask for memory it never gets, and who
+  decides which process dies when memory really runs out.</p>
+<div class="facts">
+<span class="fact">~3 hours</span>
+<span class="fact">week 4</span>
+<span class="fact">laptop only, no AWS</span>
+<span class="fact">Ubuntu 26.04 · kernel 7.0 · OpenJDK 21 · Python 3.14</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Reading <code>free</code></p>
+<h2>2 GB free on a 31 GB machine, and nothing is wrong</h2>
+</div>
+<div class="code"><code>$ free -m
+               total        used        free      shared  buff/cache   available
+Mem:           31085       20972        <span class="r">3334</span>        1814        9045       <span class="g">10112</span>
+Swap:           8191          21        8170</code></div>
+<p>Read the columns as three kinds of memory, not as "used" against "free":</p>
+<div class="membar">
+<span class="lab">The same 31,085 MB, drawn to scale</span>
+<div class="bar">
+<span class="seg app">programs 18,706</span>
+<span class="seg cache">buff/cache 9,045</span>
+<span class="seg free">free 3,334</span>
+</div>
+<div class="bracket">
+<span>used = total − available = 20,972</span>
+<span>available 10,112</span>
+</div>
+</div>
+<div class="ladder">
+<div class="rung"><span class="s">1</span><p><span class="who">free</span>Memory holding nothing at
+  all. On a healthy Linux machine this is small, on purpose. Empty RAM does no work, so the
+  kernel fills it.</p></div>
+<div class="rung"><span class="s">2</span><p><span class="who">buff/cache</span>Copies of files
+  the kernel has read or written recently: the <strong>page cache</strong>. Jars, logs, the
+  Maven repository. If a program needs the memory, the kernel drops clean cached pages and hands
+  them over. They cost a disk read later, nothing now.</p></div>
+<div class="rung"><span class="s">3</span><p><span class="who">available</span>The kernel's
+  estimate of how much a program could get <em>without swapping</em>: free memory plus the part
+  of the cache it can drop. <strong>This is the number to alert on.</strong></p></div>
+</div>
+<p>The bracket under the bar doesn't line up with the coloured blocks, and that's the point.
+  Not all of the cache can be dropped, so <code>available</code> covers the free block and only
+  most of the cache. On this version of <code>free</code> (procps-ng 4.0.4),
+  <code>used</code> is simply <code>total − available</code>. Older versions computed it
+  differently, so don't compare the <code>used</code> column across distributions. Compare
+  <code>available</code>.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The page cache</p>
+<h2>Reading a file takes 1 GB from "free" and nothing from "available"</h2>
+</div>
+<p>A 1 GB file on disk, evicted from the cache first, then read twice. <code>fincore</code>
+  shows how much of a file is sitting in RAM:</p>
+<div class="code"><code>$ fincore big.bin
+RES PAGES SIZE FILE
+ 0B     0   1G big.bin                  <span class="c"># not cached</span>
+$ dd if=big.bin of=/dev/null bs=1M
+1073741824 bytes (1.1 GB, 1.0 GiB) copied, 0.621026 s, 1.7 GB/s   <span class="c"># from disk</span>
+$ fincore big.bin
+RES  PAGES SIZE FILE
+ 1G 262144   1G big.bin                 <span class="c"># all of it is cached now</span>
+$ dd if=big.bin of=/dev/null bs=1M
+1073741824 bytes (1.1 GB, 1.0 GiB) copied, 0.0577978 s, <span class="g">19 GB/s</span>   <span class="c"># from RAM</span></code></div>
+<div class="tw"><table>
+<thead><tr><th>MB</th><th>free</th><th>buff/cache</th><th>available</th></tr></thead>
+<tbody>
+<tr><td class="key">Before the read</td><td class="num">3,334</td><td class="num">9,045</td><td class="num">10,112</td></tr>
+<tr><td class="key">After the read</td><td class="num"><span class="chip exp">2,307</span></td><td class="num"><span class="chip ok">10,069</span></td><td class="num">10,108</td></tr>
+<tr><td class="key">Change</td><td class="num">−1,027</td><td class="num">+1,024</td><td class="num">−4</td></tr>
+</tbody></table></div>
+<p>A monitor watching <code>free</code> sees a gigabyte disappear. A monitor watching
+  <code>available</code> sees nothing happen, which is correct: the second read was ten times
+  faster, and the kernel will give that gigabyte back the moment someone asks. A build agent
+  that reads a lot of jars always looks "full" by the first measure.</p>
+<div class="call warn">
+<h3>The exception: tmpfs is cache that can't be dropped</h3>
+<p>The first attempt at this demo ran in <code>/tmp</code>, which on Ubuntu 26.04 is a
+  <strong>tmpfs</strong>: a filesystem that lives in RAM. The 1 GB file went into
+  <code>shared</code> (1,811 → 2,836 MB) and couldn't be evicted, because RAM is the only place
+  it exists. tmpfs files and shared memory are counted in buff/cache but not in
+  <code>available</code>. A build that fills <code>/tmp</code> or <code>/dev/shm</code> is
+  really using memory.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Process memory</p>
+<h2>Asking for memory is not getting it</h2>
+</div>
+<p>Two numbers describe a process's memory. <strong>VSZ</strong> (virtual size) is everything
+  it has asked for. <strong>RSS</strong> (resident set size) is the part actually sitting in
+  RAM right now. A Python process asks for 2 GB, then writes one byte into each 4 KB page of the
+  first 512 MB:</p>
+<div class="code"><code>$ python3 lazy.py
+start                        VSZ    21 MB   RSS     9 MB
+after asking for 2 GB        VSZ  <span class="w">2069 MB</span>   RSS    <span class="g">10 MB</span>
+after touching 512 MB        VSZ  2069 MB   RSS   <span class="r">522 MB</span></code></div>
+<p>Asking for 2 GB cost nothing. The kernel only wrote down a promise. RAM is handed over one
+  page at a time, the first time each page is touched (a <strong>page fault</strong>). That's
+  why VSZ is almost useless for capacity planning, and why a JVM with <code>-Xmx4g</code> can
+  show a 4 GB VSZ and a 600 MB RSS.</p>
+<div class="call">
+<h3>Overcommit: the bill arrives later</h3>
+<p>Because promises are cheap, Linux lets processes ask for more than the machine has
+  (<code>vm.overcommit_memory = 0</code>, the default, refuses only absurd requests). So
+  <code>malloc()</code> almost never fails. The failure comes later, when the pages are
+  touched and there is nothing left to give. At that point no function can return an error,
+  so the kernel has to take memory back from somebody.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Running out</p>
+<h2>Drop cache, then swap, then kill</h2>
+</div>
+<p>When a page is needed and nothing is free, the kernel works down a list:</p>
+<div class="ladder">
+<div class="rung"><span class="s">1</span><p><span class="who">Reclaim cache</span>Drop clean
+  page-cache pages. Cheap. This is why <code>available</code> exists.</p></div>
+<div class="rung"><span class="s">2</span><p><span class="who">Write back and swap</span>Write
+  dirty cache to disk, and move rarely used program pages to swap. Slow. The machine stays up
+  but everything stalls on disk. A Java heap partly in swap makes garbage collection crawl.</p></div>
+<div class="rung"><span class="s">3</span><p><span class="who">The OOM killer</span>Nothing
+  left to reclaim. The kernel picks one process and sends it <code>SIGKILL</code>. No warning,
+  no cleanup, no shutdown hook.</p></div>
+</div>
+<p>Step 2 shows up before step 3, in the pressure gauge. <code>/proc/pressure/memory</code>
+  reports the share of time processes spent waiting for memory. <code>some</code> means at
+  least one task was stalled; <code>full</code> means all of them were:</p>
+<div class="code"><code>$ cat /proc/pressure/memory
+some avg10=0.00 avg60=0.00 avg300=0.00 total=316455
+full avg10=0.00 avg60=0.00 avg300=0.00 total=304477</code></div>
+<p class="note">All zeros here: 10 GB available, nothing waiting. A <code>some avg60</code>
+  that sits above a few percent means the machine really is short, whatever <code>free</code>
+  says.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The choice</p>
+<h2>Who the OOM killer picks</h2>
+</div>
+<p>Every process has an <code>oom_score</code>. It is mostly the process's share of memory,
+  shifted by <code>oom_score_adj</code>, a setting from −1000 to +1000. The highest score is
+  killed. On this laptop:</p>
+<div class="code"><code>$ for p in /proc/[0-9]*; do …; done | sort -rn | head -5
+score  adj  RSS_MB  name
+880    300  852     claude-desktop
+872    300  339     chrome
+872    300  336     chrome
+870    300  202     cef_server
+869    300  195     cef_server
+
+sshd            score=0    adj=<span class="g">-1000</span>      <span class="c"># never killed</span>
+systemd-journal score=501  adj=-250</code></div>
+<p>The browser-style apps raised their own <code>oom_score_adj</code> to 300, volunteering to
+  die first. <code>sshd</code> set −1000, so you can always log in to a machine that is out
+  of memory. On a Mule server the biggest process is almost always the JVM, so it is almost
+  always the victim. That is usually the right choice, and it is also why the service you care
+  about is the one that disappears.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">cgroups</p>
+<h2>A limit smaller than the machine, and exit code 137</h2>
+</div>
+<p>A <strong>cgroup</strong> is a group of processes the kernel accounts for together. Give it
+  a memory limit, and the group runs out of memory long before the machine does. Every Docker
+  container and every Kubernetes pod is a cgroup. <code>systemd-run</code> makes one on a
+  laptop, no container needed:</p>
+<div class="code"><code>$ systemd-run --user --scope -p MemoryMax=300M -p MemorySwapMax=0 python3 grow.py
+holding 50 MB
+holding 100 MB
+holding 150 MB
+holding 200 MB
+holding 250 MB
+Killed
+$ echo $?
+<span class="r">137</span></code></div>
+<p><strong>137 = 128 + 9.</strong> The shell reports "killed by signal N" as exit code 128 + N,
+  and signal 9 is <code>SIGKILL</code>. Python never printed an error: a process can't catch
+  <code>SIGKILL</code>, so it had no chance to. The only witness is the kernel log:</p>
+<div class="code"><code>$ journalctl -k | grep -i oom
+oom-kill:<span class="w">constraint=CONSTRAINT_MEMCG</span>,…,oom_memcg=/user.slice/…/run-p270848-i257652.scope,task=python3,pid=270848
+Memory cgroup out of memory: Killed process 270848 (python3) total-vm:328644kB, anon-rss:306476kB, …</code></div>
+<p><code>CONSTRAINT_MEMCG</code> means the limit hit was the cgroup's, not the machine's. The
+  laptop had 10 GB available the whole time. In Kubernetes the same event shows as
+  <code>Reason: OOMKilled</code>, <code>Exit Code: 137</code> on the pod, and the limit is
+  <code>resources.limits.memory</code>.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Java</p>
+<h2>Two ways a JVM dies, and only one leaves a stack trace</h2>
+</div>
+<p>A JVM started without <code>-Xmx</code> sizes its heap from the memory it can see, and it
+  reads the cgroup limit, not the machine's RAM:</p>
+<div class="code"><code>no limit (31 GB laptop):     MaxHeapSize 7772 MB     <span class="c"># 25% of RAM</span>
+cgroup MemoryMax=1G:         MaxHeapSize  <span class="w">256 MB</span>     <span class="c"># 25% of the limit</span>
+1G, -XX:MaxRAMPercentage=75: MaxHeapSize  768 MB</code></div>
+<p>The default is 25%, which wastes three quarters of a container. Now a Java program that
+  keeps allocating 50 MB arrays, under a 1 GB limit, twice:</p>
+<div class="pair">
+<div><p class="lab">A · default heap (256 MB)</p>
+<div class="code"><code>heap holds 200 MB
+Exception in thread "main"
+  <span class="r">java.lang.OutOfMemoryError: Java heap space</span>
+	at Grow.main(Grow.java:6)
+exit=1</code></div></div>
+<div><p class="lab">B · -Xmx2g, above the limit</p>
+<div class="code"><code>heap holds 800 MB
+heap holds 850 MB
+heap holds 900 MB
+exit=<span class="r">137</span></code></div></div>
+</div>
+<p>In <strong>A</strong> the JVM hit its own ceiling first. It threw an error you can log,
+  catch, and see in the console. In <strong>B</strong> the heap was allowed to grow past the
+  cgroup, so the kernel got there first and sent <code>SIGKILL</code>. No exception, no heap
+  dump, no last log line. The log just stops.</p>
+<div class="call warn">
+<h3>The heap is not the whole JVM</h3>
+<p>Setting <code>-Xmx</code> equal to the container limit still ends in 137. The JVM also uses
+  memory outside the heap: metaspace for classes, a stack per thread, the JIT's code cache,
+  direct buffers for network I/O, and the garbage collector's own tables. A Mule or Camel app
+  with many routes and threads can spend several hundred MB there. Leave room: start with
+  <code>-XX:MaxRAMPercentage=75</code> and measure RSS under load.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Build it</p>
+<h2>Fill memory, then get killed on purpose</h2>
+</div>
+<p>Everything runs on your laptop, as your own user. Work in
+  <code>devops-course/labs/p1-2/</code>, which is on your real disk. Don't use
+  <code>/tmp</code>: it's tmpfs, and Part 2 won't work there.</p>
+
+<h3>Part 1: read <code>free</code> properly</h3>
+<div class="code"><code>mkdir -p ~/IdeaProjects/devops-course/labs/p1-2 &amp;&amp; cd $_
+free -m
+grep -E '^(MemTotal|MemFree|MemAvailable|Cached|Shmem):' /proc/meminfo
+cat /proc/pressure/memory</code></div>
+<p>Without looking at the page: which column would you alert on, and which line of
+  <code>/proc/meminfo</code> is it read from?</p>
+
+<h3>Part 2: watch the page cache</h3>
+<div class="code"><code>cat &gt; evict.py &lt;&lt;'EOF'
+import os, sys
+fd = os.open(sys.argv[1], os.O_RDONLY); os.fsync(fd)
+os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED); os.close(fd)
+EOF
+head -c 1G /dev/urandom &gt; big.bin
+python3 evict.py big.bin; fincore big.bin; free -m
+dd if=big.bin of=/dev/null bs=1M
+fincore big.bin; free -m
+dd if=big.bin of=/dev/null bs=1M
+rm big.bin; free -m</code></div>
+<p>Predict before you run it: after the first <code>dd</code>, which of free, buff/cache and
+  available will move, and by how much? What happens to buff/cache after <code>rm</code>?</p>
+
+<h3>Part 3: ask for memory, then use it</h3>
+<div class="code"><code>cat &gt; lazy.py &lt;&lt;'EOF'
+import mmap
+def show(label):
+    st = {l.split(':')[0]: l.split()[1] for l in open('/proc/self/status') if l.startswith(('VmSize','VmRSS'))}
+    print(f"{label:&lt;28} VSZ {int(st['VmSize'])//1024:&gt;5} MB   RSS {int(st['VmRSS'])//1024:&gt;5} MB")
+show("start")
+m = mmap.mmap(-1, 2 * 1024**3)            # ask for 2 GB
+show("after asking for 2 GB")
+for i in range(0, 512 * 1024**2, 4096):   # touch the first 512 MB, one byte per page
+    m[i] = 1
+show("after touching 512 MB")
+EOF
+python3 lazy.py</code></div>
+<p>Predict the RSS on each of the three lines.</p>
+
+<h3>Part 4: the OOM killer in a cgroup</h3>
+<div class="code"><code>cat &gt; grow.py &lt;&lt;'EOF'
+hold = []
+for i in range(1, 100):
+    hold.append(bytearray(50 * 1024**2))      # 50 MB, zero-filled, so really touched
+    print(f"holding {i*50} MB", flush=True)
+EOF
+systemd-run --user --scope -p MemoryMax=300M -p MemorySwapMax=0 python3 grow.py
+echo "exit=$?"
+journalctl -k --since -2min | grep -iE 'oom-kill|Killed process'</code></div>
+<p>Predict the last "holding" line and the exit code. Then find the word in the kernel log
+  that proves it was the cgroup's limit, not the machine's.</p>
+
+<h3>Part 5: two ways for Java to die</h3>
+<div class="code"><code>cat &gt; Grow.java &lt;&lt;'EOF'
+import java.util.*;
+public class Grow {
+    public static void main(String[] a) {
+        List&lt;byte[]&gt; hold = new ArrayList&lt;&gt;();
+        for (int i = 1; ; i++) {
+            byte[] b = new byte[50 * 1024 * 1024];
+            Arrays.fill(b, (byte) 1);
+            hold.add(b);
+            System.out.println("heap holds " + i * 50 + " MB");
+        }
+    }
+}
+EOF
+javac Grow.java
+java -XX:+PrintFlagsFinal -version 2&gt;/dev/null | grep ' MaxHeapSize '
+systemd-run --user --scope -p MemoryMax=1G -p MemorySwapMax=0 java Grow; echo "exit=$?"
+systemd-run --user --scope -p MemoryMax=1G -p MemorySwapMax=0 java -Xmx2g Grow; echo "exit=$?"</code></div>
+<p>Predict both exit codes, and which run prints a Java exception.</p>
+
+<h3>Part 6: your servers</h3>
+<p>On a Mule server or Jenkins agent, and only looking: run <code>free -m</code> and read
+  <code>available</code>, not <code>free</code>. Run <code>ps -o pid,rss,args -C java</code> and
+  find each JVM's <code>-Xmx</code>. Add the <code>-Xmx</code> values up and compare them with
+  total RAM. Has a Mule app ever "just stopped" with nothing in its log? That is your interview
+  story for this lesson. Leave out hostnames and anything that looks like a password.</p>
+<p><strong>Done when:</strong> you can explain, without notes, why <code>free</code> being
+  low is normal, and why run B in Part 5 left no stack trace.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check</p>
+<h2>Five questions</h2>
+</div>
+<p>Out loud first, and end each one with "because…" and the consequence.</p>
+<details><summary>Monitoring on a Jenkins agent says "free memory 3%". <code>free -m</code> shows 40% available. Do you need more RAM?</summary><div class="answer"><p><strong>No, the monitor is reading the wrong column.</strong> Free memory is RAM holding nothing, and Linux keeps it small on purpose by filling it with page cache: the jars, artifacts and workspaces the agent has read. The kernel drops clean cache the moment a program needs the memory, so <code>available</code> (40%) is the real headroom. Change the alert to <code>MemAvailable</code>, and add memory pressure (<code>/proc/pressure/memory</code>) if you want to know when the box really is short.</p></div></details>
+<details><summary>A Java container restarts with exit code 137. Its log stops mid-line, with no exception. What killed it, and where do you look?</summary><div class="answer"><p><strong>The kernel's OOM killer, because the container hit its cgroup memory limit.</strong> 137 is 128 + 9, killed by <code>SIGKILL</code>, which a process can't catch, so Java never had the chance to log anything. Look in the kernel log (<code>journalctl -k</code> or <code>dmesg</code>) for <code>Memory cgroup out of memory</code>, or in Kubernetes for <code>Reason: OOMKilled</code> in <code>kubectl describe pod</code>. The cause is a JVM whose total memory, heap plus everything else, grew past the limit.</p></div></details>
+<details><summary>A JVM in a container with a 1 GiB limit and no <code>-Xmx</code> throws <code>OutOfMemoryError: Java heap space</code> at about 256 MB. Why 256, and what do you change?</summary><div class="answer"><p><strong>Because the JVM defaults to a heap of 25% of the memory it sees, and it sees the cgroup limit.</strong> 25% of 1 GiB is 256 MiB, so the heap hits its own ceiling while three quarters of the container sits unused. Raise it with <code>-XX:MaxRAMPercentage=75</code> (better than a fixed <code>-Xmx</code>, because it follows the limit if someone changes it), then check RSS under real load.</p></div></details>
+<details><summary>Someone sets <code>-Xmx1g</code> in a 1 GiB container to "use all of it". The container is now killed with 137 under load. Why?</summary><div class="answer"><p><strong>Because the heap is only part of the JVM's memory.</strong> Metaspace, one stack per thread, the JIT code cache, direct buffers and GC structures all live outside the heap, and the cgroup counts all of it. With the heap allowed to reach the full limit, the extra pushes the process past it, and the kernel kills it before Java ever reaches its own heap limit. Leave headroom: heap around 75% of the limit, then measure.</p></div></details>
+<details><summary>A program allocates 2 GB on a machine with 1 GB available. The allocation succeeds. An hour later the program is killed. Why didn't the allocation fail?</summary><div class="answer"><p><strong>Because asking for memory only reserves address space.</strong> Linux overcommits: <code>malloc</code> or <code>mmap</code> returns at once, VSZ goes up, and RAM is handed over page by page only when each page is first touched. The program filled its 2 GB slowly; when the touched pages exceeded what the kernel could reclaim, there was no function call left to fail, so the OOM killer picked the biggest process, which was this one.</p></div></details>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Interchange</p>
+<h2>Failure 2 of 8</h2>
+</div>
+<p>This lesson sets up the project's second deliberate failure. In Phase 2, when
+  <code>enrich</code> runs in a container, you will give it a memory limit and a heap that
+  don't fit together, send it load, and watch it die with 137 and a log that just stops. Then
+  you'll find it in the kernel log, fix the sizing with <code>MaxRAMPercentage</code>, and write
+  the postmortem in <code>docs/postmortems/</code>. In Phase 5 the same failure appears as
+  <code>OOMKilled</code> on a pod.</p>
+</section>
+
+<footer>
+<p>Sources: Linux kernel documentation <code>filesystems/proc.rst</code>
+  (<code>/proc/meminfo</code>, <code>MemAvailable</code>, <code>oom_score_adj</code>),
+  <code>admin-guide/cgroup-v2.rst</code> (<code>memory.max</code>, <code>memory.events</code>),
+  <code>accounting/psi.rst</code> (<code>/proc/pressure</code>),
+  <code>mm/overcommit-accounting.rst</code>; man pages <code>free(1)</code>,
+  <code>proc(5)</code>, <code>mmap(2)</code>, <code>posix_fadvise(2)</code>,
+  <code>fincore(1)</code>, <code>systemd.resource-control(5)</code>; the OpenJDK
+  documentation for <code>MaxRAMPercentage</code> and container detection. Every output on
+  this page comes from a real run on Ubuntu 26.04 with kernel 7.0, procps-ng 4.0.4, OpenJDK
+  21.0.12 and Python 3.14.4, checked 9 November 2026. Paths are shortened with
+  <code>…</code>.</p>
+<p>Next: Lesson 1.3, systemd: units, timers instead of cron, journald, and why your 2am cron
+  job failed silently.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

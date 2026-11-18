@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Table Nobody Designed</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/reading-02-terraform-lock-table.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Reading note · AWS + DevOps course</p>
+<h1>The Table Nobody Designed</h1>
+<p class="lede">Three books on your shelf create the same DynamoDB table, in the same chapter, for
+      the same reason. It is the best-designed table in any of them — eight lines, one access pattern,
+      no index — and not one author presents it as a design. It is also, as of Terraform 1.11,
+      deprecated.</p>
+<div class="facts">
+<span class="fact">Brikman, ch. 3</span>
+<span class="fact">Wojslaw, ch. 11</span>
+<span class="fact">Terraform in Action, ch. 6</span>
+<span class="fact">LockID</span>
+</div>
+</header>
+<section>
+<p class="eyebrow">What you are reading</p>
+<h2>The same eight lines, three times</h2>
+<p>Search <code>~/Documents/books/devops</code> for DynamoDB and the hits cluster in a place that
+      has nothing to do with databases — the chapter on Terraform remote state:</p>
+<div class="tw">
+<table>
+<thead><tr><th>Book</th><th>Pages</th><th>What it says about DynamoDB</th></tr></thead>
+<tbody>
+<tr><td class="key">Brikman, <em>Terraform: Up &amp; Running</em> 3e</td><td>150–164</td><td>creates the table, and explains <strong>why</strong> DynamoDB in one sentence</td></tr>
+<tr><td class="key">Wojslaw, <em>The Linux DevOps Handbook</em></td><td>324–326</td><td>names the table, describes the mechanism — incorrectly</td></tr>
+<tr><td class="key"><em>Terraform in Action</em></td><td>159–163</td><td>lists it as one of four components of an S3 backend</td></tr>
+<tr><td class="key">Kapoor, <em>AWS DevOps Simplified</em></td><td>151–159</td><td>a different table, in a CDK example, with a permissions problem</td></tr>
+</tbody>
+</table>
+</div>
+<p>None of the four discusses partition keys, access patterns or capacity. DynamoDB appears as
+      plumbing — a thing you create so that something else works. Which is exactly why it is worth
+      reading against Lesson 5.1, because the table they hand you is the one your own users table
+      should have been.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The artefact</p>
+<h2>Two tables, one correct</h2>
+</div>
+<p>Here is Brikman's, from page 152:</p>
+<div class="code">resource <span class="g">"aws_dynamodb_table"</span> <span class="g">"terraform_locks"</span> {
+  name         = <span class="g">"terraform-up-and-running-locks"</span>
+  billing_mode = <span class="g">"PAY_PER_REQUEST"</span>
+  hash_key     = <span class="w">"LockID"</span>
+
+  attribute {
+    name = <span class="g">"LockID"</span>
+    type = <span class="g">"S"</span>
+  }
+}</div>
+<p>And here is yours, from <code>terraform/main.tf</code>:</p>
+<div class="code">resource <span class="g">"aws_dynamodb_table"</span> <span class="g">"users"</span> {
+  name         = local.dynamodb_table
+  billing_mode = <span class="g">"PAY_PER_REQUEST"</span>
+  hash_key     = <span class="w">"email"</span>
+
+  attribute {
+    name = <span class="g">"email"</span>
+    type = <span class="g">"S"</span>
+  }
+}</div>
+<p>Character for character, the same table. Same billing mode, same single partition key, no sort
+      key, no index, eight lines each. <strong>One of them is exactly right and the other is the subject
+      of a whole lesson</strong> — and nothing in the Terraform tells you which is which.</p>
+<div class="call">
+<h3>The difference is not in the configuration</h3>
+<p>It is in how many questions the application asks. The lock table is asked exactly one:
+        <em>“does a lock exist for this state file?”</em> The users table is asked six, and was designed
+        for one of them.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Why it is the best table in the book</p>
+<h2>One question, answered by existence</h2>
+</div>
+<p>Brikman gives the rationale in a single sentence, and it is the most precise thing any of the
+      four books says about DynamoDB (page 152):</p>
+<div class="call">
+<h3>Quoted</h3>
+<p>“It supports strongly consistent reads and conditional writes, which are all the ingredients
+        you need for a distributed lock system.”</p>
+</div>
+<p>That is the whole design, and it is worth unpacking because the mechanism is not what most
+      people assume. The lock is not a flag that is set to true. <strong>The item's existence is the
+      lock.</strong></p>
+<div class="steps">
+<div class="step"><div class="n">1</div><div>
+<h3>Acquire</h3>
+<p>Terraform issues a <code>PutItem</code> with
+          <code class="brk">ConditionExpression: attribute_not_exists(LockID)</code>. The write
+          succeeds only if no item with that key is there. One network call, atomic, no read
+          first.</p></div></div>
+<div class="step"><div class="n">2</div><div>
+<h3>Lose the race</h3>
+<p>If somebody already holds it, DynamoDB rejects the write with
+          <code>ConditionalCheckFailedException</code> — which is the error behind the
+          <em>“Error acquiring the state lock”</em> message everyone has seen. The item holds an
+          <code>Info</code> attribute naming who, when and which operation, which is why the message
+          can tell you who to go and ask.</p></div></div>
+<div class="step"><div class="n">3</div><div>
+<h3>Release</h3>
+<p><code>DeleteItem</code>. The lock is gone because the item is gone.</p></div></div>
+<div class="step"><div class="n">4</div><div>
+<h3>The one item that is not a lock</h3>
+<p>The table also holds a row keyed <code class="brk">&lt;bucket&gt;/&lt;key&gt;-md5</code>
+          carrying a digest of the state file, so Terraform can detect a truncated or mismatched
+          upload. Two item shapes, one table, told apart by a suffix on the key — the trick from
+          Lesson 5.1, used in the wild.</p></div></div>
+</div>
+<p>Count what this table never does: no <code>Query</code>, no <code>Scan</code>, no secondary
+      index, no filter expression, no sort key, no pagination. Every access is
+      <code>GetItem</code>-shaped, by a key the caller already has. That is the ideal case, and it is
+      why nobody ever writes a blog post about their Terraform lock table being expensive.</p>
+<p class="note">The <code>LockID</code> value is the state file's own address —
+      <code class="brk">my-bucket/global/s3/terraform.tfstate</code> — so the key is the question. One
+      state file, one lock, by construction. Note also that Terraform requires the attribute to be named
+      <code>LockID</code> exactly, capitalisation included; it is not a convention you may rename.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Where the books are wrong</p>
+<h2>Three corrections, in increasing order of consequence</h2>
+</div>
+<h3>1. It is not a flag</h3>
+<p>Wojslaw, page 324, describing the same table:</p>
+<div class="call stop">
+<h3>Quoted, and wrong</h3>
+<p>“In AWS environments, it's simply a DynamoDB table with a lock entry with a state of 0 or 1.”</p>
+</div>
+<p>There is no 0 or 1. There is an item or there is no item, and the distinction is the entire
+      reason the thing works. A boolean flag would have to be <em>read</em>, inspected, and then
+      <em>written</em> — three steps with a gap in the middle, and two machines running
+      <code>terraform apply</code> at the same moment would both read <code>0</code> and both write
+      <code>1</code>. That is a textbook race, and it is precisely what a lock is supposed to prevent.</p>
+<p>The conditional write collapses the read and the write into one atomic operation that the storage
+      engine adjudicates. Getting this wrong in prose is harmless; getting it wrong in your own code —
+      “I'll just check if the row exists, then insert it” — is a bug you will not reproduce in
+      testing.</p>
+<h3>2. The pattern is deprecated</h3>
+<p>All three Terraform books teach <code>dynamodb_table</code> in the backend block. Since then:</p>
+<div class="tw">
+<table>
+<thead><tr><th>Terraform</th><th>What changed</th></tr></thead>
+<tbody>
+<tr><td class="key">1.10</td><td><code>use_lockfile = true</code> introduced — the S3 backend locks by writing a <code class="brk">.tflock</code> object beside the state, using S3 conditional writes</td></tr>
+<tr><td class="key">1.11</td><td><code>dynamodb_table</code> <strong>deprecated</strong>; configuring it emits a warning</td></tr>
+<tr><td class="key">future</td><td>removal announced</td></tr>
+</tbody>
+</table>
+</div>
+<div class="code"><span class="c"># what the books teach</span>
+terraform {
+  backend <span class="g">"s3"</span> {
+    bucket         = <span class="g">"state-files"</span>
+    key            = <span class="g">"terraform.tfstate"</span>
+    region         = <span class="g">"eu-central-1"</span>
+<span class="r">dynamodb_table = "terraform"</span> <span class="c"># deprecated in 1.11</span>
+    encrypt        = <span class="k">true</span>
+  }
+}
+
+<span class="c"># what to write today</span>
+terraform {
+  backend <span class="g">"s3"</span> {
+    bucket       = <span class="g">"state-files"</span>
+    key          = <span class="g">"terraform.tfstate"</span>
+    region       = <span class="g">"eu-central-1"</span>
+<span class="w">use_lockfile = true</span> <span class="c"># no table, no second resource</span>
+    encrypt      = <span class="k">true</span>
+  }
+}</div>
+<p>Both can be set at once during a migration, and Terraform then requires <em>both</em> locks before
+      proceeding — which is the correct way to cut over without a window where two machines use
+      different mechanisms and neither sees the other.</p>
+<h3>3. The CDK example grants everything</h3>
+<p>Kapoor, page 152, assembling permissions for a Lambda:</p>
+<div class="code">dynamodbPermissionsForLambda.addActions(<span class="r">"dynamodb:*"</span>);
+dynamodbPermissionsForLambda.addResources(dynamodbTable.tableArn);
+
+kmsPermissionsForLambda.addActions(<span class="r">"kms:*"</span>);
+kmsPermissionsForLambda.addResources(<span class="r">"*"</span>);</div>
+<p>The DynamoDB statement is at least scoped to one table, though <code>dynamodb:*</code> includes
+      <code>DeleteTable</code>. The KMS statement is <code>kms:*</code> on <code>*</code> — every key in
+      the account, every operation, including <code>ScheduleKeyDeletion</code> and
+      <code>PutKeyPolicy</code>. Lesson 4.2 spent a section on exactly this, and Lesson 5.1 closes by
+      <em>removing</em> a single verb from a policy so that an expensive mistake becomes impossible.
+      Here a book does the opposite, in a chapter about a different subject, where a reader copying the
+      CDK is not thinking about IAM at all.</p>
+<p class="note">This is the same shape as Reading Note 1: the simplification is in the part the
+      chapter is not about, which is exactly where a reader will not be looking.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">What survives</p>
+<h2>The mechanism was never DynamoDB</h2>
+</div>
+<p>It would be easy to read the deprecation as “DynamoDB was the wrong choice”. It was not. For a
+      decade it was the only AWS store that offered the two primitives Brikman named — strongly
+      consistent reads and conditional writes. S3 could not do it: writes were eventually consistent,
+      and there was no way to say “create this object only if it does not exist”.</p>
+<p>What changed is S3, not Terraform. S3 gained strong read-after-write consistency in 2020 and
+      <strong>conditional writes</strong> in late 2024 — <code>If-None-Match</code> on a PUT, which is
+      byte-for-byte the same idea as <code class="brk">attribute_not_exists(LockID)</code>. The moment
+      the state store itself could do compare-and-set, the second service became an extra moving part
+      with its own IAM policy, its own bill and its own bootstrap problem.</p>
+<div class="call">
+<h3>The transferable idea</h3>
+<p>A distributed lock is <strong>compare-and-set on a store everybody can see</strong>. DynamoDB,
+        S3 with <code>If-None-Match</code>, Redis with <code>SET NX</code>, etcd with a compare-and-swap,
+        a unique index in Postgres — all the same primitive wearing different vendor names. Learn the
+        primitive and the migration above is a configuration change rather than a new topic.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">For this repo</p>
+<h2>You already have this table</h2>
+</div>
+<p>Not hypothetically. <code>terraform/state-backend/main.tf</code> contains it, created by whoever
+      followed this chapter — which was you:</p>
+<div class="code">resource <span class="g">"aws_dynamodb_table"</span> <span class="g">"state_lock"</span> {
+  name         = <span class="g">"${var.namespace}-tfstate-lock"</span>
+  billing_mode = <span class="g">"PAY_PER_REQUEST"</span>
+  hash_key     = <span class="w">"LockID"</span>
+
+  attribute {
+    name = <span class="g">"LockID"</span>
+    type = <span class="g">"S"</span>
+  }
+}</div>
+<p>So this repo holds <strong>both</strong> tables from the comparison above: the ideal one in
+      <code>state-backend/</code> and the over-asked one in <code>main.tf</code>, eight lines each,
+      written months apart, and only one of them is a problem. And your <code>backend.hcl</code> passes
+      the deprecated argument:</p>
+<div class="code"><span class="c"># terraform/backend.hcl.example</span>
+bucket         = <span class="g">"prima-tech-challenge-lisakalex-tfstate"</span>
+key            = <span class="g">"senior-sre-tech-challenge/terraform.tfstate"</span>
+<span class="r">dynamodb_table = "prima-tech-challenge-lisakalex-tfstate-lock"</span>
+kms_key_id     = <span class="g">"arn:aws:kms:..."</span>
+encrypt        = <span class="k">true</span></div>
+<p>Nothing is broken — it still works, and the AWS stack is torn down anyway. But when you rebuild
+      it, this is a free simplification:</p>
+<div class="steps">
+<div class="step"><div class="n">1</div><div>
+<h3>Swap <code>dynamodb_table</code> for <code>use_lockfile = true</code></h3>
+<p>Set both at once first, run an apply so each machine holds both locks, then remove
+          <code>dynamodb_table</code> and delete <code>aws_dynamodb_table.state_lock</code>. You lose one
+          resource, one IAM statement and one thing to forget when you tear the stack down — which,
+          given how often you destroy this stack, matters more here than in most repos.</p></div></div>
+<div class="step"><div class="n">2</div><div>
+<h3>Keep versioning on the state bucket</h3>
+<p>This is the part none of the books oversell: the lock protects you from concurrent writes, and
+          versioning protects you from the bad write that succeeded. Different failures, both
+          needed.</p></div></div>
+<div class="step"><div class="n">3</div><div>
+<h3>If you inherit a lock table, learn the stuck-lock drill before you need it</h3>
+<p>A crashed <code>apply</code> leaves the item behind and every later run fails. The supported
+          fix is <code class="brk">terraform force-unlock &lt;LOCK_ID&gt;</code>, taking the ID from
+          the error message — not deleting rows in the console. And if somebody has already deleted
+          rows: the <code class="brk">-md5</code> row is not a lock and does not need restoring;
+          Terraform rewrites it on the next apply.</p></div></div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check yourself</p>
+<h2>Two questions</h2>
+</div>
+<details>
+<summary>A colleague proposes adding a sort key to the lock table “so we can keep lock history and see who locked what, when”. What do you tell them?</summary>
+<div class="answer">
+<p>Three separate noes. First, <strong>you cannot</strong>: the key schema is fixed at creation, so
+          this is a destroy-and-create of the table, and Terraform will show it as
+          <code>forces replacement</code>. Second, <strong>it would not work</strong>: Terraform
+          requires a table whose primary key is exactly <code>LockID</code>, and it writes and deletes
+          by that key alone — a composite key would break the backend, because the code does not supply
+          a sort key value.</p>
+<p>Third, and most importantly, <strong>it is the wrong tool for the question</strong>. Lock
+          history is not an access pattern of the locking system; the lock item is deleted the moment
+          the operation finishes, by design. If you want an audit trail of who ran apply and when, that
+          is CloudTrail on the state bucket, or your CI logs — a system that is supposed to retain
+          history, rather than one whose correctness depends on forgetting.</p>
+<p>Which means the right response is to ask what they are actually trying to find out, because
+          “who is running Terraform” is a reasonable question with a good answer that is not this
+          table.</p>
+</div>
+</details>
+<details>
+<summary>You are reviewing a pull request that adds a DynamoDB table for a new feature. It looks exactly like the lock table: one partition key, no sort key, no index, <code>PAY_PER_REQUEST</code>. What do you ask?</summary>
+<div class="answer">
+<p>Not “is this table right?”, because you cannot tell from the Terraform — it is the same eight
+          lines either way. Ask about the <strong>questions</strong>: what will the application look up,
+          and by what, over the life of this feature? List them. If the answer is one question and the
+          caller always holds the key, this is the ideal table and you approve it. If any answer begins
+          “we'll also need to find all the…”, the design is wrong now and will be expensive to change
+          later, because the key schema is the one thing that cannot be altered.</p>
+<p>The follow-up question is about the key's values: how many distinct ones, and will traffic land
+          evenly? A partition key with one value is a single partition with a hard ceiling, however much
+          capacity the table is allowed.</p>
+<p>Which means a DynamoDB review is never a review of the resource block — it is a review of a
+          list of sentences that does not appear in the diff.</p>
+</div>
+</details>
+</section>
+<footer>
+<p>Reading note 2 · AWS + DevOps course · 4 October 2026</p>
+<p>Sources, all in <code>~/Documents/books/devops/</code>: Yevgeniy Brikman, <em>Terraform: Up &amp;
+      Running</em> 3e (O'Reilly 2022), chapter 3 — the lock table and its rationale, PDF pages 150–164;
+      Damian Wojslaw, <em>The Linux DevOps Handbook</em> (Packt 2023), PDF pages 324–326 — the “state of
+      0 or 1” description; <em>Terraform in Action</em> (Manning), PDF pages 159–163 — the backend's four
+      components; Ashish Kapoor, <em>AWS DevOps Simplified</em> (Packt 2023), PDF pages 151–159 — the CDK
+      example and its permissions.</p>
+<p>Checked against primary sources rather than the books: the Terraform S3 backend documentation and
+      release notes for <code>use_lockfile</code> (1.10) and the <code>dynamodb_table</code> deprecation
+      (1.11); the DynamoDB documentation for conditional writes and
+      <code>ConditionalCheckFailedException</code>; and the S3 documentation for conditional writes with
+      <code>If-None-Match</code>.</p>
+<p>Companion to Lesson 5.1, <em>Queries Before Tables</em>, which this note's two tables are the
+      shortest possible illustration of.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

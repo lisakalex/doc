@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Running but Unreachable</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/p1-4-running-but-unreachable.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Phase 1 · Lesson 1.4 · AWS + DevOps course</p>
+<h1>Running but Unreachable</h1>
+<p class="lede">The new release is deployed. On the server, <code>curl localhost:8081/health</code>
+  answers <code>200</code>. The load balancer marks it unhealthy, and the testers get
+  "connection refused". The day after, a different app works but every call it makes takes
+  five seconds, exactly. Both are networking, and neither is the network. This lesson follows
+  one request from a name to a reply: DNS, the route, the TCP connection, TLS, and what each
+  step's failure looks like.</p>
+<div class="facts">
+<span class="fact">~3 hours</span>
+<span class="fact">week 6</span>
+<span class="fact">laptop only, no AWS</span>
+<span class="fact">Ubuntu 26.04 · curl · ss · openssl</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The mechanism</p>
+<h2>One request, five steps, five different failures</h2>
+</div>
+<p>When a program calls <code>https://api.example.com/orders</code>, five things happen in
+  order, and the sections below follow the same order. Step 3, the connection, has two
+  sections: what happens on the server (3a) and what the client sees (3b). Each has its own error message and its own tool, so the first job when "it can't
+  connect" is to find out <strong>which step</strong> failed.</p>
+<div class="ladder">
+<div class="rung"><span class="s">1</span><p><span class="who">Name → address · DNS</span>The
+  name is turned into an IP address. Fails with "Could not resolve host", or is slow.
+  Tool: <code>getent hosts</code>.</p></div>
+<div class="rung"><span class="s">2</span><p><span class="who">Address → interface · routing</span>The
+  kernel picks which network card the packets leave by, using the routing table. Tool:
+  <code>ip route get</code>.</p></div>
+<div class="rung"><span class="s">3</span><p><span class="who">Connect · TCP</span>A three-way
+  handshake with a program <strong>listening</strong> on that address and port. Fails as
+  "connection refused" (fast) or "timed out" (slow). Tools: <code>curl -v</code>,
+  <code>nc -zv</code>; on the server, <code>ss -ltnp</code>.</p></div>
+<div class="rung"><span class="s">4</span><p><span class="who">Prove who it is · TLS</span>The
+  server shows a certificate; the client checks it's valid, in date, and for this name. Fails
+  with "certificate has expired" or "PKIX path building failed". Tool:
+  <code>openssl s_client</code>.</p></div>
+<div class="rung"><span class="s">5</span><p><span class="who">Ask · HTTP</span>Only now does
+  the request reach the application. A 404, 500 or 502 means steps 1 to 4 all worked.</p></div>
+</div>
+<p>In the library: DNS is the <strong>directory</strong> that turns a library's name into a
+  street address. The IP address is the <strong>building</strong>, and the port is the
+  <strong>counter number</strong> inside it (counter 443, counter 8081). A program listening on a
+  port is a <strong>librarian sitting at that counter</strong>. Each connection is a loan ticket
+  again: a socket is a file descriptor, and <code>ss</code> shows which process holds it, just as
+  <code>lsof</code> did in Lesson 1.1.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Step 1 · name</p>
+<h2>DNS, and the five-second timeout</h2>
+</div>
+<p>A program asks the C library (<code>getaddrinfo()</code>), and the library follows two
+  files:</p>
+<div class="code"><code>$ grep '^hosts' /etc/nsswitch.conf
+hosts:          files mdns4_minimal [NOTFOUND=return] dns      <span class="c"># the order to ask in</span>
+$ grep -v '^#' /etc/resolv.conf
+nameserver 127.0.0.53                                          <span class="c"># systemd-resolved, on loopback</span>
+options edns0 trust-ad
+search .
+$ resolvectl status | grep 'DNS Servers'
+       DNS Servers: <span class="c">(the ISP's two resolvers, given by the router's DHCP)</span></code></div>
+<div class="ladder">
+<div class="rung"><span class="s">1</span><p><span class="who">files</span><code>/etc/hosts</code>
+  first. If the name is there, the search stops. Nothing else is asked.</p></div>
+<div class="rung"><span class="s">2</span><p><span class="who">mdns4_minimal</span>Names ending
+  in <code>.local</code>, answered by machines on the LAN. Anything else falls through.</p></div>
+<div class="rung"><span class="s">3</span><p><span class="who">dns</span>Each
+  <code>nameserver</code> in <code>/etc/resolv.conf</code>, in order. On Ubuntu that's
+  systemd-resolved's stub at <code>127.0.0.53</code>, which caches and forwards to the real
+  servers. On most RHEL servers <code>resolv.conf</code> lists the company's DNS servers
+  directly.</p></div>
+</div>
+
+<h3><code>/etc/hosts</code> wins, and <code>dig</code> doesn't know</h3>
+<p>With one line added to <code>/etc/hosts</code> (in a private copy made with <code>unshare</code>; the lab does the same with a container):</p>
+<div class="code"><code>10.9.9.9 example.com                         <span class="c"># the added line</span>
+$ getent ahostsv4 example.com
+10.9.9.9        STREAM example.com           <span class="c"># what programs get</span>
+$ python3 -c 'import socket; print(socket.gethostbyname("example.com"))'
+10.9.9.9
+$ dig +short example.com A
+104.20.23.154                                <span class="c"># dig asks the DNS server directly</span></code></div>
+<p><code>dig</code> and <code>nslookup</code> are DNS tools: they skip
+  <code>nsswitch.conf</code> and <code>/etc/hosts</code>. Your Java app, curl and Python don't.
+  When "dig says the right IP but the app goes to the old one", use <code>getent hosts</code>,
+  which follows the same path as the app, and look in <code>/etc/hosts</code>. Then check
+  caches: the JVM keeps successful lookups for 30 seconds by default
+  (<code>networkaddress.cache.ttl</code>), and some old setups cache forever.</p>
+
+<h3>The five seconds</h3>
+<p>If the first <code>nameserver</code> doesn't answer, the resolver waits for it, then tries
+  the next. The default wait is 5 seconds. A fake <code>resolv.conf</code> whose first server
+  is an address that never answers:</p>
+<div class="code"><code>nameserver 10.255.255.1        <span class="c"># dead</span>
+nameserver 127.0.0.53          <span class="c"># works</span>
+
+$ time getent ahostsv4 example.com
+104.20.23.154   STREAM example.com
+5.00s                          <span class="c"># the right answer, five seconds late</span>
+
+<span class="c"># the same, with options timeout:1 attempts:1 added</span>
+1.00s</code></div>
+<p>Nothing fails. Every lookup is just slow, by a suspiciously round number. So: when every
+  call takes 5.0 seconds, or 10, suspect DNS first. Prove it with curl's timing, which splits a
+  request into its steps:</p>
+<div class="code"><code>$ curl -s -o /dev/null -w 'dns %{time_namelookup}\ntcp %{time_connect}\ntls %{time_appconnect}\nfirst-byte %{time_starttransfer}\n' https://example.com/
+dns 0.027660
+tcp 0.048201
+tls 0.077594
+first-byte 0.102771</code></div>
+<div class="reqbar">
+<span class="lab">That request, to scale (times are cumulative, so each step is the difference)</span>
+<div class="bar">
+<span class="seg dns">DNS 28</span>
+<span class="seg tcp">TCP 21</span>
+<span class="seg tls">TLS 29</span>
+<span class="seg srv">server 25</span>
+</div>
+<div class="bar-scale"><span>0 ms</span><span>103 ms</span></div>
+</div>
+<p>With the dead nameserver, the first segment would be 5,000 ms and the other three
+  unchanged.</p>
+<div class="call">
+<h3>Coming in Phase 5: <code>ndots:5</code></h3>
+<p>Not run here, because it needs a cluster. A Kubernetes pod's <code>resolv.conf</code> has
+  three <code>search</code> domains and <code>options ndots:5</code>: any name with
+  fewer than five dots is tried with each search domain appended first. So one lookup of
+  <code>api.example.com</code> becomes eight DNS queries (A and AAAA for each of four names) before the real one is asked. That's why
+  cluster DNS gets busy, and why a trailing dot (<code>api.example.com.</code>) or a full name
+  speeds things up. You'll see it with <code>cat /etc/resolv.conf</code> inside a pod.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Step 2 · route</p>
+<h2>Interfaces and routes</h2>
+</div>
+<p>An <strong>interface</strong> is a network card, real or virtual. Each has one or more IP
+  addresses. On this laptop:</p>
+<div class="code"><code>$ ip -br addr
+lo               UNKNOWN   127.0.0.1/8 ::1/128          <span class="c"># loopback: never leaves the machine</span>
+wlp0s20f3        UP        192.168.0.32/24              <span class="c"># Wi-Fi: the home network</span>
+docker0          DOWN      172.17.0.1/16                <span class="c"># Docker's default bridge</span>
+br-69abccb9ce83  UP        172.23.0.1/16                <span class="c"># a Compose project's network</span>
+vethbcc244e@if2  UP                                     <span class="c"># one end of a cable into a container</span>
+…                                                       <span class="c"># 14 in all, most of them Docker's</span></code></div>
+<p>The <strong>routing table</strong> says which interface to use for each destination. The
+  most specific match wins, and <code>default</code> catches everything else:</p>
+<div class="code"><code>$ ip route
+default via 192.168.0.1 dev wlp0s20f3 proto dhcp src 192.168.0.32   <span class="c"># everything else: to the router</span>
+172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1    <span class="c"># Docker's addresses: the bridge</span>
+…
+
+$ ip route get 8.8.8.8
+8.8.8.8 via 192.168.0.1 dev wlp0s20f3 src 192.168.0.32
+$ ip route get 127.0.0.1
+local 127.0.0.1 dev lo src 127.0.0.1
+$ ip route get 172.17.0.5
+172.17.0.5 dev docker0 src 172.17.0.1</code></div>
+<p><code>ip route get</code> answers "if I sent a packet there, which way would it go, and from
+  which of my addresses?" It's the quickest check when a server has two networks (a front-end
+  and a back-end network, or a VPN) and traffic leaves by the wrong one.</p>
+<p class="note"><code>/24</code> and <code>/16</code> are the network size: the first 24 (or 16)
+  bits of the address name the network, and the rest name the machine on it. So
+  <code>192.168.0.32/24</code> shares a network with every <code>192.168.0.x</code>. VPC design
+  in Phase 3 is mostly choosing these numbers.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Step 3a · connect, on the server</p>
+<h2>0.0.0.0 against loopback: which door is the librarian at?</h2>
+</div>
+<p>A server program calls <code>bind()</code> to choose which of the machine's addresses it
+  listens on, then <code>listen()</code>. The address it picks decides who can reach it:</p>
+<div class="tw"><table>
+<thead><tr><th>Bound to</th><th>Reachable from</th><th>Typical use</th></tr></thead>
+<tbody>
+<tr><td class="key">127.0.0.1</td><td>This machine only, through <code>lo</code></td><td>Admin ports, databases on a single box, anything that must not be exposed</td></tr>
+<tr><td class="key">0.0.0.0</td><td>Every interface: loopback, the LAN, every bridge</td><td>A service other machines must reach</td></tr>
+<tr><td class="key">192.168.0.32</td><td>Only through that one interface</td><td>Servers with a public and a private network</td></tr>
+</tbody></table></div>
+<p>Two copies of Python's built-in web server, one bound each way:</p>
+<div class="code"><code>$ python3 -m http.server 8141 --bind 127.0.0.1 &amp;
+$ python3 -m http.server 8142 --bind 0.0.0.0 &amp;
+$ ss -ltnp
+State  Recv-Q Send-Q  Local Address:Port  Peer Address:Port Process
+LISTEN 0      5           127.0.0.1:8141       0.0.0.0:*    users:(("python3",pid=865059,fd=3))
+LISTEN 0      5             0.0.0.0:8142       0.0.0.0:*    users:(("python3",pid=865060,fd=3))</code></div>
+<p><code>ss -ltnp</code>: <strong>l</strong>istening sockets, <strong>t</strong>CP,
+  <strong>n</strong>umeric (no name lookups), with the <strong>p</strong>rocess. The
+  <code>fd=3</code> is the loan ticket: the listening socket is file descriptor 3 in that
+  process. Then the same request to each, from the laptop itself:</p>
+<div class="tw"><table>
+<thead><tr><th>curl to</th><th>Server on 127.0.0.1:8141</th><th>Server on 0.0.0.0:8142</th></tr></thead>
+<tbody>
+<tr><td class="key">127.0.0.1</td><td><span class="chip ok">200</span></td><td><span class="chip ok">200</span></td></tr>
+<tr><td class="key">192.168.0.32 (own LAN address)</td><td><span class="chip exp">refused</span> in 0 ms</td><td><span class="chip ok">200</span></td></tr>
+</tbody></table></div>
+<p>That's the incident from the top of the page. <code>curl localhost</code> on the server
+  proves only that the program answers on loopback. The load balancer arrives on the LAN
+  address, where nobody is listening, so the kernel answers for the program: refused.
+  <strong>On the server, <code>ss -ltnp</code> shows it in one line</strong>: look at the
+  Local Address column. In a Mule app the setting is the HTTP Listener's host
+  (<code>0.0.0.0</code> or <code>localhost</code>); in Spring Boot it's
+  <code>server.address</code>.</p>
+<p>This laptop's own listeners show all three choices on purpose:</p>
+<div class="code"><code>$ ss -ltn
+LISTEN 0  4096      127.0.0.1:631   0.0.0.0:*   <span class="c"># CUPS printing: this machine only</span>
+LISTEN 0  4096  127.0.0.53%lo:53    0.0.0.0:*   <span class="c"># systemd-resolved's DNS stub: loopback only</span>
+LISTEN 0  4096        0.0.0.0:22    0.0.0.0:*   <span class="c"># sshd: every interface, so others can log in</span></code></div>
+
+<div class="call warn">
+<h3>In a container, localhost is the container</h3>
+<p>Every container has its own network namespace, with its own <code>lo</code>. A program bound
+  to <code>127.0.0.1</code> inside the container is reachable only from inside that container,
+  and <code>-p</code> forwards to the container's other interface. Two containers from the same
+  image, publishing port 8000 to the laptop:</p>
+<div class="code"><code>$ docker run -d -p 8143:8000 php:8.5.12-cli-alpine sh -c '… php -S 127.0.0.1:8000 -t /tmp'
+$ docker run -d -p 8144:8000 php:8.5.12-cli-alpine sh -c '… php -S 0.0.0.0:8000 -t /tmp'
+$ curl http://127.0.0.1:8143/
+curl: (56) Recv failure: Connection reset by peer
+$ curl http://127.0.0.1:8144/
+hello
+$ docker exec lab14-lo wget -qO- http://127.0.0.1:8000/     <span class="c"># from inside, it works</span>
+hello</code></div>
+<p><code>docker ps</code> showed <code>0.0.0.0:8143-&gt;8000/tcp</code> for both, so the
+  publishing looked fine. The error is "reset", not "refused": Docker's forwarder accepted the
+  connection on 8143, found nothing listening on the container's address, and cut it. This is
+  Phase 2's first trap, and in Kubernetes the same app fails its readiness probe.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Step 3b · connect, on the client</p>
+<h2>Refused is fast. Timed out is slow. They mean different things.</h2>
+</div>
+<div class="code"><code>$ nc -zv -w 3 127.0.0.1 22
+Connection to 127.0.0.1 22 port [tcp/ssh] succeeded!
+$ nc -zv -w 3 127.0.0.1 8149
+nc: connect to 127.0.0.1 port 8149 (tcp) failed: Connection refused
+$ nc -zv -w 3 10.255.255.1 80
+nc: connect to 10.255.255.1 port 80 (tcp) timed out: Operation now in progress</code></div>
+<div class="tw"><table>
+<thead><tr><th>Error</th><th>What happened</th><th>How long</th><th>Look at</th></tr></thead>
+<tbody>
+<tr><td class="key">Connection refused<br>errno 111, ECONNREFUSED</td><td>The packet reached the machine. The kernel found no listener on that address and port and sent back a reset.</td><td class="num">0 ms</td><td>The server: is the program running? <code>ss -ltnp</code>: right port, right address?</td></tr>
+<tr><td class="key">Connection timed out<br>curl exit 28</td><td>No answer at all. Something dropped the packet: a firewall, a security group, a wrong IP, a route to nowhere.</td><td class="num">the full timeout (5.00 s here)</td><td>The path: firewall rules, security groups, <code>ip route get</code>, is the IP right?</td></tr>
+<tr><td class="key">Connection reset by peer<br>curl exit 56</td><td>Connected, then cut. Something accepted the connection and then closed it hard: a proxy with no backend, a crashing app, a TLS mismatch.</td><td class="num">fast</td><td>Whatever sits in between: proxy, load balancer, Docker's forwarder</td></tr>
+</tbody></table></div>
+<p>Python's <code>socket</code> shows the same two at the system-call level:
+  <code>ConnectionRefusedError: errno=111 Connection refused after 0.00s</code> and
+  <code>TimeoutError: timed out after 5.00s</code>. Newer curl prints both kinds of failure as
+  "Could not connect to server", so <code>nc -zv</code> is the clearer test.</p>
+<div class="call">
+<h3>Why a timeout is worse than refused</h3>
+<p>Refused costs nothing: the caller knows in a millisecond and can fail over. A timeout holds
+  the caller's thread, connection and memory for the whole timeout. If an app has 200 worker
+  threads and every call to a dead dependency waits 30 seconds, 200 requests in 30 seconds fill
+  it, and now the healthy app is down too. That is how a failure moves from where it started to
+  somewhere else, and it's Interchange failure 7. Every outgoing call needs an explicit connect
+  timeout and read timeout, short ones.</p>
+</div>
+<p>The state of every connection on the machine, counted:</p>
+<div class="code"><code>$ ss -tan | awk 'NR&gt;1{print $1}' | sort | uniq -c | sort -rn
+     74 ESTAB         <span class="c"># open connections</span>
+     32 LISTEN        <span class="c"># programs waiting at a counter</span>
+      8 TIME-WAIT     <span class="c"># closed by this side, kept ~60 s so stray packets aren't misread</span>
+      2 FIN-WAIT-2    <span class="c"># closing, waiting for the other side to finish</span></code></div>
+<p class="note">Thousands of <code>TIME-WAIT</code> usually means a client opening a new
+  connection for every request instead of reusing a pool. Thousands of <code>CLOSE-WAIT</code>
+  means the opposite and is a bug: the other side closed, and this program never closed its
+  end, so its file descriptors leak until it hits the limit from Lesson 1.1.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Step 4 · TLS</p>
+<h2>TLS: proving who's at the counter</h2>
+</div>
+<p>After the TCP handshake, the server sends its certificate and the chain of certificates
+  that signed it. The client checks three things: the chain ends at a root certificate it
+  already trusts, today is inside the certificate's dates, and the name it asked for is listed
+  in the certificate. Then both sides agree on keys, and everything after is encrypted.</p>
+<div class="code"><code>$ echo | openssl s_client -connect example.com:443 -servername example.com
+ 0 s:CN=example.com                                       <span class="c"># the server's own certificate</span>
+   i:C=US, O=SSL Corporation, CN=Cloudflare TLS Issuing ECC CA 3    <span class="c"># signed by…</span>
+ 1 s:C=US, O=SSL Corporation, CN=Cloudflare TLS Issuing ECC CA 3   <span class="c"># an intermediate</span>
+   i:C=US, O=SSL Corporation, CN=SSL.com TLS Transit ECC CA R2
+ …                                                        <span class="c"># 4 certificates in all</span>
+
+$ … | openssl x509 -noout -subject -enddate -ext subjectAltName
+subject=CN=example.com
+notAfter=Dec 25 22:56:35 2026 GMT                         <span class="c"># expiry date</span>
+X509v3 Subject Alternative Name:
+    DNS:example.com, DNS:*.example.com                    <span class="c"># the names it's valid for</span></code></div>
+<p><code>-servername</code> sends the name in the handshake (SNI), so a server hosting many
+  sites knows which certificate to send. Leave it out and you may get the wrong one. Three test
+  sites at badssl.com each break one of the three checks:</p>
+<div class="tw"><table>
+<thead><tr><th>Site</th><th>curl says</th><th>Which check failed</th></tr></thead>
+<tbody>
+<tr><td class="key">expired.badssl.com</td><td><code>certificate has expired (10)</code></td><td>The dates. Someone forgot to renew.</td></tr>
+<tr><td class="key">wrong.host.badssl.com</td><td><code>no alternative certificate subject name matches target hostname</code></td><td>The name. You connected by IP, an alias, or an old name.</td></tr>
+<tr><td class="key">self-signed.badssl.com</td><td><code>self-signed certificate (18)</code></td><td>The chain. It ends at a root this machine doesn't trust: internal CAs and test servers.</td></tr>
+</tbody></table></div>
+<div class="call warn">
+<h3>Java has its own list of trusted roots</h3>
+<p>curl and Python use the operating system's store (<code>/etc/ssl/certs</code>). Java uses
+  a file called <code>cacerts</code>, inside the JDK. On this laptop it's a link to a copy
+  Ubuntu builds from the system store (120 Java entries, 121 system ones), so they agree. A
+  JDK unpacked from a tarball into <code>/opt</code>, which is common with Mule and Jenkins,
+  carries its own <code>cacerts</code> and ignores the system store. That's why "curl works
+  but the Java app says <code>PKIX path building failed</code>" after a company CA or a new
+  intermediate certificate is introduced. The fix is to import the CA into that JDK's
+  <code>cacerts</code> with <code>keytool -importcert</code>, never to switch verification off.
+  <code>curl -k</code> is a diagnosis, not a fix.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The method</p>
+<h2>"It can't connect": the order to check in</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Step</th><th>Command</th><th>Healthy answer</th></tr></thead>
+<tbody>
+<tr><td class="key">1 · name</td><td><code>getent hosts api.example.com</code></td><td>An IP, quickly, and the one you expected</td></tr>
+<tr><td class="key">2 · route</td><td><code>ip route get &lt;that IP&gt;</code></td><td>The interface you expected</td></tr>
+<tr><td class="key">3 · connect</td><td><code>nc -zv -w 3 api.example.com 443</code></td><td><code>succeeded</code>. Refused → step 3 on the server. Timed out → firewall or security group</td></tr>
+<tr><td class="key">3 · server side</td><td><code>ss -ltnp | grep 443</code></td><td>A listener, on <code>0.0.0.0</code> or the right address, owned by the right process</td></tr>
+<tr><td class="key">4 · TLS</td><td><code>openssl s_client -connect host:443 -servername host</code></td><td><code>Verify return code: 0 (ok)</code></td></tr>
+<tr><td class="key">5 · HTTP</td><td><code>curl -v https://…</code></td><td>A status code. Now it's the application's problem</td></tr>
+<tr><td class="key">slow?</td><td><code>curl -w '%{time_namelookup} %{time_connect} …'</code></td><td>Shows which step the time went to</td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Lab</p>
+<h2>Six parts, on your laptop</h2>
+</div>
+<p>Write your prediction down before each run. Work in <code>labs/p1-4/</code>. Nothing here
+  needs <code>sudo</code>.</p>
+<p>The parts are numbered in the order that's easiest to run, not in request order. Each heading
+  says which step of the request it tests.</p>
+
+<h3>Part 1: your interfaces and routes <span class="muted">· step 2, route</span></h3>
+<div class="code"><code>ip -br addr
+ip route
+ip route get 8.8.8.8
+ip route get 127.0.0.1</code></div>
+<p>Predict first: which interface will a packet to <code>8.8.8.8</code> leave by, and which
+  address will it come from? Then count how many of your interfaces belong to Docker.</p>
+
+<h3>Part 2: two servers, four requests <span class="muted">· step 3a, connect on the server</span></h3>
+<div class="code"><code>MYIP=$(ip route get 8.8.8.8 | awk '{for(i=1;i&lt;NF;i++) if($i=="src") print $(i+1)}')
+python3 -m http.server 8141 --bind 127.0.0.1 &gt;/dev/null 2&gt;&amp;1 &amp;
+python3 -m http.server 8142 --bind 0.0.0.0   &gt;/dev/null 2&gt;&amp;1 &amp;
+sleep 1; ss -ltnp | grep 814
+for p in 8141 8142; do for h in 127.0.0.1 $MYIP; do
+  printf '%-15s :%s  ' $h $p; curl -s -o /dev/null -m 3 -w '%{http_code}\n' http://$h:$p/ || echo failed
+done; done
+kill %1 %2</code></div>
+<p>Predict: of the four requests, which fail, and how fast?</p>
+
+<h3>Part 3: refused against timed out <span class="muted">· step 3b, connect on the client</span></h3>
+<div class="code"><code>time nc -zv -w 5 127.0.0.1 8149
+time nc -zv -w 5 10.255.255.1 80</code></div>
+<p>Predict: which one returns at once, and which waits? What is each one telling you about
+  where the problem is?</p>
+
+<h3>Part 4: the resolver, in a container <span class="muted">· step 1, name</span></h3>
+<p>A container gets its own <code>/etc/resolv.conf</code> and <code>/etc/hosts</code>, and
+  Docker lets you choose what goes in them, so you can break name resolution without touching
+  your laptop's. <code>php:8.2-cli</code> is Debian-based, so it uses the same C-library resolver
+  as the laptop. (Alpine images use musl, which asks every nameserver at once and never shows the
+  delay.)</p>
+<div class="code"><code>time getent ahostsv4 example.com
+docker run --rm --dns 10.255.255.1 --dns 1.1.1.1 php:8.2-cli \
+  bash -c 'cat /etc/resolv.conf; time getent ahostsv4 example.com | head -1'
+docker run --rm --dns 10.255.255.1 --dns 1.1.1.1 --dns-option timeout:1 --dns-option attempts:1 php:8.2-cli \
+  bash -c 'time getent ahostsv4 example.com | head -1'
+docker run --rm --add-host example.com:10.9.9.9 php:8.2-cli getent ahostsv4 example.com
+dig +short example.com A</code></div>
+<p>Predict: with the dead nameserver first, does the lookup fail, or work? How long does it
+  take, and how long with <code>timeout:1</code>? In the last two lines, does the container's
+  <code>getent</code> agree with <code>dig</code>?</p>
+<p class="note">The page's own demo used <code>unshare -rm</code> to mount private copies over
+  the real files. Ubuntu blocks that in an ordinary terminal
+  (<code>kernel.apparmor_restrict_unprivileged_userns = 1</code>; the error is
+  <code>write failed /proc/self/uid_map: Operation not permitted</code>), so the lab uses
+  containers instead.</p>
+
+<h3>Part 5: where the time goes, and three broken certificates <span class="muted">· steps 1 to 4, then step 4, TLS</span></h3>
+<div class="code"><code>curl -s -o /dev/null -w 'dns %{time_namelookup}\ntcp %{time_connect}\ntls %{time_appconnect}\nfirst-byte %{time_starttransfer}\n' https://example.com/
+echo | openssl s_client -connect example.com:443 -servername example.com 2&gt;/dev/null | openssl x509 -noout -subject -enddate
+for s in expired wrong.host self-signed; do curl -sS -o /dev/null https://$s.badssl.com/ 2&gt;&amp;1 | head -1; done</code></div>
+<p>Predict: which step of the request takes longest? Which of the three checks does each
+  badssl site fail?</p>
+
+<h3>Part 6: your servers <span class="muted">· all steps, at work</span></h3>
+<p>On a Mule server or Jenkins agent, and only looking: <code>ss -ltnp</code> (you may need
+  <code>sudo</code> to see process names; without it, the addresses are enough). Which address
+  does the Mule HTTP listener bind to: <code>0.0.0.0</code>, or something narrower? Read
+  <code>/etc/resolv.conf</code>: how many nameservers, any <code>options</code>? Find which JDK
+  Mule runs (<code>readlink -f</code> on its java) and whether its <code>cacerts</code> is a
+  link to the system store or its own file. Leave out hostnames, IP addresses and anything that
+  names the customer.</p>
+<p><strong>Done when:</strong> you can say, without notes, what "refused" and "timed out" each
+  tell you, why a service answers on <code>localhost</code> and not from outside, and why
+  every lookup taking 5 seconds points at DNS.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check</p>
+<h2>Five questions</h2>
+</div>
+<p>Out loud first, and end each one with "because…" and the consequence.</p>
+<details><summary>After a release, <code>curl localhost:8081/health</code> on the server returns 200, but the load balancer marks the app unhealthy and testers get "connection refused". What do you check first, and what's the likely cause?</summary><div class="answer"><p><strong><code>ss -ltnp</code> on the server, and look at the Local Address.</strong> If it says <code>127.0.0.1:8081</code>, the app is listening on loopback only. The load balancer arrives on the server's network address, where nothing is listening, so the kernel refuses the connection. curl on the server works because it goes through loopback. Fix the app's bind address (the Mule HTTP Listener host, or <code>server.address</code>) to <code>0.0.0.0</code> or the server's address, restart, and check <code>ss</code> again.</p></div></details>
+<details><summary>"Connection refused" against "connection timed out": what does each tell you, and where do you look for each?</summary><div class="answer"><p><strong>Refused means the machine answered and nobody was listening; timed out means nothing answered at all.</strong> Refused comes back in a millisecond, as a reset from the target's kernel, so the network path is fine: look at the server, whether the program is running and listening on that port and address. Timed out takes the full timeout, because the packets were dropped on the way: look at firewalls, security groups, routing, and whether the IP is right at all.</p></div></details>
+<details><summary>Every call from the app to a partner API takes just over 5 seconds, then succeeds. What's your first suspect, and how do you prove it?</summary><div class="answer"><p><strong>DNS: the first nameserver isn't answering.</strong> The resolver waits 5 seconds for it, then asks the next, which works, so nothing fails and everything is slow by a round number. Prove it with <code>curl -w '%{time_namelookup}'</code> (it will show about 5.0) or <code>time getent hosts partner-api</code>, then read <code>/etc/resolv.conf</code> and test each nameserver with <code>dig @server name</code>. Fix or remove the dead server; <code>options timeout:1</code> reduces the damage meanwhile.</p></div></details>
+<details><summary><code>dig api.internal</code> returns the new IP, but the app keeps connecting to the old one. Give two reasons.</summary><div class="answer"><p><strong>The app doesn't ask DNS the way dig does.</strong> First, <code>/etc/hosts</code>: the app's lookups go through <code>nsswitch.conf</code>, which checks <code>files</code> first, and an old entry there wins; dig skips it. <code>getent hosts api.internal</code> shows what the app really gets. Second, caching: the JVM keeps lookups for 30 seconds by default, and longer if <code>networkaddress.cache.ttl</code> is set, so a long-running app may never look again until it restarts.</p></div></details>
+<details><summary>After a certificate renewal, the Mule app's HTTPS calls fail with "PKIX path building failed", but <code>curl</code> to the same URL from the same server works. Why?</summary><div class="answer"><p><strong>Java checks against its own trusted roots, not the system's.</strong> curl uses <code>/etc/ssl/certs</code>; the JVM uses the <code>cacerts</code> file inside its JDK, and a JDK unpacked into <code>/opt</code> has its own copy. The new certificate is signed by a CA (or a new intermediate) that is in the system store but not in that <code>cacerts</code>, so Java can't build a chain to a root it trusts. Import the CA into that JDK's <code>cacerts</code> with <code>keytool -importcert</code> and restart; don't disable verification.</p></div></details>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Interchange</p>
+<h2>Setting up failures 5 and 7</h2>
+</div>
+<p>When the four services run in containers in Phase 2, the first thing that breaks is the
+  loopback trap above: a service bound to <code>localhost</code> inside its container, unreachable
+  from the others. The deliberate failures come later. Failure 7, in Phase 6, adds 3 seconds of
+  latency to <code>reference</code>: nothing refuses, nothing times out quickly, and callers'
+  threads and connection pools fill while they wait, until the failure shows up somewhere it
+  didn't start. That's this lesson's "a timeout is worse than refused", at system scale. Failure
+  5, in Phase 5, is 502s during a rollout that reports success: connections reset by a load
+  balancer whose backend has gone. You now know which step each of those errors comes from.</p>
+</section>
+
+<footer>
+<p>Sources: man pages <code>ip-address(8)</code>, <code>ip-route(8)</code>, <code>ss(8)</code>,
+  <code>bind(2)</code> and <code>connect(2)</code> (<code>ECONNREFUSED</code>,
+  <code>ETIMEDOUT</code>), <code>tcp(7)</code>, <code>nsswitch.conf(5)</code>,
+  <code>hosts(5)</code>, <code>resolv.conf(5)</code> (<code>timeout</code>,
+  <code>attempts</code>, <code>ndots</code>, default 5 seconds), <code>getaddrinfo(3)</code>,
+  <code>systemd-resolved(8)</code>, <code>unshare(1)</code>, <code>curl(1)</code>
+  (<code>--write-out</code> variables), <code>openssl-s_client(1)</code>,
+  <code>openssl-x509(1)</code>, <code>keytool</code>; the JDK's
+  <code>java.security</code> for <code>networkaddress.cache.ttl</code>. Every output on this
+  page comes from a real run on Ubuntu 26.04, checked 14 November 2026, except the
+  <code>ndots</code> callout, which needs a cluster. The ISP's resolver addresses are left
+  out.</p>
+<p>Next: Lesson 1.5, users, groups and permissions, from below: the things your Ansible
+  playbooks have been setting for two years.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

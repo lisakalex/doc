@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Toolchain That Shrank</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/reading-03-dopc02-domain-1.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Reading note · AWS + DevOps course</p>
+<h1>The Toolchain That Shrank</h1>
+<p class="lede">Domain 1 is the best section of the DOP-C02 course — 2.5 hours on the CI/CD chain, and
+      the CodeDeploy lectures are as good as anything in it. It is also the section that decayed most,
+      because the <code>Code*</code> family is precisely what AWS has spent two years retiring. Four of
+      its claims have expired, three of its services have moved on without it, and the part that is
+      still exactly right is worth your eleven minutes.</p>
+<div class="facts">
+<span class="fact">Maarek DOP-C02 · Domain 1</span>
+<span class="fact">28 lectures · 2.5 h</span>
+<span class="fact">21,000 words read</span>
+<span class="fact">4 corrections</span>
+</div>
+</header>
+<section>
+<p class="eyebrow">What you are reading</p>
+<h2>Read, watch, or skip — lecture by lecture</h2>
+<p>Domain 1 is 69% slide-driven theory and 31% console walkthrough. The theory transcribes completely,
+      so this note replaces it. The walkthroughs do not — but they state their facts aloud, and those are
+      folded in below.</p>
+<div class="tw"><table>
+<thead><tr><th>Lectures</th><th>Time</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td class="key">001 CI/CD intro</td><td>5:39</td><td><span class="chip ok">read here</span> Definitions only. Nothing in it you do not already do with GitHub Actions.</td></tr>
+<tr><td class="key">002–005 CodeCommit</td><td>22 min</td><td><span class="chip exp">skip</span> Not in exam guide v1.6. See below.</td></tr>
+<tr><td class="key">006–010 CodePipeline</td><td>29 min</td><td><span class="chip imp">read here, then watch 010</span> The cross-region artifact-store diagram is worth seeing drawn.</td></tr>
+<tr><td class="key">011–014 CodeBuild</td><td>29 min</td><td><span class="chip ok">read here</span> Two of its four compute options did not exist when this was recorded.</td></tr>
+<tr><td class="key">015–019 CodeDeploy</td><td>31 min</td><td><span class="chip imp">watch 016</span> The best lecture in the course, and entirely current.</td></tr>
+<tr><td class="key">020–022 CodeArtifact</td><td>19 min</td><td><span class="chip ok">read here</span> Upstreams, external connections and domains, all unchanged.</td></tr>
+<tr><td class="key">023–024 CodeGuru</td><td>5 min</td><td><span class="chip exp">skip</span> In maintenance mode since November 2025.</td></tr>
+<tr><td class="key">025–026 EC2 Image Builder</td><td>5 min</td><td><span class="chip ok">read here</span> Short and still accurate.</td></tr>
+<tr><td class="key">027–028 Amplify</td><td>3 min</td><td><span class="chip exp">skip</span> Three minutes of "think of it as Beanstalk for web apps".</td></tr>
+</tbody>
+</table></div>
+<p class="note">A warning if you ever grep the captions yourself: they are machine-generated and mangle
+      the terms that matter. <code>appspec.yml</code> is transcribed as "appendectomy file" throughout
+      lecture 016, and "auto scaling group" becomes "autoscanning group".</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Where it is wrong</p>
+<h2>Four claims that have expired</h2>
+</div>
+<p>None of these were wrong when recorded. All four are wrong now, and three of them are wrong in the
+      same direction: AWS withdrew the service.</p>
+<h3>1 · "CodeStar regroups CodeCommit, CodePipeline, CodeBuild and CodeDeploy in one tool"</h3>
+<p><em>Lecture 001.</em> <strong>AWS CodeStar reached end of support on 25 July 2024</strong> and is
+      listed by AWS among services in full shutdown. This is not a rename or a repositioning — the service
+      is gone. Do not spend time on it. The exam guide still lists CodeStar among in-scope Developer
+      Tools, which tells you something about how closely the guide tracks the console.</p>
+<h3>2 · "A CodeStar Source Connection — a GitHub application that connects GitHub into AWS"</h3>
+<p><em>Lecture 008.</em> Renamed to <strong>AWS CodeConnections</strong> on 29 March 2024. From
+      1 July 2024 the console creates connections with <code>codeconnections</code> in the ARN;
+      resources created under the old <code>codestar-connections</code> namespace are still supported.</p>
+<div class="call">
+<h3>What did not change</h3>
+<p>The mechanism. A connection is still the right answer for an event-driven third-party source, and
+        it is still the thing that replaces polling. Only the name moved — so an exam question may use
+        either, and the ARN namespace is the tell for which era the question was written in.</p>
+</div>
+<h3>3 · "CodeGuru Reviewer does automated code reviews… it supports Java and Python"</h3>
+<p><em>Lectures 023 and 024.</em> Since <strong>7 November 2025</strong> you cannot create new
+      repository associations in CodeGuru Reviewer. It is in maintenance mode: existing associations keep
+      working, and AWS will not add functionality. Automated code review moved to <strong>Amazon Q
+      Developer</strong>, which covers static analysis for security and best practice, secrets exposure,
+      dependency vulnerabilities and code quality. The Secrets Detector demo in lecture 024 is the
+      clearest casualty.</p>
+<p class="note">Maarek hedges inside the lecture — "don't quote me on this, maybe things will evolve
+      over time" — which turned out to be the most durable sentence in it. Worth noting which claims an
+      author chooses to hedge; it is usually the ones they know are thin.</p>
+<h3>4 · "Why would you want to use CodeCommit? Git repositories can be quite expensive"</h3>
+<p><em>Lecture 002.</em> This one is more interesting, because the obvious conclusion is wrong.
+      AWS closed CodeCommit to new customers on 25 July 2024 — and then
+      <strong>returned it to general availability</strong>. So the service works, new accounts can use it,
+      and the lecture is not factually wrong.</p>
+<div class="call stop">
+<h3>The real problem</h3>
+<p><strong>CodeCommit does not appear in the Developer Tools section of exam guide v1.6.</strong>
+        The in-scope list there runs CodeArtifact, CodeBuild, CodeDeploy, CodeGuru, CodePipeline,
+        CodeStar, Fault Injection Simulator, X-Ray. The course spends 22 minutes and five lectures on a
+        service the current guide omits — and zero on Fault Injection Simulator, which the guide
+        includes.</p>
+</div>
+<p>The branch-security content in lecture 005 survives the cut and is worth keeping, because the shape
+      of it recurs: CodeCommit has no resource policy, so restricting who may push to <code>main</code> is
+      done with an IAM <code>Deny</code> on the user or group, conditioned on the branch reference. That
+      is the same reasoning as Module 2's explicit-deny lesson, in a service you will probably never
+      use.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Where it is incomplete</p>
+<h2>Three things that arrived after the recording</h2>
+</div>
+<p>Not errors. Features that did not exist, whose absence makes a correct answer in the course an
+      incomplete answer now.</p>
+<div class="tw"><table>
+<thead><tr><th>Service</th><th>What the course knows</th><th>What exists now</th></tr></thead>
+<tbody>
+<tr><td class="key">CodePipeline</td><td>Three ways to start a pipeline: events (preferred), webhooks, polling (discouraged)</td><td>Still true, now underspecified. <strong>V2-type pipelines</strong> add triggers that <em>filter</em>: on git tags, branches and file paths for pushes, and on branches and file paths for pull requests — which is what makes branch-based development and monorepos work. Plus <strong>Parallel</strong> and <strong>Queued</strong> execution modes, and <strong>stage-level rollback</strong>, either to a named previous successful execution or automatically on failure.</td></tr>
+<tr><td class="key">CodeBuild</td><td>Builds run in a container on managed compute, from an AWS-provided image or your own</td><td>Two compute <em>modes</em>: <strong>EC2</strong> and <strong>AWS Lambda</strong>, the latter for lower start-up latency and no queueing. EC2 mode runs on either on-demand fleets (<code>BUILD_GENERAL1_SMALL</code> and friends) or <strong>reserved capacity fleets</strong>, where you choose vCPU, memory and disk and CodeBuild picks a matching type.</td></tr>
+<tr><td class="key">CodeDeploy</td><td>Everything</td><td>Nothing to add. The hooks, the lifecycle, the traffic-shifting strategies and the troubleshooting list are all current.</td></tr>
+</tbody>
+</table></div>
+<p>The CodePipeline gap is the one that costs you marks. "How do I start a pipeline only when files
+      under <code>services/api/</code> change on a pull request into <code>main</code>?" had no good answer
+      in 2023 — you started on every change and burned a build step deciding not to build. It is now one
+      trigger filter, and a question written against the current console will assume you know that.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Where it is right</p>
+<h2>The lifecycle, which has not moved at all</h2>
+</div>
+<p>Lecture 016 teaches the CodeDeploy EC2 hook sequence, and the thing that makes it a good lecture is
+      the distinction it draws: some events are yours to script, and four belong to the agent. Checked
+      against the appspec hooks reference, every claim holds.</p>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="The thirteen CodeDeploy lifecycle events for the EC2 and on-premises platform in run order, from BeforeBlockTraffic to AfterAllowTraffic. Four are reserved for the agent and cannot run scripts. A matrix shows which events apply to an in-place deployment, to the replacement instances of a blue/green deployment, and to the original instances." role="img" viewbox="0 0 760 401">
+<text fill="var(--ink)" font-family="Archivo, sans-serif" font-size="13" font-weight="600" x="14" y="20">appspec.yml hooks — EC2/on-premises, in run order</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" x="14" y="36">the six traffic events apply only when the deployment group names a CLB, ALB or NLB</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="420" y="42">in-place</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="548" y="42">blue/green</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="548" y="52">replacement</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="676" y="42">blue/green</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="676" y="52">original</text>
+<line stroke="var(--rule)" stroke-width="1" x1="18" x2="736" y1="51" y2="51"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="70.7">1</text>
+<rect fill="var(--accent-soft)" height="18" rx="3" stroke="var(--accent)" width="212" x="96" y="58.5"></rect>
+<text fill="var(--accent-ink)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="70.7">BeforeBlockTraffic</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="102" x2="102" y1="76.5" y2="81.5"></line>
+<circle cx="420" cy="67.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="544" x2="552" y1="67.5" y2="67.5"></line>
+<circle cx="676" cy="67.5" fill="var(--good)" r="3.6"></circle>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="93.7">2</text>
+<rect fill="var(--surface-2)" height="18" rx="3" stroke="var(--rule-strong)" width="212" x="96" y="81.5"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="93.7">BlockTraffic</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="9" x="317" y="93.7">agent only</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="102" x2="102" y1="99.5" y2="104.5"></line>
+<circle cx="420" cy="90.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="544" x2="552" y1="90.5" y2="90.5"></line>
+<circle cx="676" cy="90.5" fill="var(--good)" r="3.6"></circle>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="116.7">3</text>
+<rect fill="var(--accent-soft)" height="18" rx="3" stroke="var(--accent)" width="212" x="96" y="104.5"></rect>
+<text fill="var(--accent-ink)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="116.7">AfterBlockTraffic</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="102" x2="102" y1="122.5" y2="127.5"></line>
+<circle cx="420" cy="113.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="544" x2="552" y1="113.5" y2="113.5"></line>
+<circle cx="676" cy="113.5" fill="var(--good)" r="3.6"></circle>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="139.7">4</text>
+<rect fill="var(--accent-soft)" height="18" rx="3" stroke="var(--accent)" width="212" x="96" y="127.5"></rect>
+<text fill="var(--accent-ink)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="139.7">ApplicationStop</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="102" x2="102" y1="145.5" y2="150.5"></line>
+<circle cx="420" cy="136.5" fill="var(--good)" r="3.6"></circle>
+<circle cx="548" cy="136.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="672" x2="680" y1="136.5" y2="136.5"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="162.7">5</text>
+<rect fill="var(--surface-2)" height="18" rx="3" stroke="var(--rule-strong)" width="212" x="96" y="150.5"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="162.7">DownloadBundle</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="9" x="317" y="162.7">agent only</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="102" x2="102" y1="168.5" y2="173.5"></line>
+<circle cx="420" cy="159.5" fill="var(--good)" r="3.6"></circle>
+<circle cx="548" cy="159.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="672" x2="680" y1="159.5" y2="159.5"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="185.7">6</text>
+<rect fill="var(--accent-soft)" height="18" rx="3" stroke="var(--accent)" width="212" x="96" y="173.5"></rect>
+<text fill="var(--accent-ink)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="185.7">BeforeInstall</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="102" x2="102" y1="191.5" y2="196.5"></line>
+<circle cx="420" cy="182.5" fill="var(--good)" r="3.6"></circle>
+<circle cx="548" cy="182.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="672" x2="680" y1="182.5" y2="182.5"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="208.7">7</text>
+<rect fill="var(--surface-2)" height="18" rx="3" stroke="var(--rule-strong)" width="212" x="96" y="196.5"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="208.7">Install</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="9" x="317" y="208.7">agent only</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="102" x2="102" y1="214.5" y2="219.5"></line>
+<circle cx="420" cy="205.5" fill="var(--good)" r="3.6"></circle>
+<circle cx="548" cy="205.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="672" x2="680" y1="205.5" y2="205.5"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="231.7">8</text>
+<rect fill="var(--accent-soft)" height="18" rx="3" stroke="var(--accent)" width="212" x="96" y="219.5"></rect>
+<text fill="var(--accent-ink)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="231.7">AfterInstall</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="102" x2="102" y1="237.5" y2="242.5"></line>
+<circle cx="420" cy="228.5" fill="var(--good)" r="3.6"></circle>
+<circle cx="548" cy="228.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="672" x2="680" y1="228.5" y2="228.5"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="254.7">9</text>
+<rect fill="var(--accent-soft)" height="18" rx="3" stroke="var(--accent)" width="212" x="96" y="242.5"></rect>
+<text fill="var(--accent-ink)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="254.7">ApplicationStart</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="102" x2="102" y1="260.5" y2="265.5"></line>
+<circle cx="420" cy="251.5" fill="var(--good)" r="3.6"></circle>
+<circle cx="548" cy="251.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="672" x2="680" y1="251.5" y2="251.5"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="277.7">10</text>
+<rect fill="var(--accent-soft)" height="18" rx="3" stroke="var(--accent)" width="212" x="96" y="265.5"></rect>
+<text fill="var(--accent-ink)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="277.7">ValidateService</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="102" x2="102" y1="283.5" y2="288.5"></line>
+<circle cx="420" cy="274.5" fill="var(--good)" r="3.6"></circle>
+<circle cx="548" cy="274.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="672" x2="680" y1="274.5" y2="274.5"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="300.7">11</text>
+<rect fill="var(--accent-soft)" height="18" rx="3" stroke="var(--accent)" width="212" x="96" y="288.5"></rect>
+<text fill="var(--accent-ink)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="300.7">BeforeAllowTraffic</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="102" x2="102" y1="306.5" y2="311.5"></line>
+<circle cx="420" cy="297.5" fill="var(--good)" r="3.6"></circle>
+<circle cx="548" cy="297.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="672" x2="680" y1="297.5" y2="297.5"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="323.7">12</text>
+<rect fill="var(--surface-2)" height="18" rx="3" stroke="var(--rule-strong)" width="212" x="96" y="311.5"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="323.7">AllowTraffic</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="9" x="317" y="323.7">agent only</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="102" x2="102" y1="329.5" y2="334.5"></line>
+<circle cx="420" cy="320.5" fill="var(--good)" r="3.6"></circle>
+<circle cx="548" cy="320.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="672" x2="680" y1="320.5" y2="320.5"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="end" x="84" y="346.7">13</text>
+<rect fill="var(--accent-soft)" height="18" rx="3" stroke="var(--accent)" width="212" x="96" y="334.5"></rect>
+<text fill="var(--accent-ink)" font-family="IBM Plex Mono, monospace" font-size="10" x="105" y="346.7">AfterAllowTraffic</text>
+<circle cx="420" cy="343.5" fill="var(--good)" r="3.6"></circle>
+<circle cx="548" cy="343.5" fill="var(--good)" r="3.6"></circle>
+<line stroke="var(--rule-strong)" stroke-width="1.4" x1="672" x2="680" y1="343.5" y2="343.5"></line>
+<text fill="var(--ink-2)" font-family="Archivo, sans-serif" font-size="11.5" font-weight="600" x="14" y="371">Blue/green splits the list in two: the replacement instances install, the original instances only lose traffic.</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" x="14" y="388">On a blue/green rollback the two columns swap, so the hooks you wrote for v2 run against v1.</text>
+</svg>
+</div>
+<figcaption>Run order for an in-place deployment with a load balancer, and which events each kind of
+      deployment actually fires. Teal events take your scripts; grey ones are reserved for the CodeDeploy
+      agent. Verified against the appspec <code>hooks</code> reference and its availability table.</figcaption>
+</figure>
+<p>Two facts the documentation carries and the lecture does not, both of which are exactly the sort of
+      thing a professional-level question turns on:</p>
+<div class="call warn">
+<h3><code>ApplicationStop</code> runs the old revision's script</h3>
+<p>It fires before the new bundle is downloaded, so "the AppSpec file and scripts used for this
+        deployment lifecycle event are from the previous successfully deployed application revision". Two
+        consequences. A fix you make to <code>ApplicationStop</code> does not take effect until the
+        deployment <em>after</em> the one you ship it in. And the hook does not run at all on the first
+        deployment to an instance, because no AppSpec file is there yet.</p>
+</div>
+<div class="call">
+<h3>The ECS hook is called <code>AfterAllowTestTraffic</code></h3>
+<p>Lecture 017 describes the test-listener step correctly but never names it. The five scriptable ECS
+        hooks are <code>BeforeInstall</code>, <code>AfterInstall</code>,
+        <code>AfterAllowTestTraffic</code>, <code>BeforeAllowTraffic</code> and
+        <code>AfterAllowTraffic</code>; <code>Start</code>, <code>Install</code>,
+        <code>TestTraffic</code>, <code>AllowTraffic</code> and <code>End</code> are reserved. There is no
+        <code>ApplicationStop</code>, <code>ApplicationStart</code> or <code>ValidateService</code> on
+        ECS — and every hook is a Lambda function, not a script, which must call
+        <code>putLifecycleEventHookExecutionStatus</code> within the hour or the deployment is
+        failed.</p>
+</div>
+<p>Lambda deployments have exactly two hooks, <code>BeforeAllowTraffic</code> and
+      <code>AfterAllowTraffic</code>, which the course gets right. And a detail worth stealing for any
+      deployment system: each hook script has a <code>timeout</code> whose default is 3600 seconds, which
+      is also the ceiling for all scripts in one lifecycle event combined, and a <code>runas</code> for
+      the user to impersonate. Hooks receive <code>APPLICATION_NAME</code>,
+      <code>DEPLOYMENT_ID</code>, <code>DEPLOYMENT_GROUP_NAME</code>, <code>DEPLOYMENT_GROUP_ID</code> and
+      <code>LIFECYCLE_EVENT</code> as environment variables — the course names only the deployment group.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">For this repo</p>
+<h2>What this maps onto in your own code</h2>
+</div>
+<h3>Why CodePipeline needs an artifact store and GitHub Actions does not</h3>
+<p>The course's best architectural point, in lecture 006: stages do not talk to each other. CodePipeline
+      extracts the source into an <strong>S3 artifact store</strong> and hands that artifact to CodeBuild —
+      which is why CodeBuild needs no access to the source repository at all. CodePipeline pushes the code
+      to it, through S3.</p>
+<p>Your <code>.github/workflows/cicd.yml</code> never needs that, because steps in a job share a
+      filesystem and jobs pass artifacts through the Actions artifact API. The difference is not
+      cosmetic — it is why a cross-region CodePipeline needs <strong>one artifact bucket per region in
+      which it has actions</strong>, and why the pipeline's service role needs read and write on every one
+      of them. Create the pipeline in the console and AWS makes those buckets for you; create it with the
+      CLI or SDK and you make them yourself, which is the failure mode worth remembering.</p>
+<h3>The hooks you already have</h3>
+<p>Your repo deploys with Helm, so there is no CodeDeploy. The concept transfers exactly: Helm's
+      <code>pre-install</code>, <code>post-install</code> and <code>pre-upgrade</code> hooks are
+      <code>BeforeInstall</code>, <code>AfterInstall</code> and <code>ApplicationStop</code> wearing
+      different names, and <code>ValidateService</code> is what your <code>/ready</code> probe is for. The
+      Module 13 split between <code>/health</code> and <code>/ready</code> is the same decision as putting
+      a check in <code>ValidateService</code> rather than <code>AfterInstall</code>: one asks whether the
+      process is alive, the other whether it should receive traffic.</p>
+<h3>The third appearance of one rule</h3>
+<p>Cross-account access to a CodeArtifact repository needs a <strong>resource policy</strong> on the
+      repository; an identity policy in the other account cannot reach it, and access is all-packages or
+      nothing — you cannot grant a subset. That is Module 3's bucket policy and Module 4's key policy for
+      the third time. The rule to carry out of the course is the general one: <em>crossing an account
+      boundary requires the resource to opt in</em>, and the service-specific detail is only which
+      document does the opting.</p>
+<div class="call">
+<h3>And one you will use before the exam</h3>
+<p><code>buildspec.yml</code> resolves environment variables from SSM Parameter Store and Secrets
+        Manager at build time, which is the correct place to put a CI secret. Putting it in the
+        <code>variables</code> block puts it in your git history instead — Lesson 2.6's trap, in a
+        file you have not written yet.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check yourself</p>
+<h2>Four questions</h2>
+</div>
+<details>
+<summary>A pull request into <code>main</code> should start your pipeline, but only when files under
+    <code>services/api/</code> have changed. What do you configure — and what did this require before
+    2023?</summary>
+<div class="answer">
+<p>A <strong>V2-type pipeline</strong> with a trigger on pull-request events, filtered on branch
+      <code>main</code> and on the file path <code>services/api/</code>. Push and pull-request events take
+      different filter sets: pushes can filter on git tags, branches and file paths, pull requests on
+      branches and file paths.</p>
+<p>Before trigger filters existed you started the pipeline on every change and decided inside it — a
+      first CodeBuild action that inspected the diff and exited early. You paid for a build in order to
+      learn that you did not need a build. The course's events-versus-webhooks-versus-polling lecture is
+      still correct about <em>how</em> a pipeline starts and has nothing at all about <em>which</em>
+      changes should start one.</p>
+</div>
+</details>
+<details>
+<summary>A blue/green CodeDeploy deployment to EC2 installs cleanly and then fails at
+    <code>AllowTraffic</code>. There is nothing in the deployment logs. Where do you look?</summary>
+<div class="answer">
+<p><strong>The load balancer's health checks.</strong> The deployment logs are empty because nothing
+      in the deployment failed — the application installed, and the ELB simply never considered the
+      replacement instances healthy, so traffic could not be allowed. Check the target group's health
+      check path, port, protocol and thresholds.</p>
+<p>The sharper half of the answer: a <code>BeforeAllowTraffic</code> hook is where you would have
+      caught this yourself, with the same health check the ELB is about to run. A deployment that can only
+      fail at a reserved event is a deployment missing a validation hook.</p>
+</div>
+</details>
+<details>
+<summary>One CodePipeline deploys a Lambda function to <code>eu-west-1</code> and
+    <code>us-east-2</code>. It works for eu-west-1 and fails for us-east-2. Name the likely causes.</summary>
+<div class="answer">
+<p><strong>No artifact store in us-east-2.</strong> A pipeline needs an S3 artifact bucket in every
+      region where it has actions. If the pipeline was created in the console those buckets were created
+      for you; if it was created with the CLI, SDK or CloudFormation, they are yours to create.</p>
+<p><strong>The pipeline's service role lacks read and write on that bucket.</strong> CodePipeline
+      copies input artifacts into the remote region itself, so it needs both.</p>
+<p>And a third, less obvious: a cross-region CloudFormation action needs <em>its own template</em>.
+      One build step producing one <code>template.yaml</code> is not enough — the course's example emits
+      <code>template-us-east-2.yaml</code> as a separate artifact for exactly this reason.</p>
+</div>
+</details>
+<details>
+<summary>Your CI needs a database password. Where can CodeBuild get it, and what must you not
+    do?</summary>
+<div class="answer">
+<p>The <code>env</code> section of <code>buildspec.yml</code> resolves values from the
+      <strong>SSM Parameter Store</strong> and from <strong>Secrets Manager</strong> at build time. Neither
+      value is stored in the file.</p>
+<p>What you must not do is put it in the <code>variables</code> block, which is plaintext in the
+      buildspec and therefore in git, forever, on every branch and in every fork.</p>
+<p>The permission detail that catches people: the CodeBuild <strong>service role</strong> needs read
+      access on whichever store you chose, and <code>kms:Decrypt</code> on the key if the parameter is a
+      <code>SecureString</code> — because a wildcard in one service namespace never crosses into
+      another. That is Lesson 2.5 and Lesson 4.2, arriving in a build file.</p>
+</div>
+</details>
+</section>
+<footer>
+<p>Reading note 3 · AWS + DevOps course · 4 October 2026</p>
+<p>Source: Stephane Maarek, <em>AWS Certified DevOps Engineer Professional — DOP-C02</em> (Udemy),
+      Domain 1 "SDLC Automation", 28 lectures, 2:28 total. Read from the English captions rather than
+      watched; the captions are machine-generated and the lecture numbers above are the course's own.
+      Slides and sample code are published by the author at
+      <code>links.datacumulus.com/devops-slides-h3e</code>.</p>
+<p>Checked against primary sources rather than the course: the DOP-C02 exam guide v1.6 (domain
+      weightings and the in-scope services appendix); the AWS announcements for CodeStar end of support
+      (25 July 2024), the CodeConnections rename (29 March 2024), and CodeCommit's return to general
+      availability; the CodeGuru Reviewer availability-change notice (7 November 2025); the CodePipeline
+      documentation on triggers, trigger filters and execution modes; the CodeBuild documentation on
+      compute modes and reserved capacity fleets; and the CodeDeploy appspec <code>hooks</code> reference,
+      including the lifecycle-event availability table that the figure above is drawn from.</p>
+<p>Companion to Modules 8 and 11, which will teach the Terraform and GitHub Actions answers to the
+      same questions. Where the course and this repo disagree about tooling, the repo is the primary
+      source for claims about the repo.</p>
+</footer>
+</div>
+</body>
+</html>

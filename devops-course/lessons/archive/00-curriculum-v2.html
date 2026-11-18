@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Three Things, Properly</title>
+<link rel="icon" href="../../assets/img/favicon-reference.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/00-curriculum-v2.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Curriculum v3 · AWS + DevOps course</p>
+<h1>Three Things, Properly</h1>
+<p class="lede">Nine listings in ten name AWS, Terraform and Kubernetes. So the plan now spends
+      two thirds of its hours on exactly those three — and fixes the gap that market data exposed in the
+      last version, which taught Kubernetes on a laptop and AWS beside it and never taught the thing the
+      listings actually describe: <strong>EKS</strong>.</p>
+<div class="facts">
+<span class="fact">24 weeks · 214 h of modules</span>
+<span class="fact">67% on AWS + Terraform + K8s</span>
+<span class="fact">EKS now its own module</span>
+<span class="fact">~$5 of real AWS spend</span>
+</div>
+</header>
+<section>
+<p class="eyebrow">What your research changed</p>
+<h2>Four edits, and one real omission found</h2>
+<div class="tw"><table>
+<thead><tr><th>Change</th><th>v2</th><th>v3</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td><strong>EKS as its own module</strong></td><td>absent</td><td>10 h</td><td>The genuine omission. v2 taught Kubernetes on <code>kind</code> and AWS separately. "AWS and Kubernetes" on a job advert means EKS, which has its own failure modes — none of which appear in vanilla Kubernetes.</td></tr>
+<tr><td>Terraform</td><td>26 h, 3 modules</td><td>36 h, 4 modules</td><td>Added multi-environment and module design, because that is what Terraform interview questions actually probe: "how do you manage dev, staging and prod?"</td></tr>
+<tr><td>Kubernetes</td><td>62 h</td><td>72 h</td><td>EKS, plus a little more room in the debugging drills.</td></tr>
+<tr><td>Linux and networking</td><td>22 h, broad</td><td>14 h, re-aimed</td><td>Compressed and pointed at container and cluster debugging specifically. Kept — see below.</td></tr>
+<tr><td>Observability</td><td>34 h, 5 modules</td><td>26 h, 3 modules</td><td>Trimmed, not dropped. Most listings that name your three also name Prometheus or Datadog, and SLO questions are common.</td></tr>
+<tr><td>Cost engineering</td><td>its own module, week 24</td><td>folded into the AWS phase</td><td>You already own the material — the August EKS burn is your worked example.</td></tr>
+</tbody>
+</table></div>
+<div class="call">
+<h3>Why Linux and networking survive the cut</h3>
+<p>They are not competing with Kubernetes; they are what Kubernetes debugging <em>is</em>. You cannot
+        diagnose <code>CrashLoopBackOff</code> without exit codes and signals, or a Service returning 503
+        without DNS and TCP, or <code>OOMKilled</code> without cgroups. Fourteen hours here is what makes
+        the seventy-two hours after it land. What I did cut is the breadth that was there for its own
+        sake — page-cache internals, MTU trivia, systemd beyond units.</p>
+</div>
+<div class="call warn">
+<h3>One caution about optimising from listings</h3>
+<p>Listings are written by recruiters from templates and name <em>technologies</em>. Interviews are
+        run by engineers and test <em>debugging and judgement</em>. Both signals are real, and they point
+        at different things: the listing gets you in the room, the drills get you the offer. So I have
+        leaned the <strong>coverage</strong> toward your three and kept every timed drill. If something
+        has to give later, give up a reading module, never a drill.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The shape</p>
+<h2>Six phases, reweighted</h2>
+</div>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="A 24-week plan weighted toward AWS, Terraform and Kubernetes. Weeks 1 to 2 foundations, 18 hours. Weeks 3 to 6 AWS, 36 hours. Weeks 7 to 10 Terraform, 36 hours. Weeks 11 to 18 Kubernetes and EKS, 72 hours. Weeks 19 to 21 delivery, 26 hours. Weeks 22 to 24 operations, 26 hours. Four tracks run alongside." role="img" viewbox="0 0 760 384">
+<text fill="var(--ink)" font-family="Archivo, sans-serif" font-size="13" font-weight="600" x="14" y="20">24 weeks · 214 hours of modules · 67% of it on your three</text>
+<line stroke="var(--rule)" stroke-width="1" x1="258.0" x2="258.0" y1="38" y2="352"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="258.0" y="32">wk 1</text>
+<line stroke="var(--rule)" stroke-width="1" x1="338.3" x2="338.3" y1="38" y2="352"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="338.3" y="32">wk 5</text>
+<line stroke="var(--rule)" stroke-width="1" x1="418.7" x2="418.7" y1="38" y2="352"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="418.7" y="32">wk 9</text>
+<line stroke="var(--rule)" stroke-width="1" x1="499.0" x2="499.0" y1="38" y2="352"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="499.0" y="32">wk 13</text>
+<line stroke="var(--rule)" stroke-width="1" x1="579.3" x2="579.3" y1="38" y2="352"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="579.3" y="32">wk 17</text>
+<line stroke="var(--rule)" stroke-width="1" x1="659.7" x2="659.7" y1="38" y2="352"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="659.7" y="32">wk 21</text>
+<line stroke="var(--rule)" stroke-width="1" x1="740.0" x2="740.0" y1="38" y2="352"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="740.0" y="32">wk 24</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="11" text-anchor="end" x="246" y="68">Foundations for cluster debugging</text>
+<rect fill="var(--muted)" height="17" opacity="0.88" rx="3" width="40.2" x="258.0" y="56"></rect>
+<text fill="var(--surface)" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" x="265.0" y="68">18 h</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="11" text-anchor="end" x="246" y="98">AWS, finished</text>
+<rect fill="var(--accent)" height="17" opacity="0.88" rx="3" width="80.3" x="298.2" y="86"></rect>
+<text fill="var(--surface)" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" x="305.2" y="98">36 h</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="11" text-anchor="end" x="246" y="128">Terraform, deeply</text>
+<rect fill="var(--good)" height="17" opacity="0.88" rx="3" width="80.3" x="378.5" y="116"></rect>
+<text fill="var(--surface)" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" x="385.5" y="128">36 h</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="11" text-anchor="end" x="246" y="158">Kubernetes and EKS</text>
+<rect fill="var(--warn)" height="17" opacity="0.88" rx="3" width="160.7" x="458.8" y="146"></rect>
+<text fill="var(--surface)" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" x="465.8" y="158">72 h</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="11" text-anchor="end" x="246" y="188">Delivery</text>
+<rect fill="var(--good)" height="17" opacity="0.88" rx="3" width="60.2" x="619.5" y="176"></rect>
+<text fill="var(--surface)" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" x="626.5" y="188">26 h</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="11" text-anchor="end" x="246" y="218">Operate</text>
+<rect fill="var(--stop)" height="17" opacity="0.88" rx="3" width="60.2" x="679.8" y="206"></rect>
+<text fill="var(--surface)" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" x="686.8" y="218">26 h</text>
+<line stroke="var(--rule-strong)" stroke-dasharray="3 3" stroke-width="1" x1="14" x2="740" y1="244" y2="244"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" letter-spacing="0.1em" x="14" y="258">RUNNING ALONGSIDE</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="246" y="278">Your own project: Terraform to EKS</text>
+<rect fill="var(--accent-soft)" height="10" rx="2" stroke="var(--accent)" width="361.5" x="298.2" y="270"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="246" y="298">Scripting drills</text>
+<rect fill="var(--accent-soft)" height="10" rx="2" stroke="var(--accent)" width="461.9" x="278.1" y="290"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="246" y="318">System design</text>
+<rect fill="var(--accent-soft)" height="10" rx="2" stroke="var(--accent)" width="281.2" x="458.8" y="310"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="246" y="338">Interview practice</text>
+<rect fill="var(--accent-soft)" height="10" rx="2" stroke="var(--accent)" width="461.9" x="278.1" y="330"></rect>
+<text fill="var(--ink-2)" font-family="Archivo, sans-serif" font-size="11.5" font-weight="600" x="14" y="374">Terraform provisions EKS; CI deploys to it; Prometheus watches it. That join is the thing the listings are describing.</text>
+</svg>
+</div>
+<figcaption>Terraform now gets four weeks and Kubernetes eight, of which one is EKS. Foundations drop
+      to two weeks and Operate to three. The project track starts in week 3 and its spine is the
+      three-way join the listings describe.</figcaption>
+</figure>
+<div class="split">
+<div class="card">
+<p class="tag">AWS</p>
+<h3>36 h + 5 modules already done</h3>
+<p>Mental model, IAM, S3, KMS and DynamoDB are behind you. VPC, compute, secrets, databases and
+        cost remain — and VPC matters twice now, because the EKS networking model makes pod addressing a
+        VPC problem.</p>
+</div>
+<div class="card">
+<p class="tag">Terraform</p>
+<h3>36 h, four modules</h3>
+<p>The language, state and everything that breaks it, multi-environment and module design, then
+        testing and plan review in CI. Ending with a module registry you wrote yourself.</p>
+</div>
+<div class="card">
+<p class="tag">Kubernetes</p>
+<h3>72 h, nine modules</h3>
+<p>Containers, the objects, scheduling, networking, state, security, <strong>EKS</strong>, timed
+        debugging drills, then Helm and Argo CD. A third of the whole plan.</p>
+</div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The new module</p>
+<h2>Module 23 · EKS, which is not Kubernetes</h2>
+</div>
+<p>Everything in Modules 18 to 22 runs on <code>kind</code> and teaches Kubernetes. None of it teaches
+      the parts that only exist when AWS runs your control plane, and those are precisely what an
+      interviewer for an AWS-plus-Kubernetes role will ask about.</p>
+<div class="tw"><table>
+<thead><tr><th>Topic</th><th>Why it only exists on EKS</th></tr></thead>
+<tbody>
+<tr><td class="key">Control plane vs data plane</td><td>AWS runs the API server, etcd and scheduler; you run the nodes. The split decides what you can debug and what you open a support case about.</td></tr>
+<tr><td class="key">The AWS VPC CNI and IP exhaustion</td><td>Every pod gets a <strong>real VPC IP address</strong> from your subnet. A /24 subnet holds 251 pods, not 251 nodes — the classic EKS outage, and pure Kubernetes has no equivalent.</td></tr>
+<tr><td class="key">Managed node groups vs Fargate vs Karpenter</td><td>Three capacity models with different cost shapes, scaling latencies and constraints. "Which would you pick and why" is a standard question.</td></tr>
+<tr><td class="key">IRSA and EKS Pod Identity</td><td>How a pod gets AWS credentials without static keys — the direct continuation of Module 2's OIDC federation, and the specimen repo already does it.</td></tr>
+<tr><td class="key">AWS Load Balancer Controller</td><td>An Ingress becomes a real ALB, with target groups, subnet tags and annotations. Ingress on <code>kind</code> teaches none of this.</td></tr>
+<tr><td class="key">EBS CSI driver and add-ons</td><td>Storage is an AWS volume with AZ affinity, so a pod can become unschedulable for a reason that does not exist on a laptop.</td></tr>
+<tr><td class="key">Version upgrades and extended support</td><td>Control plane then nodes then add-ons, in that order. Miss the window and the price goes from <strong>$0.10 to $0.60 per cluster-hour</strong> — a 6× bill for standing still.</td></tr>
+<tr><td class="key">Provisioning all of it in Terraform</td><td>The join. Cluster, node groups, OIDC provider, IRSA roles, add-ons and controllers as code — which is the thing the job adverts are actually describing.</td></tr>
+</tbody>
+</table></div>
+<div class="call stop">
+<h3>This is the one module that costs real money</h3>
+<p>EKS has no free tier: <strong>$0.10 per cluster-hour</strong>, charged whether anything runs on it
+        or not. Two <code>t3.medium</code> nodes for a three-hour session comes to roughly $0.70 all in,
+        so six sessions across the course is about $5 — provided you <code>terraform destroy</code> every
+        single time. You have already paid the tuition for forgetting: $34.96 in August 2026, which at
+        $0.10 an hour is 350 hours of an empty control plane.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The modules</p>
+<h2>Thirty-two, of which five are done</h2>
+</div>
+<h3>Phase 1 · weeks 1–2 · 18 h · Foundations, aimed at clusters</h3>
+<div class="tw"><table>
+<thead><tr><th>#</th><th>Module</th><th>h</th><th>Exit</th></tr></thead>
+<tbody>
+<tr><td class="key">5.3</td><td>When not to use DynamoDB — transactions, streams, single-table design and its costs, TTL, and the honest case for Postgres</td><td>4</td><td>Argue both sides for the repo's users table.</td></tr>
+<tr><td class="key">6</td><td>Linux for container debugging — processes and signals, exit codes, cgroups and namespaces (what a container <em>is</em>), file descriptors, the OOM killer, systemd units</td><td>7</td><td>Four timed drills: CPU pegged, disk full, port bound, process won't die.</td></tr>
+<tr><td class="key">7</td><td>Networking for cluster debugging — DNS resolution path, TCP states, TLS chain validation, L4 vs L7, iptables and conntrack</td><td>7</td><td>Diagnose a broken TLS chain and a DNS failure from the symptom alone.</td></tr>
+</tbody>
+</table></div>
+<h3>Phase 2 · weeks 3–6 · 36 h · AWS, finished</h3>
+<div class="tw"><table>
+<thead><tr><th>#</th><th>Module</th><th>h</th><th>Exit</th></tr></thead>
+<tbody>
+<tr><td class="key">8</td><td>VPC and network design — subnets, route tables, IGW and NAT, security groups vs NACLs, VPC endpoints, in-VPC DNS, and subnet sizing for pods</td><td>10</td><td>Size a VPC for a 300-pod cluster and defend the maths.</td></tr>
+<tr><td class="key">9</td><td>Compute, and defending a choice — EC2, ASG, ECS, Fargate, Lambda, EKS; cost and operational shape of each</td><td>7</td><td>Defend one against two alternatives, with numbers.</td></tr>
+<tr><td class="key">10</td><td>Secrets and configuration — Secrets Manager vs Parameter Store vs env vars, rotation, and the non-AWS answer you will meet (Vault, External Secrets Operator)</td><td>7</td><td>Move one secret through four stores and price each.</td></tr>
+<tr><td class="key">11</td><td>Databases for operators — Multi-AZ vs read replicas, backup and <strong>restore drills</strong>, connection pooling, zero-downtime migration, failover</td><td>7</td><td>Actually perform a restore.</td></tr>
+<tr><td class="key">12</td><td>Cost engineering — unit economics, tagging, rightsizing, and the traps: NAT gateways, idle control planes, cross-AZ transfer</td><td>5</td><td>Write up the August 2026 EKS burn as a proper post-mortem.</td></tr>
+</tbody>
+</table></div>
+<h3>Phase 3 · weeks 7–10 · 36 h · Terraform, deeply</h3>
+<div class="tw"><table>
+<thead><tr><th>#</th><th>Module</th><th>h</th><th>Exit</th></tr></thead>
+<tbody>
+<tr><td class="key">13</td><td>The language — modules and composition, variable validation, outputs, locals, <code>for_each</code> vs <code>count</code>, dynamic blocks, provider versioning and lock files</td><td>9</td><td>Refactor the specimen repo's flat <code>main.tf</code> into modules.</td></tr>
+<tr><td class="key">14</td><td>State, and everything that breaks it — backends, locking, drift, <code>import</code> and <code>moved</code>, <code>-target</code> as a smell, recovering corrupted state</td><td>9</td><td>Import an unmanaged resource; fix a drifted one.</td></tr>
+<tr><td class="key">15</td><td><strong>Multi-environment and module design</strong> — dev/staging/prod patterns, workspaces vs directories vs branches, module versioning and a private registry, DRY against explicit, where Terragrunt fits</td><td>9</td><td>One module, three environments, no copy-paste.</td></tr>
+<tr><td class="key">16</td><td>Testing and review — <code>terraform test</code> with <code>.tftest.hcl</code>, <code>mock_provider</code>, <code>command = plan</code>, tflint, Checkov and Trivy, plan review in pull requests, OpenTofu</td><td>9</td><td>Tests for a module, and CI that blocks a bad plan.</td></tr>
+</tbody>
+</table></div>
+<p class="note">Sidebar, 2 h: Ansible's model, and why it and Terraform are not competitors — adverts
+      still name it and you should be able to say so in one sentence.</p>
+<h3>Phase 4 · weeks 11–18 · 72 h · Kubernetes and EKS</h3>
+<div class="tw"><table>
+<thead><tr><th>#</th><th>Module</th><th>h</th><th>Exit</th></tr></thead>
+<tbody>
+<tr><td class="key">17</td><td>Containers deeply — layers and build cache, multi-stage, distroless and non-root, digests vs tags, registries, CVE triage</td><td>8</td><td>Shrink the repo's image and justify each layer.</td></tr>
+<tr><td class="key">18</td><td>The objects — Pod, ReplicaSet, Deployment, Service, ConfigMap, Secret, Job, CronJob, namespaces, with the reconciliation loop as the unifying idea</td><td>9</td><td>Deploy the chart on <code>kind</code>; explain what each object did.</td></tr>
+<tr><td class="key">19</td><td>Scheduling and resources — requests vs limits, QoS classes, OOMKilled, CPU throttling, evictions, affinity, taints, PDBs, topology spread</td><td>9</td><td>Make a pod unschedulable four ways on purpose.</td></tr>
+<tr><td class="key">20</td><td>Networking — Service types, kube-proxy, cluster DNS and the search path, Ingress controllers, NetworkPolicy as default-deny</td><td>9</td><td>Explain the repo's NetworkPolicy, then break it deliberately.</td></tr>
+<tr><td class="key">21</td><td>State and configuration — PV, PVC, StorageClass, access modes, StatefulSets, init containers, projected volumes, External Secrets Operator</td><td>7</td><td>Run a stateful workload; survive a pod delete.</td></tr>
+<tr><td class="key">22</td><td>Security and identity — RBAC and debugging a 403, ServiceAccounts and token projection, Pod Security Admission, admission control</td><td>8</td><td>Grant exactly one permission; prove nothing else works.</td></tr>
+<tr><td class="key">23</td><td><strong>EKS, which is not Kubernetes</strong> — the table above, provisioned entirely in Terraform</td><td>10</td><td>Stand up a cluster from code, deploy to it, destroy it, and read the bill.</td></tr>
+<tr><td class="key">24</td><td><strong>Debugging drills</strong> — seven broken clusters: <code>Pending</code>, <code>CrashLoopBackOff</code>, <code>ImagePullBackOff</code>, OOMKilled, 503 through an Ingress, DNS failure, node <code>NotReady</code></td><td>6</td><td>All seven from symptoms alone, under thirty minutes, narrated aloud.</td></tr>
+<tr><td class="key">25</td><td>Helm, then GitOps — templating, <code>values.schema.json</code>, hooks, release lifecycle; then Argo CD: declarative sync, drift detection, sync waves, why pull beats push</td><td>8</td><td>Argo CD heals a manual change you made on purpose.</td></tr>
+</tbody>
+</table></div>
+<h3>Phase 5 · weeks 19–21 · 26 h · Delivery</h3>
+<div class="tw"><table>
+<thead><tr><th>#</th><th>Module</th><th>h</th><th>Exit</th></tr></thead>
+<tbody>
+<tr><td class="key">26</td><td>Pipeline design — stages and gates, artifact immutability, environment promotion, ephemeral preview environments, caching, secrets in CI, OIDC over static keys</td><td>9</td><td>Design a pipeline for fifty services, not one.</td></tr>
+<tr><td class="key">27</td><td>Supply chain — SBOM, signing with <code>cosign</code>, provenance and SLSA, admission policy that refuses unsigned images, base-image pinning</td><td>8</td><td>Block an unsigned image at admission.</td></tr>
+<tr><td class="key">28</td><td>Progressive delivery and rollback — rolling vs blue/green vs canary, Argo Rollouts, migrations safe to deploy <em>and</em> revert, feature flags</td><td>9</td><td>Roll back in two minutes with the database already migrated.</td></tr>
+</tbody>
+</table></div>
+<h3>Phase 6 · weeks 22–24 · 26 h · Operate</h3>
+<div class="tw"><table>
+<thead><tr><th>#</th><th>Module</th><th>h</th><th>Exit</th></tr></thead>
+<tbody>
+<tr><td class="key">29</td><td>Metrics — the Prometheus model, exporters, the four metric types, histograms and why averages lie, PromQL, cardinality, recording rules, Grafana</td><td>10</td><td>Instrument your own service; build one dashboard worth looking at.</td></tr>
+<tr><td class="key">30</td><td>Logs, traces and SLOs — structured logging, retention economics, OpenTelemetry and context propagation, SLI selection, error budgets, burn-rate alerts</td><td>9</td><td>An SLO for your service and the alerts that defend it.</td></tr>
+<tr><td class="key">31</td><td>Incident response — triage and severity, comms, runbooks that work at 3 a.m., blameless postmortems, three simulated incidents against your own project</td><td>7</td><td>Three postmortems in your words. These become interview stories.</td></tr>
+</tbody>
+</table></div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The project</p>
+<h2>Build the sentence the listings are describing</h2>
+</div>
+<p>The project track starts in week 3 and its spine is deliberately the three-way join, because that
+      join <em>is</em> the job description: <strong>Terraform provisions EKS, CI deploys to it, Prometheus
+      watches it.</strong> If you can say that about something you built, and then answer twenty minutes
+      of questions about why each piece is the way it is, you are interviewing as a mid-level DevOps
+      engineer rather than as a developer who has read about it.</p>
+<div class="steps">
+<div class="step"><div class="n">1</div><div>
+<h3>Weeks 3–6 · the service and its infrastructure</h3>
+<p>Something small and genuinely yours — a URL shortener, a webhook relay, a feed poller. Container
+        it properly, then Terraform the VPC, a bucket, a table and the IAM it needs. By week 6 it runs
+        somewhere real.</p>
+</div></div>
+<div class="step"><div class="n">2</div><div>
+<h3>Weeks 7–10 · the Terraform becomes defensible</h3>
+<p>Refactor it into modules with a remote backend, three environments from one module, variable
+        validation, and <code>terraform test</code> in CI. This is the part most candidates have never
+        done and every Terraform question is about.</p>
+</div></div>
+<div class="step"><div class="n">3</div><div>
+<h3>Weeks 11–18 · onto Kubernetes, then onto EKS</h3>
+<p>Helm chart, probes, resources, a NetworkPolicy, an HPA. Run it on <code>kind</code> all through
+        the phase, and in week 18 stand the same chart up on a real EKS cluster your own Terraform
+        created — with IRSA, an ALB Ingress and the add-ons. Then destroy it.</p>
+</div></div>
+<div class="step"><div class="n">4</div><div>
+<h3>Weeks 19–24 · delivered and observed</h3>
+<p>GitHub Actions with OIDC, image signing, Argo CD syncing the chart, Prometheus metrics, one
+        Grafana dashboard, an SLO, a runbook, and three postmortems from deliberately broken
+        deployments. Then a README that defends every decision and names what you would change.</p>
+</div></div>
+</div>
+<div class="call">
+<h3>Checkpoints</h3>
+<p><strong>Week 10:</strong> the project is deployed and its Terraform is modular and tested — if not,
+        Phase 3 needs another week and Operate loses one. <strong>Week 18:</strong> it has run on real
+        EKS at least once. <strong>Week 20:</strong> start applying, four weeks before the plan ends.
+        Interviews find remaining gaps faster than any syllabus can.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Honesty</p>
+<h2>What two thirds on three technologies cannot buy</h2>
+</div>
+<p>Weighting the plan toward what the listings name makes you <strong>legible</strong> to the filter
+      that reads CVs. It does not change what happens in the room. The three things still missing at the
+      end of this are production operational history, experience of scale, and a year of carrying
+      something — and no curriculum supplies those. Module 31's simulated incidents and the real cost
+      incident you lived through are what you will have. Say so plainly; candidates who name the edge of
+      their experience interview better than candidates who paper over it.</p>
+<p>And one risk worth naming in writing, because it is the predictable failure of this plan: AWS
+      Modules 1–5 finish in week 6 and you may not interview until month six. The weekly interview-practice
+      track exists for exactly that, rotating back over IAM evaluation, S3 lifecycle and KMS key policies
+      so they are still live when somebody asks. Skip that track and the first third of this work
+      evaporates.</p>
+</section>
+<footer>
+<p>Curriculum v3 · AWS + DevOps course · 4 October 2026</p>
+<p>Target role: mid-level DevOps engineer. 24 weeks at 8–10 h/week; 214 hours of modules plus about
+      20 across the four tracks. No certificate track, by choice. Five of thirty-two modules complete:
+      the AWS mental model, IAM, S3, KMS, and DynamoDB through Lesson 5.2.</p>
+<p>Revised from v2 after the learner's own survey of job listings — nine in ten naming AWS, Terraform
+      and Kubernetes. The reweighting moved AWS, Terraform and Kubernetes from 58% to 67% of remaining
+      hours, added EKS as a module, gave Terraform a fourth, and compressed foundations and observability.
+      The detailed syllabus and progress log live in <code>docs/DEVOPS_COURSE.md</code>.</p>
+<p>Prices quoted are us-east-1 list: EKS at $0.10 per cluster-hour on standard support and $0.60 on
+      extended support, checked against the EKS pricing page, which states no free tier.</p>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,45 @@
+/* questions without the Q1, Q2 counter */
+section{counter-reset:none;}
+details{counter-increment:none;}
+summary{padding:.85rem 1.05rem;line-height:inherit;position:static;display:flex;gap:.7rem;align-items:baseline;}
+summary::before{content:"Q";position:static;left:auto;top:auto;font-size:inherit;flex:none;}
+
+.facts{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.45rem .55rem;
+  margin-top:.3rem;
+}
+.fact{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:.73rem;
+  letter-spacing:.02em;
+  color:var(--muted);
+  border:1px solid var(--rule);
+  border-radius:2px;
+  padding:.24rem .5rem;
+  background:var(--surface);
+}
+
+/* glossary additions */
+.filter{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;
+  position:sticky;top:0;z-index:5;background:var(--paper);padding:.7rem 0;border-bottom:1px solid var(--rule);}
+.filter input{flex:1 1 14rem;min-width:0;font-family:"IBM Plex Mono",monospace;font-size:.9rem;
+  padding:.5rem .7rem;border:1px solid var(--rule-strong);border-radius:6px;
+  background:var(--surface);color:var(--ink);}
+.filter input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.filter .count{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--muted);white-space:nowrap;}
+.gl{border:1px solid var(--rule);border-radius:7px;background:var(--surface);overflow:hidden;}
+.gi{display:grid;grid-template-columns:7.5rem 1fr;gap:.2rem 1rem;padding:.62rem .9rem;
+  border-bottom:1px solid var(--rule);}
+.gi:last-child{border-bottom:none;}
+.gi .ab{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:.86rem;color:var(--accent-ink);
+  display:flex;align-items:baseline;gap:.35rem;flex-wrap:wrap;}
+.gi .ab .seen{font-size:.55rem;letter-spacing:.08em;color:var(--good);border:1px solid var(--good-rule);
+  background:var(--good-soft);border-radius:2px;padding:0 .22rem;font-weight:600;}
+.gi .ex{font-size:.93rem;}
+.gi .ex b{font-weight:600;}
+.gi .ex i{font-style:normal;color:var(--muted);}
+.gi[hidden]{display:none;}
+section[hidden]{display:none;}
+@media (max-width:38rem){.gi{grid-template-columns:1fr;gap:.15rem;}}

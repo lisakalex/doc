@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Style Bench</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/style-bench.css">
+</head>
+<body>
+
+<title>The Style Bench</title>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link rel="stylesheet" href="../../assets/fonts/bench/bench.css">
+<div class="page">
+<header class="top">
+<p class="kicker">aws-sre · lesson page treatments</p>
+<h1>The Style Bench</h1>
+<p class="sub">Six directions, each rendering the <em>same</em> fragment of Lesson 3.1 — so what
+    differs is treatment, not content. One is the system your seven lessons already use; the other
+    five are real alternatives, not sketches.</p>
+</header>
+<!-- 1 -->
+<div class="spec-block">
+<div class="spec-head">
+<span class="spec-num">01</span>
+<h2 class="spec-name">Technical Reference</h2>
+<span class="inuse">in use</span>
+<p class="spec-for">Dense, calm, built for re-reading. Cool grey ground keeps long code blocks from glaring.</p>
+</div>
+<div class="spec-meta">
+<span class="sw"><i class="u-background-eff1f4"></i><i class="u-background-0e7c86"></i><i class="u-background-a9660a"></i><i class="u-background-1b222a"></i></span>
+<span>Archivo / IBM Plex Sans / IBM Plex Mono</span>
+<span>light + dark</span>
+</div>
+<div class="frame"><div class="spec s1">
+<p class="eyebrow">Module 03 · Lesson 3.1</p>
+<h3>Keys, Not Paths</h3>
+<p class="lede">A bucket is a flat map from one string to a pile of bytes. Everything else is presentation.</p>
+<div class="tbl">
+<div class="row"><b>bucket</b><span>A named container in one region. The name is global.</span></div>
+<div class="row"><b>key</b><span>The whole string identifying an object. The slash is just a character.</span></div>
+<div class="row"><b>object</b><span>Bytes plus metadata. Written whole, replaced whole.</span></div>
+</div>
+<pre><i># app/services/s3.py</i>
+key = f"<em>avatars/</em>{uuid.uuid4()}.{extension}"</pre>
+</div></div>
+</div>
+<!-- 2 -->
+<div class="spec-block">
+<div class="spec-head">
+<span class="spec-num">02</span>
+<h2 class="spec-name">Terminal</h2>
+<p class="spec-for">Mono throughout, phosphor green on near-black. Commits to one look — no light mode, by choice.</p>
+</div>
+<div class="spec-meta">
+<span class="sw"><i class="u-background-0b0e0c"></i><i class="u-background-b6f0c0"></i><i class="u-background-e4c46a"></i><i class="u-background-4f7f5c"></i></span>
+<span>IBM Plex Mono only</span>
+<span>single-theme</span>
+</div>
+<div class="frame"><div class="spec s2">
+<p class="eyebrow">module 03 / lesson 3.1</p>
+<h3>keys, not paths</h3>
+<p class="lede">A bucket is a flat map from one string to a pile of bytes. Everything else is presentation.</p>
+<div class="tbl">
+<div class="row"><b>bucket</b><span>A named container in one region. The name is global.</span></div>
+<div class="row"><b>key</b><span>The whole string identifying an object. The slash is just a character.</span></div>
+<div class="row"><b>object</b><span>Bytes plus metadata. Written whole, replaced whole.</span></div>
+</div>
+<pre><i># app/services/s3.py</i>
+key = f"<em>avatars/</em>{uuid.uuid4()}.{extension}"</pre>
+</div></div>
+</div>
+<!-- 3 -->
+<div class="spec-block">
+<div class="spec-head">
+<span class="spec-num">03</span>
+<h2 class="spec-name">Field Manual</h2>
+<p class="spec-for">Serif reading text, drop cap, oxblood accent. Slower and more authored — good for concept lessons, worse for reference.</p>
+</div>
+<div class="spec-meta">
+<span class="sw"><i class="u-background-fcfaf6"></i><i class="u-background-7a2d24"></i><i class="u-background-8a6a3b"></i><i class="u-background-231f1a"></i></span>
+<span>Fraunces / Newsreader / IBM Plex Mono</span>
+<span>light-first</span>
+</div>
+<div class="frame"><div class="spec s3">
+<p class="eyebrow">Module Three · Lesson 3.1</p>
+<h3>Keys, Not Paths</h3>
+<p class="lede">A bucket is a flat map from one string to a pile of bytes. Everything else is presentation.</p>
+<div class="tbl">
+<div class="row"><b>bucket</b><span>A named container in one region. The name is global.</span></div>
+<div class="row"><b>key</b><span>The whole string identifying an object. The slash is just a character.</span></div>
+<div class="row"><b>object</b><span>Bytes plus metadata. Written whole, replaced whole.</span></div>
+</div>
+<pre><i># app/services/s3.py</i>
+key = f"<em>avatars/</em>{uuid.uuid4()}.{extension}"</pre>
+</div></div>
+</div>
+<!-- 4 -->
+<div class="spec-block">
+<div class="spec-head">
+<span class="spec-num">04</span>
+<h2 class="spec-name">Swiss Grid</h2>
+<p class="spec-for">Hairline rules, zero radius, condensed caps, one signal red. Maximum authority, minimum warmth.</p>
+</div>
+<div class="spec-meta">
+<span class="sw"><i class="u-background-ffffff"></i><i class="u-background-000000"></i><i class="u-background-d8232a"></i></span>
+<span>Archivo Narrow / Archivo / IBM Plex Mono</span>
+<span>light-first</span>
+</div>
+<div class="frame"><div class="spec s4">
+<p class="eyebrow">Module 03 / Lesson 3.1</p>
+<h3>Keys, Not Paths</h3>
+<div class="rule"></div>
+<p class="lede">A bucket is a flat map from one string to a pile of bytes. Everything else is presentation.</p>
+<div class="tbl">
+<div class="row"><b>bucket</b><span>A named container in one region. The name is global.</span></div>
+<div class="row"><b>key</b><span>The whole string identifying an object. The slash is just a character.</span></div>
+<div class="row"><b>object</b><span>Bytes plus metadata. Written whole, replaced whole.</span></div>
+</div>
+<pre><i># app/services/s3.py</i>
+key = f"<em>avatars/</em>{uuid.uuid4()}.{extension}"</pre>
+</div></div>
+</div>
+<!-- 5 -->
+<div class="spec-block">
+<div class="spec-head">
+<span class="spec-num">05</span>
+<h2 class="spec-name">Blueprint</h2>
+<p class="spec-for">Drawing-board ground with a real 22px grid, cyan annotation, amber call-outs. Suits architecture and wire-level diagrams.</p>
+</div>
+<div class="spec-meta">
+<span class="sw"><i class="u-background-0e2036"></i><i class="u-background-5fc8e8"></i><i class="u-background-f2c572"></i><i class="u-background-2c5478"></i></span>
+<span>IBM Plex Mono / IBM Plex Sans</span>
+<span>single-theme</span>
+</div>
+<div class="frame"><div class="spec s5">
+<p class="eyebrow">Module 03 · Lesson 3.1</p>
+<h3>Keys, Not Paths</h3>
+<p class="lede">A bucket is a flat map from one string to a pile of bytes. Everything else is presentation.</p>
+<div class="tbl">
+<div class="row"><b>bucket</b><span>A named container in one region. The name is global.</span></div>
+<div class="row"><b>key</b><span>The whole string identifying an object. The slash is just a character.</span></div>
+<div class="row"><b>object</b><span>Bytes plus metadata. Written whole, replaced whole.</span></div>
+</div>
+<pre><i># app/services/s3.py</i>
+key = f"<em>avatars/</em>{uuid.uuid4()}.{extension}"</pre>
+</div></div>
+</div>
+<!-- 6 -->
+<div class="spec-block">
+<div class="spec-head">
+<span class="spec-num">06</span>
+<h2 class="spec-name">Console UI</h2>
+<p class="spec-for">Treats the page as a tool: stat tiles, state chips, severity stripes. Right for dashboards and audits, wrong for prose.</p>
+</div>
+<div class="spec-meta">
+<span class="sw"><i class="u-background-f5f6f8"></i><i class="u-background-3e7bc4"></i><i class="u-background-1f6b44"></i><i class="u-background-c98207"></i></span>
+<span>Archivo / IBM Plex Sans / IBM Plex Mono</span>
+<span>light-first</span>
+</div>
+<div class="frame"><div class="spec s6">
+<p class="eyebrow">Module 03 · Lesson 3.1</p>
+<h3>Keys, Not Paths</h3>
+<p class="lede">A bucket is a flat map from one string to a pile of bytes. Everything else is presentation.</p>
+<div class="tiles">
+<div class="tile"><span class="lbl">key limit</span><span class="val">1024 <small>bytes</small></span></div>
+<div class="tile"><span class="lbl">max object</span><span class="val">5 <small>TB</small></span></div>
+<div class="tile warnstripe"><span class="lbl">durability</span><span class="val">11 <small>nines</small></span></div>
+</div>
+<div class="chips">
+<span class="chip ok">versioning on</span>
+<span class="chip ok">public access blocked</span>
+<span class="chip warn">lifecycle: none</span>
+<span class="chip off">force_destroy off</span>
+</div>
+<pre><i># app/services/s3.py</i>
+key = f"<em>avatars/</em>{uuid.uuid4()}.{extension}"</pre>
+</div></div>
+</div>
+<footer class="foot">
+<p><strong>Recommendation: keep 01.</strong> Not because it is the most striking — 03 and 04 are —
+    but because six lessons already use it and a course that changes clothes every module reads as six
+    unrelated documents. Switching is only worth it if all seven change together.</p>
+<p>If you do want a second look in play, the honest pairing is <strong>01 for lessons, 05 for
+    architecture pages</strong>: different job, visibly different artefact, no confusion about which
+    is which. And <strong>06 for the cost and audit pages</strong>, which are scanned rather than read.</p>
+<p>Specimen source lives with the course in <code>lessons/</code>; the head block of any
+    existing lesson is the system in 01, ready to copy.</p>
+</footer>
+</div>
+
+</body>
+</html>

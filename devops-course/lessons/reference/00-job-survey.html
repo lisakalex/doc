@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nine in Ten, Checked</title>
+<link rel="icon" href="../../assets/img/favicon-reference.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/00-job-survey.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Survey · AWS + DevOps course</p>
+<h1>Nine in Ten, Checked</h1>
+<p class="lede">I scanned 5,393 job postings, kept the 147 with a genuine DevOps-family job title, and
+      counted. Your three are the top three — Kubernetes, AWS and Terraform, in that order. But all three
+      appear together in <strong>12%</strong> of postings, not ninety. Here is the data, the method, what
+      I got wrong on the first attempt, and the five changes it makes to the curriculum.</p>
+<div class="facts">
+<span class="fact">5,393 scanned · 147 counted</span>
+<span class="fact">Nov 2025 – Oct 2026</span>
+<span class="fact">3 sources</span>
+<span class="fact">77% US startup skew</span>
+</div>
+</header>
+<section>
+<p class="eyebrow">Method, including its faults</p>
+<h2>What I actually did</h2>
+<div class="tw"><table>
+<thead><tr><th>Source</th><th>Scanned</th><th>Kept</th><th>What it is, and how it skews</th></tr></thead>
+<tbody>
+<tr><td class="key">Hacker News<br/>"Who is hiring"</td><td>3,662</td><td>113</td><td>Twelve monthly threads, Nov 2025 to Oct 2026. Real postings with full text. Heavily US startups and scale-ups; postings are terse.</td></tr>
+<tr><td class="key">arbeitnow</td><td>1,450</td><td>26</td><td>EU, mostly Germany. The closest thing here to your market, and the only non-US sample.</td></tr>
+<tr><td class="key">RemoteOK</td><td>281</td><td>8</td><td>Remote-first. Nearly useless: its <code>tag=devops</code> endpoint returned a construction engineer, a hotel porter and a pest-control supervisor, so I filtered on job titles myself.</td></tr>
+</tbody>
+</table></div>
+<p>Inclusion rule: the posting's <strong>title</strong> had to name a DevOps-family role — DevOps,
+      SRE, site reliability, platform engineer, infrastructure or cloud engineer, production engineer,
+      sysadmin. Then I split the result in two: <strong>147 "pure"</strong> postings advertising only that
+      kind of role, and <strong>92 multi-role</strong> postings ("SWE, SRE, Security, Design") whose
+      technology list cannot be attributed to the DevOps part. All figures below are the pure set.</p>
+<div class="call stop">
+<h3>My first attempt was wrong, and here is how I knew</h3>
+<p>Run one: 252 postings, Docker at 6%, only 30% naming any cloud, and <strong>"Nomad" at 78% of
+        RemoteOK</strong> — which is a remote-jobs board, so it was matching <em>digital nomad</em>. Three
+        impossible numbers meant the corpus was contaminated: my filter had admitted general software
+        postings that merely mentioned DevOps among several roles, and I was counting the whole posting's
+        stack. I threw it away and rebuilt with title-only matching. The lesson is the one from
+        <em>Where the Mock Lies</em>: an implausible result is evidence about your instrument.</p>
+</div>
+<p class="note"><strong>The skew you must hold in mind.</strong> 77% of the sample is Hacker News, so
+      this measures US startups and scale-ups posting their own roles. It will understate enterprise
+      tooling — Azure, Jenkins, ServiceNow, VMware, Ansible — and overstate modern tooling. It also
+      measures about 1% of the market, and the wrong 1% for a UK candidate: see the correction
+      below, which supersedes the explanation offered in the cards above.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The result</p>
+<h2>What employers name</h2>
+</div>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="Horizontal bar chart of how often each technology is named in 147 job postings with a DevOps-family job title. Kubernetes 41 percent, AWS 33 percent, Python 33 percent, Terraform 29 percent, then Grafana 20, GCP 17, Linux 17, Go 17, Prometheus 16, Node or TypeScript 16, PostgreSQL 16, Rust 14, Docker 13, Azure 12, Ansible 12, Datadog 10, Argo CD or GitOps 9, Helm 7, GitHub Actions 7, EKS 5, GitLab CI 4, Pulumi 3, CloudFormation 1, Jenkins 1." role="img" viewbox="0 0 760 500">
+<text fill="var(--ink)" font-family="Archivo, sans-serif" font-size="13" font-weight="600" x="14" y="20">Share of 147 DevOps-titled postings naming each technology</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" x="14" y="36">Darker bars are the three you asked about. Percentages are labelled, so nothing depends on colour alone.</text>
+<line stroke="var(--rule)" stroke-width="1" x1="212.0" x2="212.0" y1="52" y2="464"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="212.0" y="46">0%</text>
+<line stroke="var(--rule)" stroke-width="1" x1="320.4" x2="320.4" y1="52" y2="464"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="320.4" y="46">10%</text>
+<line stroke="var(--rule)" stroke-width="1" x1="428.9" x2="428.9" y1="52" y2="464"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="428.9" y="46">20%</text>
+<line stroke="var(--rule)" stroke-width="1" x1="537.3" x2="537.3" y1="52" y2="464"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="537.3" y="46">30%</text>
+<line stroke="var(--rule)" stroke-width="1" x1="645.8" x2="645.8" y1="52" y2="464"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle" x="645.8" y="46">40%</text>
+<text fill="var(--ink)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" font-weight="600" text-anchor="end" x="206" y="69.5">Kubernetes (any form)</text>
+<path d="M 212 58 H 658.0 a 4 4 0 0 1 4 4 V 69 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--accent)"><title>Kubernetes (any form): 61 of 147 postings (41%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="668.0" y="69">41%</text>
+<text fill="var(--ink)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" font-weight="600" text-anchor="end" x="206" y="86.5">AWS</text>
+<path d="M 212 75 H 569.5 a 4 4 0 0 1 4 4 V 86 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--accent)"><title>AWS: 49 of 147 postings (33%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="579.5" y="86">33%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="103.5">Python</text>
+<path d="M 212 92 H 562.1 a 4 4 0 0 1 4 4 V 103 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Python: 48 of 147 postings (33%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="572.1" y="103">33%</text>
+<text fill="var(--ink)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" font-weight="600" text-anchor="end" x="206" y="120.5">Terraform</text>
+<path d="M 212 109 H 525.2 a 4 4 0 0 1 4 4 V 120 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--accent)"><title>Terraform: 43 of 147 postings (29%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="535.2" y="120">29%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="137.5">Grafana</text>
+<path d="M 212 126 H 421.9 a 4 4 0 0 1 4 4 V 137 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Grafana: 29 of 147 postings (20%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="431.9" y="137">20%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="154.5">GCP</text>
+<path d="M 212 143 H 392.4 a 4 4 0 0 1 4 4 V 154 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>GCP: 25 of 147 postings (17%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="402.4" y="154">17%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="171.5">Linux</text>
+<path d="M 212 160 H 392.4 a 4 4 0 0 1 4 4 V 171 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Linux: 25 of 147 postings (17%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="402.4" y="171">17%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="188.5">Go / Golang</text>
+<path d="M 212 177 H 392.4 a 4 4 0 0 1 4 4 V 188 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Go / Golang: 25 of 147 postings (17%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="402.4" y="188">17%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="205.5">Node / TypeScript</text>
+<path d="M 212 194 H 385.1 a 4 4 0 0 1 4 4 V 205 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Node / TypeScript: 24 of 147 postings (16%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="395.1" y="205">16%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="222.5">Prometheus</text>
+<path d="M 212 211 H 377.7 a 4 4 0 0 1 4 4 V 222 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Prometheus: 23 of 147 postings (16%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="387.7" y="222">16%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="239.5">PostgreSQL</text>
+<path d="M 212 228 H 377.7 a 4 4 0 0 1 4 4 V 239 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>PostgreSQL: 23 of 147 postings (16%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="387.7" y="239">16%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="256.5">Rust</text>
+<path d="M 212 245 H 355.5 a 4 4 0 0 1 4 4 V 256 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Rust: 20 of 147 postings (14%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="365.5" y="256">14%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="273.5">Docker</text>
+<path d="M 212 262 H 348.2 a 4 4 0 0 1 4 4 V 273 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Docker: 19 of 147 postings (13%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="358.2" y="273">13%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="290.5">Azure</text>
+<path d="M 212 279 H 340.8 a 4 4 0 0 1 4 4 V 290 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Azure: 18 of 147 postings (12%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="350.8" y="290">12%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="307.5">Ansible</text>
+<path d="M 212 296 H 340.8 a 4 4 0 0 1 4 4 V 307 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Ansible: 18 of 147 postings (12%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="350.8" y="307">12%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="324.5">Datadog</text>
+<path d="M 212 313 H 318.7 a 4 4 0 0 1 4 4 V 324 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Datadog: 15 of 147 postings (10%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="328.7" y="324">10%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="341.5">Argo CD / GitOps</text>
+<path d="M 212 330 H 303.9 a 4 4 0 0 1 4 4 V 341 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Argo CD / GitOps: 13 of 147 postings (9%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="313.9" y="341">9%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="358.5">Helm</text>
+<path d="M 212 347 H 289.1 a 4 4 0 0 1 4 4 V 358 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Helm: 11 of 147 postings (7%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="299.1" y="358">7%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="375.5">GitHub Actions</text>
+<path d="M 212 364 H 289.1 a 4 4 0 0 1 4 4 V 375 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>GitHub Actions: 11 of 147 postings (7%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="299.1" y="375">7%</text>
+<text fill="var(--ink)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" font-weight="600" text-anchor="end" x="206" y="392.5">EKS, named explicitly</text>
+<path d="M 212 381 H 267.0 a 4 4 0 0 1 4 4 V 392 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--accent)"><title>EKS, named explicitly: 8 of 147 postings (5%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="277.0" y="392">5%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="409.5">GitLab CI</text>
+<path d="M 212 398 H 252.3 a 4 4 0 0 1 4 4 V 409 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>GitLab CI: 6 of 147 postings (4%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="262.3" y="409">4%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="426.5">Pulumi</text>
+<path d="M 212 415 H 237.5 a 4 4 0 0 1 4 4 V 426 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Pulumi: 4 of 147 postings (3%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="247.5" y="426">3%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="443.5">CloudFormation</text>
+<path d="M 212 432 H 222.8 a 4 4 0 0 1 4 4 V 443 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>CloudFormation: 2 of 147 postings (1%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="232.8" y="443">1%</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="10.5" text-anchor="end" x="206" y="460.5">Jenkins</text>
+<path d="M 212 449 H 215.4 a 4 4 0 0 1 4 4 V 460 a 4 4 0 0 1 -4 4 H 212 Z" fill="var(--bar-dim)"><title>Jenkins: 1 of 147 postings (1%)</title></path>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="9.5" x="225.4" y="460">1%</text>
+<line stroke="var(--rule-strong)" stroke-width="1.2" x1="212" x2="700" y1="464" y2="464"></line>
+<text fill="var(--ink-2)" font-family="Archivo, sans-serif" font-size="11.5" font-weight="600" x="14" y="492">Terraform 29% against CloudFormation 1% is the clearest single result in the survey.</text>
+</svg>
+</div>
+<figcaption>Named technologies only. Hover a bar for the raw count. Concepts rather than tools —
+      "CI/CD" at 29%, "monitoring" 24%, "infrastructure as code" 23%, "observability" 22%, "on-call"
+      12% — are counted in the text below rather than mixed into a chart of products.</figcaption>
+</figure>
+<div class="split">
+<div class="card">
+<p class="tag">Confirmed</p>
+<h3>Your ranking is right</h3>
+<p>Kubernetes 41%, AWS 33%, Terraform 29% are the top three named technologies, with Python tied
+        with AWS. Nothing else in infrastructure comes close.</p>
+</div>
+<div class="card">
+<p class="tag">Corrected</p>
+<h3>Ninety per cent is not</h3>
+<p>All three together: <strong>12%</strong>. Any two: 18–21%. At least one named cloud: 51%. And 29%
+        of postings name <em>no</em> concrete technology at all.</p>
+</div>
+<div class="card">
+<p class="tag">Corrected again</p>
+<h3>Why your number was higher</h3>
+<p>Not selection bias, as I first assumed. <strong>Reed UK is 77% recruitment-agency postings; my
+        sample is 0%.</strong> Agency adverts list every technology the client mentioned. See the
+        correction below — your 90% is probably right for your market.</p>
+</div>
+</div>
+<p>There is a second, more innocent reason: <strong>posting length</strong>. The median posting here is
+      1,132 characters, because Hacker News adverts are three lines. A LinkedIn job description runs four
+      to six thousand characters and lists everything anyone in the team has touched. Mine undercounts by
+      brevity rather than by absence — so read my percentages as a <em>floor</em>, and the ranking as the
+      reliable part.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">What the data says that your survey could not</p>
+<h2>Six findings worth acting on</h2>
+</div>
+<h3>1 · Terraform has won infrastructure as code outright</h3>
+<div class="tw"><table>
+<thead><tr><th>Tool</th><th>Postings</th><th>Share</th></tr></thead>
+<tbody>
+<tr><td class="key">Terraform</td><td>43</td><td><strong>29%</strong></td></tr>
+<tr><td class="key">Ansible</td><td>18</td><td>12%</td></tr>
+<tr><td class="key">Pulumi</td><td>4</td><td>3%</td></tr>
+<tr><td class="key">Chef / Puppet / Salt</td><td>3</td><td>2%</td></tr>
+<tr><td class="key">CloudFormation / CDK</td><td>2</td><td>1%</td></tr>
+<tr><td class="key">OpenTofu</td><td>1</td><td>1%</td></tr>
+</tbody>
+</table></div>
+<p>Twenty-nine to one against CloudFormation. That settles the decision to drop the AWS-native
+      tooling from the curriculum, and it also settles OpenTofu: know what it is and why it exists, spend
+      no hours on it.</p>
+<h3>2 · Grafana and Prometheus beat the managed tools, and CloudWatch is absent</h3>
+<p>Grafana 20%, Prometheus 16%, Datadog 10%, Elastic 5%, OpenTelemetry 1%. <strong>CloudWatch: zero
+      postings.</strong> Splunk and New Relic: zero. So replacing CloudWatch with Prometheus and Grafana as
+      the observability subject was the right call, and Grafana being the single most-named observability
+      tool means the dashboard you build matters more than the storage engine behind it.</p>
+<h3>3 · Employers want CI/CD the idea, not CI/CD the product</h3>
+<p>"CI/CD" as a concept appears in 29% of postings. The tools barely register: GitHub Actions 7%,
+      GitLab CI 4%, <strong>Jenkins 1%</strong>, CircleCI and Buildkite under 1%. Which means pipeline
+      <em>design</em> is the examinable skill and tool trivia is not — exactly how Module 26 is built. It
+      also means the Jenkins experience you do not have is not worth acquiring.</p>
+<h3>4 · Python is the DevOps language, and it is already yours</h3>
+<p>Python 33%, Go 17%, Bash 8%. Python is named as often as AWS. You are a Python developer, which is
+      a genuine advantage over candidates who arrived through system administration — and the weekly
+      scripting track should lean into it rather than treating it as revision. Go at 17% is worth reading
+      fluently, because half the tools you will operate are written in it, but not worth learning to write
+      well.</p>
+<h3>5 · EKS is almost never named, and the module stays anyway</h3>
+<p>"EKS" appears explicitly in 5% of postings. But AWS and Kubernetes appear <em>together</em> in 19%,
+      and there is no such thing as running Kubernetes on AWS without running EKS or building something
+      worse. The advert says "AWS" and "Kubernetes" in separate bullet points; the job is EKS. The VPC CNI
+      exhausting your subnet does not care whether the advert mentioned it.</p>
+<h3>6 · The European subset looks different, and that is probably your market</h3>
+<div class="tw"><table>
+<thead><tr><th>Technology</th><th>US / HN (n=113)</th><th>EU (n=26)</th></tr></thead>
+<tbody>
+<tr><td class="key">Azure</td><td>7%</td><td><strong>38%</strong></td></tr>
+<tr><td class="key">AWS</td><td>37%</td><td>23%</td></tr>
+<tr><td class="key">GCP</td><td>19%</td><td>8%</td></tr>
+<tr><td class="key">"CI/CD" as a term</td><td>23%</td><td>62%</td></tr>
+<tr><td class="key">"infrastructure as code"</td><td>17%</td><td>50%</td></tr>
+<tr><td class="key">"monitoring"</td><td>17%</td><td>54%</td></tr>
+<tr><td class="key">Networking (VPC/DNS/TLS)</td><td>4%</td><td>27%</td></tr>
+<tr><td class="key">Ansible</td><td>11%</td><td>19%</td></tr>
+<tr><td class="key">GitLab CI</td><td>3%</td><td>12%</td></tr>
+</tbody>
+</table></div>
+<p>Twenty-six postings is a small sample and every one of those percentages carries a wide error bar.
+      But the direction is consistent with what everyone says about the European market: <strong>more
+      Azure, more GitLab, more Ansible, and far more emphasis on process language</strong> — CI/CD,
+      infrastructure as code, monitoring — than on specific products. If you are applying in the UK or
+      the EU, Azure at 38% is not something to ignore.</p>
+<div class="call warn">
+<h3>One thing I am assuming and should not</h3>
+<p>I have inferred you are in the UK or Europe, from your machine's clock sitting at UTC+1 in
+        October. If that is wrong, the sixth finding above does not apply to you and the Azure
+        recommendation below should be dropped. Worth correcting me.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Correction, 5 October 2026</p>
+<h2>How much of the market this actually covers: about 1%</h2>
+</div>
+<p>I published the conclusion above and then checked the obvious question I should have checked
+      first — how big is the real market. The answer makes this survey much smaller than it looked, and
+      it supplies a better explanation for the disagreement than the one I gave.</p>
+<div class="tw"><table>
+<thead><tr><th>Source</th><th>DevOps postings</th><th>Period</th><th>Reachable?</th></tr></thead>
+<tbody>
+<tr><td class="key">This survey</td><td><strong>147</strong></td><td>12 months</td><td>public APIs, no key</td></tr>
+<tr><td class="key">Reed.co.uk, UK only</td><td><strong>630</strong></td><td>live right now</td><td>free API key required</td></tr>
+<tr><td class="key">LinkedIn, UK only</td><td><strong>7,000+</strong></td><td>live right now</td><td>no third-party API; scraping breaches its terms</td></tr>
+<tr><td class="key">LinkedIn, worldwide</td><td><strong>11,000+</strong></td><td>live right now</td><td>as above</td></tr>
+<tr><td class="key">Indeed</td><td>unknown</td><td>—</td><td>public API retired; returns 403</td></tr>
+</tbody>
+</table></div>
+<p>So twelve months of the open web produced 147 DevOps postings, while <strong>one UK board has 630
+      standing at this instant</strong> and LinkedIn reports seven thousand in the UK alone. The open APIs cover
+      something on the order of <strong>1% of the addressable market</strong>, and they cover a
+      structurally different slice of it.</p>
+<div class="call stop">
+<h3>The structural difference, which is the real finding</h3>
+<p>Reed's own facets: <strong>484 of those 630 postings are placed by recruitment agencies and 146
+        by direct employers</strong> — 77% agency. Hacker News is <strong>0% agency</strong> by
+        construction; it is founders and engineers posting their own roles in three lines.</p>
+<p>Agency adverts are keyword-dense, because the recruiter lists every technology the client
+        mentioned plus everything that might match a candidate search. Direct-employer adverts say "we
+        run Go on GCP" and stop. <strong>That, not filtered searching, is why you saw AWS, Terraform and
+        Kubernetes in nine adverts out of ten and I measured twelve per cent.</strong> We were counting
+        different populations, and if you are applying in the UK, yours is the one that matters.</p>
+</div>
+<p>What survives from my survey is the <em>relative</em> ordering within a population. What does not
+      survive is any absolute claim about prevalence. <strong>I also wrote here that the near-zeros
+      were safe — that CloudWatch at zero and Terraform beating CloudFormation 29:1 were gaps too wide
+      to be artefacts. The next section measures 662 UK adverts and finds CloudWatch at 11.3% and the
+      ratio at 4.9:1. They were artefacts. Only the direction held.</strong></p>
+<div class="tw"><table>
+<thead><tr><th>Reed UK, "devops", 5 Oct 2026</th><th>Count</th><th>Why it matters to you</th></tr></thead>
+<tbody>
+<tr><td>total live</td><td>630</td><td>and 41 posted today, 213 in the last week — roughly 30 new a day on one board</td></tr>
+<tr><td>via agency / direct</td><td>484 / 146</td><td>most applications will go through a recruiter, who screens on keywords before a human reads anything</td></tr>
+<tr><td>permanent / contract</td><td>452 / 167</td><td>a quarter of the UK market is contract, which usually wants more experience than mid-level</td></tr>
+<tr><td>hybrid / on-site / remote</td><td>345 / 152 / 125</td><td>hybrid is the default; fully remote is a fifth of the market</td></tr>
+</tbody>
+</table></div>
+<h3>Where these two numbers came from, exactly</h3>
+<p>Neither needed an API key, and neither yields what a keyword survey actually needs.</p>
+<div class="tw"><table>
+<thead><tr><th>Source</th><th>How</th><th>What it gives</th><th>What it withholds</th></tr></thead>
+<tbody>
+<tr><td class="key">Reed</td><td>one <code>GET</code> of the public search page; the counts sit in its
+      <code>__NEXT_DATA__</code> JSON under <code>searchResults.searchFacets</code></td>
+<td>the total, and every facet above — agency/direct, permanent/contract, working option, county,
+      date posted. These are Reed's own counts over all 630, not a sample</td>
+<td>the <strong>job descriptions</strong>. Each of the 25 records per page carries a 150-character
+      snippet and nothing more, so tool prevalence cannot be measured from it</td></tr>
+<tr><td class="key">LinkedIn</td><td>one <code>GET</code> of the logged-out search page</td>
+<td>the headline count, plus 60 cards of title, company, location and date</td>
+<td>everything else — no descriptions, no facets, no totals by type. There is no third-party jobs
+      API, and paginating the guest endpoint to build a corpus is scraping, which breaches its terms,
+      so I did not</td></tr>
+</tbody>
+</table></div>
+<p class="note">Both counts are live and drift. Re-fetched a few hours after the figures above were
+      recorded, Reed read 632 with 486 agency and 43 posted today — the same picture, a few jobs further
+      on. Treat every absolute number on this page as a snapshot of 5 October 2026, and the
+      <em>ratios</em> as the durable part.</p>
+<div class="call warn">
+<h3>What this changes about how you prepare</h3>
+<p>Nothing about the <em>learning</em> — depth still beats breadth, and no keyword gets you through a
+        debugging question. But it changes the <strong>CV</strong>. In a market where three quarters of
+        adverts are agency-placed and screened on term matching, a CV that demonstrates depth in three
+        technologies and never mentions the other twelve will be filtered out before an engineer sees it.
+        Learn depth-first; write the CV so the keywords are present and truthful.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Second survey, 5 October 2026 — this one supersedes the figures above</p>
+<h2>The real UK market, measured: 662 adverts</h2>
+</div>
+<p>An Adzuna API key arrived, so the survey no longer depends on three key-free sources covering
+      1% of the market. This run measures <strong>every advert on a national UK aggregator whose title
+      contains “devops”</strong> — 662 of them, against 609,377 UK jobs in total. Where this
+      section and the one above disagree, <strong>this one is right</strong>: it is a national market
+      rather than a convenience sample, and the matching runs against complete advert text.</p>
+<div class="call">
+<h3>The method, and the two API behaviours that nearly ruined it</h3>
+<p>Adzuna truncates the description it returns to <strong>500 characters</strong> — the preamble of a
+      corporate advert, not its technology list. So this run counts no text. It asks the API how many
+      adverts match and divides: <code>title_only=devops</code> gives the denominator, adding
+      <code>what_phrase=terraform</code> gives the numerator. Matching happens server-side against the
+      full advert, so truncation cannot suppress it, and the whole survey costs 81 API calls.</p>
+<p>Two behaviours had to be measured rather than assumed, and both bite:</p>
+<p><strong>1. <code>title_only</code> ANDs its keywords.</strong> <code>title_only="devops sre"</code>
+      returns 3 adverts — the ones whose title contains both words — not the union. Role families must be
+      surveyed one term at a time.</p>
+<p><strong>2. <code>what_or</code> does not OR the phrases you give it.</strong> It splits them into
+      single words and ORs those. <code>what_or="istio,linkerd,service mesh"</code> returns 446, which is
+      <em>exactly</em> what <code>what_or="service"</code> returns. A first run built on
+      <code>what_or</code> reported GCP at 85% and service mesh at 67% of all adverts; both were the
+      count for a common English word. That run was discarded. Every row below is one exact phrase, and
+      <strong>the rows are not additive</strong> — an advert naming both Kubernetes and EKS is in both.</p>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Phrase</th><th>Share of 662</th><th>Adverts</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td class="key">Terraform</td><td><strong>70.4%</strong></td><td>466</td><td>the single most-named technology in the survey — ahead of every cloud</td></tr>
+<tr><td class="key">Kubernetes</td><td><strong>62.1%</strong></td><td>411</td><td>plus K8s 2.1%, EKS 14.2%, AKS 6.8%, GKE 2.9%, OpenShift 7.9%</td></tr>
+<tr><td class="key">AWS</td><td><strong>60.1%</strong></td><td>398</td><td>plus 4.1% spelling out “Amazon Web Services”</td></tr>
+<tr><td class="key">Azure</td><td><strong>45.2%</strong></td><td>299</td><td>nearly half. Far more than a sidebar's worth</td></tr>
+<tr><td class="key">Docker</td><td><strong>44.6%</strong></td><td>295</td><td></td></tr>
+<tr><td class="key">Observability (phrase)</td><td><strong>39.3%</strong></td><td>260</td><td>the concept outruns every tool that implements it</td></tr>
+<tr><td class="key">Linux</td><td><strong>36.9%</strong></td><td>244</td><td></td></tr>
+<tr><td class="key">Bash</td><td><strong>35.2%</strong></td><td>233</td><td></td></tr>
+<tr><td class="key">Ansible</td><td><strong>31.9%</strong></td><td>211</td><td>second-most-named IaC tool, and not close to Terraform</td></tr>
+<tr><td class="key">Jenkins</td><td><strong>29.5%</strong></td><td>195</td><td><strong>the most-named CI tool.</strong> My first survey found it in one posting out of 147</td></tr>
+<tr><td class="key">GitLab</td><td><strong>26.1%</strong></td><td>173</td><td></td></tr>
+<tr><td class="key">PowerShell</td><td><strong>24.6%</strong></td><td>163</td><td><strong>absent from my first survey entirely.</strong> A quarter of UK DevOps work touches Windows</td></tr>
+<tr><td class="key">GitHub Actions</td><td><strong>23.0%</strong></td><td>152</td><td></td></tr>
+<tr><td class="key">Azure DevOps</td><td><strong>22.7%</strong></td><td>150</td><td></td></tr>
+<tr><td class="key">Grafana</td><td><strong>22.1%</strong></td><td>146</td><td></td></tr>
+<tr><td class="key">Prometheus</td><td><strong>21.3%</strong></td><td>141</td><td></td></tr>
+<tr><td class="key">GCP</td><td><strong>16.2%</strong></td><td>107</td><td>a sixth, against Azure's half</td></tr>
+<tr><td class="key">CloudFormation</td><td><strong>14.5%</strong></td><td>96</td><td>Terraform leads it 4.9:1 here, not the 29:1 I published</td></tr>
+<tr><td class="key">CloudWatch</td><td><strong>11.3%</strong></td><td>75</td><td><strong>I published that this was zero and that the zero was durable.</strong> It is not</td></tr>
+<tr><td class="key">Site reliability (phrase)</td><td><strong>11.5%</strong></td><td>76</td><td></td></tr>
+<tr><td class="key">GitOps</td><td><strong>10.1%</strong></td><td>67</td><td>ArgoCD 6.0%, Flux 0.5%</td></tr>
+<tr><td class="key">Secrets management (phrase)</td><td><strong>9.1%</strong></td><td>60</td><td>HashiCorp Vault by name, 2.0%</td></tr>
+<tr><td class="key">Splunk / Datadog</td><td><strong>8.2% / 8.0%</strong></td><td>54 / 53</td><td>New Relic 2.0%</td></tr>
+<tr><td class="key">Serverless (phrase)</td><td><strong>6.8%</strong></td><td>45</td><td>AWS Lambda by name, 0.5%</td></tr>
+<tr><td class="key">FinOps</td><td><strong>3.6%</strong></td><td>24</td><td></td></tr>
+<tr><td class="key">OpenTelemetry</td><td><strong>3.3%</strong></td><td>22</td><td></td></tr>
+<tr><td class="key">Service mesh (phrase)</td><td><strong>2.7%</strong></td><td>18</td><td>Istio by name, 1.2%</td></tr>
+<tr><td class="key">Pulumi / Terragrunt</td><td><strong>2.7% / 2.1%</strong></td><td>18 / 14</td><td>OpenTofu 0.6%</td></tr>
+<tr><td class="key">Golang</td><td><strong>2.3%</strong></td><td>15</td><td>as the unambiguous spelling; the bare word cannot be counted</td></tr>
+<tr><td class="key">Helm chart</td><td><strong>2.1%</strong></td><td>14</td><td></td></tr>
+<tr><td class="key">Karpenter / eBPF</td><td><strong>0.6% / 0.2%</strong></td><td>4 / 1</td><td>genuinely niche, and now measured rather than assumed</td></tr>
+</tbody>
+</table></div>
+<div class="call stop">
+<h3>“Nine out of ten want AWS, Terraform and Kubernetes” — now a measured claim</h3>
+<p><code>what_and</code> does AND its words, so co-occurrence can be tested directly. Among the 662:</p>
+<div class="tw"><table>
+<thead><tr><th>Named together</th><th>Share</th><th>Adverts</th></tr></thead>
+<tbody>
+<tr><td>AWS + Terraform</td><td><strong>48.5%</strong></td><td>321</td></tr>
+<tr><td>Terraform + Kubernetes</td><td><strong>51.2%</strong></td><td>339</td></tr>
+<tr><td>AWS + Kubernetes</td><td><strong>43.1%</strong></td><td>285</td></tr>
+<tr><td>all three</td><td><strong>37.3%</strong></td><td>247</td></tr>
+</tbody>
+</table></div>
+<p>So not nine in ten. But <strong>more than a third of UK DevOps adverts demand all three at once</strong>,
+      and each of the three is individually the most-named item in its category. The instinct to lean the
+      curriculum toward them was right; the 90% was not. My 12% was further from the truth than the
+      learner's 90% was.</p>
+</div>
+<h3>What this changes, beyond the numbers</h3>
+<p><strong>Jenkins is not a paragraph.</strong> I recommended one paragraph on the evidence of a single
+      posting in 147. It is named in 29.5% of UK DevOps adverts — the most-named CI tool, ahead of GitHub
+      Actions and GitLab. That recommendation was wrong and is withdrawn.</p>
+<p><strong>PowerShell exists.</strong> It never appeared in my first survey. A quarter of UK DevOps
+      adverts name it, which is the visible edge of a Windows-shop market that US startup boards do not
+      show at all.</p>
+<p><strong>The near-zeros did not all survive.</strong> I wrote that CloudWatch at zero was too wide a gap
+      to be a sampling artefact. It was a sampling artefact: 11.3% here. The Terraform-to-CloudFormation
+      ratio held its direction but not its size — 4.9:1, not 29:1. Relative ordering survived; the
+      magnitudes did not, including the ones I said would.</p>
+<p><strong>Azure is not a sidebar.</strong> At 45.2% it is named in nearly half of UK DevOps adverts.
+      Four hours of Azure literacy was sized against a 38% figure from a small EU subset and happens to
+      survive this, but it is the floor, not the answer.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Third survey, 5 October 2026 — the other half of the market</p>
+<h2>What direct employers ask for: 162 adverts, no agency in sight</h2>
+</div>
+<p>The Adzuna run measures a national aggregator where roughly three quarters of adverts are placed by
+      recruitment agencies. This one measures the opposite population and is <strong>0% agency by
+      construction</strong>, because every advert comes from a company's own hiring system. Three vendors
+      serve a public, key-free JSON endpoint per company:</p>
+<div class="tw"><table>
+<thead><tr><th>Vendor</th><th>Public endpoint, no key</th></tr></thead>
+<tbody>
+<tr><td class="key">Greenhouse</td><td><code>boards-api.greenhouse.io/v1/boards/</code><code>{slug}/jobs?content=true</code></td></tr>
+<tr><td class="key">Lever</td><td><code>api.lever.co/v0/postings/</code><code>{slug}?mode=json</code></td></tr>
+<tr><td class="key">Ashby</td><td><code>api.ashbyhq.com/posting-api/</code><code>job-board/{slug}</code></td></tr>
+</tbody>
+</table></div>
+<p>95 of 148 companies on a hand-written UK-and-Europe list resolved, giving <strong>9,333 postings</strong>,
+      of which <strong>162</strong> are DevOps-family roles by the same title rule the first survey used.
+      And the thing that makes this run worth more than the other two: the <strong>median advert is 7,231
+      characters</strong>, against Adzuna's 500-character truncation and the ~1,100 of a Hacker News post.
+      Nothing here is suppressed by brevity. These are measurements, not floors.</p>
+<div class="call warn">
+<h3>The limitation, which cannot be fixed by fetching more</h3>
+<p>The sampling frame is a list of companies I wrote by hand. It is not random, it cannot be, and it
+      skews toward firms well known enough for me to name. Read this as <em>“what engineering-led
+      employers ask for”</em>, not <em>“what the market asks for”</em>. The Adzuna run
+      answers the second question; this one does not and should not be quoted as if it did.</p>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Named in direct-employer DevOps adverts</th><th>Share of 162</th><th>Adverts</th></tr></thead>
+<tbody>
+<tr><td class="key">Kubernetes (any form)</td><td><strong>70.4%</strong></td><td>114</td></tr>
+<tr><td class="key">Terraform</td><td><strong>62.3%</strong></td><td>101</td></tr>
+<tr><td class="key">Observability (as a term)</td><td><strong>61.1%</strong></td><td>99</td></tr>
+<tr><td class="key">AWS</td><td><strong>57.4%</strong></td><td>93</td></tr>
+<tr><td class="key">Python</td><td><strong>57.4%</strong></td><td>93</td></tr>
+<tr><td class="key">Go / Golang</td><td><strong>54.3%</strong></td><td>88</td></tr>
+<tr><td class="key">GCP</td><td><strong>52.5%</strong></td><td>85</td></tr>
+<tr><td class="key">IaC (as a term)</td><td><strong>52.5%</strong></td><td>85</td></tr>
+<tr><td class="key">On-call / PagerDuty</td><td><strong>40.1%</strong></td><td>65</td></tr>
+<tr><td class="key">CI/CD (as a term)</td><td><strong>38.3%</strong></td><td>62</td></tr>
+<tr><td class="key">Linux</td><td><strong>37.0%</strong></td><td>60</td></tr>
+<tr><td class="key">Monitoring (as a term)</td><td><strong>36.4%</strong></td><td>59</td></tr>
+<tr><td class="key">Azure</td><td><strong>35.8%</strong></td><td>58</td></tr>
+<tr><td class="key">Prometheus</td><td><strong>29.6%</strong></td><td>48</td></tr>
+<tr><td class="key">Docker</td><td><strong>27.2%</strong></td><td>44</td></tr>
+<tr><td class="key">SLO / SLI / error budget</td><td><strong>25.9%</strong></td><td>42</td></tr>
+<tr><td class="key">Argo CD / Flux / GitOps</td><td><strong>25.3%</strong></td><td>41</td></tr>
+<tr><td class="key">Grafana</td><td><strong>20.4%</strong></td><td>33</td></tr>
+<tr><td class="key">ELK / Elastic / OpenSearch</td><td><strong>18.5%</strong></td><td>30</td></tr>
+<tr><td class="key">Networking (VPC/DNS/TLS/LB)</td><td><strong>16.7%</strong></td><td>27</td></tr>
+<tr><td class="key">Ansible</td><td><strong>15.4%</strong></td><td>25</td></tr>
+<tr><td class="key">Helm</td><td><strong>14.8%</strong></td><td>24</td></tr>
+<tr><td class="key">Java / JVM</td><td><strong>14.8%</strong></td><td>24</td></tr>
+<tr><td class="key">GitHub Actions</td><td><strong>14.2%</strong></td><td>23</td></tr>
+<tr><td class="key">OpenTelemetry</td><td><strong>14.2%</strong></td><td>23</td></tr>
+<tr><td class="key">Datadog</td><td><strong>13.6%</strong></td><td>22</td></tr>
+<tr><td class="key">Ruby</td><td><strong>12.3%</strong></td><td>20</td></tr>
+<tr><td class="key">PostgreSQL</td><td><strong>12.3%</strong></td><td>20</td></tr>
+<tr><td class="key">Node / TypeScript</td><td><strong>11.7%</strong></td><td>19</td></tr>
+<tr><td class="key">Service mesh</td><td><strong>9.9%</strong></td><td>16</td></tr>
+</tbody>
+</table></div>
+<p class="note">Go at 54.3% was checked by hand rather than trusted, because a bare “Go” is the
+      kind of token that ruined two earlier runs. All 24 inspected matches were the language —
+      “programming in Golang”, “Python or Go”, “Go-based tooling”. The
+      figure stands.</p>
+<div class="call stop">
+<h3>The two populations, side by side — and this is the real finding</h3>
+<p>Only phrases both surveys can express the same way are compared. The multiplier is direct-employer
+      share divided by aggregator share.</p>
+<div class="tw"><table>
+<thead><tr><th>Technology</th><th>Aggregator<br/>(662, 77% agency)</th><th>Direct employers<br/>(162, 0% agency)</th><th>Ratio</th><th>Skews toward</th></tr></thead>
+<tbody>
+<tr><td>OpenTofu</td><td>0.6%</td><td>6.8%</td><td><strong>×11.3</strong></td><td>direct employers</td></tr>
+<tr><td>OpenTelemetry</td><td>3.3%</td><td>14.2%</td><td><strong>×4.3</strong></td><td>direct employers</td></tr>
+<tr><td>Pulumi</td><td>2.7%</td><td>8.0%</td><td><strong>×3.0</strong></td><td>direct employers</td></tr>
+<tr><td>PostgreSQL</td><td>5.7%</td><td>12.3%</td><td><strong>×2.2</strong></td><td>direct employers</td></tr>
+<tr><td>Datadog</td><td>8.0%</td><td>13.6%</td><td><strong>×1.7</strong></td><td>direct employers</td></tr>
+<tr><td>Observability (the word)</td><td>39.3%</td><td>61.1%</td><td><strong>×1.6</strong></td><td>direct employers</td></tr>
+<tr><td>Prometheus</td><td>21.3%</td><td>29.6%</td><td><strong>×1.4</strong></td><td>neither — within noise</td></tr>
+<tr><td>Kafka</td><td>5.1%</td><td>6.2%</td><td><strong>×1.2</strong></td><td>neither — within noise</td></tr>
+<tr><td>Kubernetes</td><td>62.1%</td><td>70.4%</td><td><strong>×1.1</strong></td><td>neither — within noise</td></tr>
+<tr><td>Python</td><td>52.7%</td><td>57.4%</td><td><strong>×1.1</strong></td><td>neither — within noise</td></tr>
+<tr><td>Linux</td><td>36.9%</td><td>37.0%</td><td><strong>×1.0</strong></td><td>neither — within noise</td></tr>
+<tr><td>AWS</td><td>60.1%</td><td>57.4%</td><td><strong>×1.0</strong></td><td>neither — within noise</td></tr>
+<tr><td>Grafana</td><td>22.1%</td><td>20.4%</td><td><strong>×0.9</strong></td><td>neither — within noise</td></tr>
+<tr><td>Terraform</td><td>70.4%</td><td>62.3%</td><td><strong>×0.9</strong></td><td>neither — within noise</td></tr>
+<tr><td>Azure</td><td>45.2%</td><td>35.8%</td><td><strong>×0.8</strong></td><td>neither — within noise</td></tr>
+<tr><td>EKS</td><td>14.2%</td><td>7.4%</td><td><strong>×0.5</strong></td><td>the aggregator</td></tr>
+<tr><td>Ansible</td><td>31.9%</td><td>15.4%</td><td><strong>×0.5</strong></td><td>the aggregator</td></tr>
+<tr><td>Terragrunt</td><td>2.1%</td><td>0.6%</td><td><strong>×0.3</strong></td><td>the aggregator</td></tr>
+<tr><td>Jenkins</td><td>29.5%</td><td>4.9%</td><td><strong>×0.2</strong></td><td>the aggregator</td></tr>
+<tr><td>CloudWatch</td><td>11.3%</td><td>1.2%</td><td><strong>×0.1</strong></td><td>the aggregator</td></tr>
+<tr><td>Splunk</td><td>8.2%</td><td>0.6%</td><td><strong>×0.1</strong></td><td>the aggregator</td></tr>
+</tbody>
+</table></div>
+<p><strong>The core does not move.</strong> AWS, Kubernetes, Terraform, Python and Linux land within ten
+      per cent of each other in both populations. Whatever market you end up in, that is the stack, and
+      that is the strongest evidence this course has produced for the shape of the curriculum.</p>
+<p><strong>Everything that moves, moves along one axis.</strong> Cloud-native and observability tooling
+      skews to direct employers — OpenTofu ×11, OpenTelemetry ×4.3, Pulumi ×3, Datadog
+      ×1.7, the word “observability” itself ×1.6. Enterprise and legacy tooling skews
+      to the aggregator — Jenkins ×0.2, CloudWatch ×0.1, Splunk ×0.1, Ansible
+      ×0.5. These are not two samples of one market. They are two markets.</p>
+</div>
+<h3>What that means for the plan</h3>
+<p><strong>The Jenkins question has an answer now.</strong> I withdrew the “one paragraph”
+      recommendation an hour ago on the aggregator's 29.5%. Direct employers name it in 4.9%. Both are
+      true: Jenkins is how you get through an agency screen for an enterprise role, and nearly absent at
+      product companies. Learn enough to discuss it; do not spend a module on it.</p>
+<p><strong>SRE practice vocabulary is almost invisible on the aggregator and everywhere at product
+      companies.</strong> On-call appears in 40.1% of direct-employer adverts and SLOs in 25.9%. Those are
+      practices rather than tools, they cannot be picked up from documentation, and they are what the
+      interview will actually probe.</p>
+<p><strong>Go is not optional at this end of the market.</strong> 54.3%, second only to Python. I
+      previously called it “worth reading fluently, not worth writing well” on a 17% figure
+      from the Hacker News corpus. At product companies it is half the adverts, and the reading-fluency
+      recommendation is the floor rather than the target.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Consequences</p>
+<h2>Five changes to the curriculum, and three things that stay</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Change</th><th>From</th><th>To</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td><strong>Azure literacy sidebar</strong></td><td>nothing</td><td>+4 h, in phase 2</td><td>38% of the EU subset and 24% of all cloud-naming postings. Not a second cloud to learn — enough to map the service names, explain the differences that matter, and answer "we're on Azure, is that a problem?" without flinching.</td></tr>
+<tr><td>Ansible</td><td>2 h sidebar</td><td>5 h module-let</td><td>12% overall, 19% in the EU subset — more than I assumed, and the second-most-named IaC tool. Enough to write a playbook and say precisely why it is not a Terraform competitor.</td></tr>
+<tr><td>EKS module</td><td>10 h</td><td>8 h</td><td>Named explicitly in only 5%. Keeps its place because AWS + Kubernetes co-occur in 19%, but it need not be the longest module in the phase.</td></tr>
+<tr><td>Scripting track</td><td>Bash and Python, generic</td><td>Python-first, with Go reading fluency</td><td>Python 33%, Go 17%, Bash 8%. Your existing strength is the single most-named skill after Kubernetes.</td></tr>
+<tr><td>Jenkins</td><td>mentioned in module 26</td><td class="key">WITHDRAWN — see the second survey</td><td>1% here; <strong>29.5% of 662 UK adverts</strong>, the most-named CI tool of all. One posting in 147 was not evidence.</td></tr>
+</tbody>
+</table></div>
+<div class="split">
+<div class="card">
+<p class="tag">Unchanged</p>
+<h3>Kubernetes keeps its eight weeks</h3>
+<p>41% — the most-named technology in the survey, ahead of every cloud. A third of the plan is
+        correct.</p>
+</div>
+<div class="card">
+<p class="tag">Unchanged</p>
+<h3>Prometheus and Grafana keep the Operate phase</h3>
+<p>Validated hard. CloudWatch, Splunk and New Relic appear in zero postings between them.</p>
+</div>
+<div class="card">
+<p class="tag">Unchanged</p>
+<h3>The drills stay</h3>
+<p>Nothing in a job advert measures whether you can debug. Module 24 remains the module most likely
+        to convert an interview.</p>
+</div>
+</div>
+<p>Net effect on hours: +7 for the Azure and Ansible additions, −2 from EKS, so Phase 2 grows by about
+      five hours and the plan stays inside its 24 weeks. The AWS–Terraform–Kubernetes share moves from 67%
+      to roughly 65% — slightly <em>less</em> concentrated than v3, which is what the evidence actually
+      supports.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The uncomfortable finding</p>
+<h2>Twenty-nine per cent of adverts name no technology at all</h2>
+</div>
+<p>Forty-two of the 147 postings mention no cloud, no orchestrator, no language and no tool. They ask
+      for "a strong infrastructure background", "experience owning production systems", "someone who has
+      scaled a platform". Those postings cannot be matched by keyword, and they are nearly a third of
+      the market.</p>
+<p>Which tells you something the technology table cannot. For that third, the filter is not your skill
+      list — it is whether your CV and your project read like someone who has <em>operated</em> something.
+      That is what the project track and the three postmortems in Module 31 are for, and it is the half of
+      the preparation that keyword-counting makes invisible.</p>
+<div class="call">
+<h3>And the seniority note</h3>
+<p>Across the sample, "senior" appears far more often than "mid" or "junior" — which is partly real
+        and partly that almost nobody advertises a role as mid-level; they advertise "DevOps Engineer" and
+        decide the level in the interview. Do not filter yourself out of postings that say senior. Apply,
+        and let them calibrate you.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Reproduce it</p>
+<h2>The survey is a script, so re-run it in three months</h2>
+</div>
+<div class="code"><span class="c"># fetch 12 months of HN "Who is hiring", plus EU and remote boards</span>
+uv run assets/scripts/jobsurvey.py --fetch
+
+<span class="c"># count, with the title filter and the pure/multi-role split</span>
+uv run assets/scripts/jobsurvey.py --count
+
+<span class="c"># 5,393 postings scanned, 147 DevOps-titled, 24 technologies ranked</span></div>
+<p>The corpus is a moving target — Hacker News adds a thread every month, and the whole point of this
+      exercise is that a claim about the job market decays. Re-running it in February tells you whether
+      Kubernetes is still at 41% and whether OpenTofu has moved off 1%. The script is in the repo so that
+      the answer in three months is a measurement rather than a memory.</p>
+</section>
+<footer>
+<p>Survey · AWS + DevOps course · 5 October 2026</p>
+<p>Corpus: 5,393 job postings scanned, 147 retained. Sources: Hacker News "Ask HN: Who is hiring?"
+      monthly threads for November 2025 to October 2026 via the Algolia API (3,662 postings, 113
+      retained); arbeitnow's public job-board API, EU and predominantly German (1,450 scanned, 26
+      retained); RemoteOK's public API (281 scanned, 8 retained, its own tag filter discarded as
+      unreliable). Retention rule: a DevOps-family role named in the posting title, excluding postings
+      that also advertise non-infrastructure engineering roles in the same title.</p>
+<p>All percentages are the share of the 147 retained postings mentioning a term at least once,
+      case-insensitive, counted once per posting. The sample is a convenience sample, not a random one;
+      77% of it is Hacker News, which skews to US startups and scale-ups and away from enterprise
+      tooling. Posting length skews the figures downward: the median retained posting is 1,132 characters
+      against the three to six thousand typical of a corporate job description, so these shares are a
+      floor and the ranking is the durable part.</p>
+<p>Reproducible: <code>assets/scripts/jobsurvey.py</code>. Chart palette validated with the
+      visualisation skill's checker for contrast against both light and dark surfaces; every bar carries
+      its own percentage so identity never depends on colour.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

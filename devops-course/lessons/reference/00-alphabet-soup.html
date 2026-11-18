@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Alphabet Soup</title>
+<link rel="icon" href="../../assets/img/favicon-reference.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/00-alphabet-soup.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Reference sheet · AWS + DevOps course</p>
+<h1>Alphabet Soup</h1>
+<p class="lede">Every abbreviation this course has used or will use, expanded — with the
+    one thing about each that actually matters. Green marks the ones already taught; the rest
+    are ahead of you.</p>
+<div class="facts">
+<span class="fact">grouped by domain</span>
+<span class="fact">type to filter</span>
+<span class="fact">updated 2026-09-13</span>
+</div>
+</header>
+<div class="filter">
+<input aria-label="Filter the glossary" id="q" placeholder="filter — try kms, network, policy, key…" type="search"/>
+<span class="count" id="count"></span>
+</div>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Identity &amp; access</p><h2>Who you are, what you may do</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">IAM <span class="seen">taught</span></span><span class="ex"><b>Identity and Access Management</b> — <i>global service; the ARN's region field is empty. Controls every request in the account.</i></span></div>
+<div class="gi"><span class="ab">STS <span class="seen">taught</span></span><span class="ex"><b>Security Token Service</b> — <i>mints temporary credentials. The doorman that checks a role's trust policy.</i></span></div>
+<div class="gi"><span class="ab">ARN <span class="seen">taught</span></span><span class="ex"><b>Amazon Resource Name</b> — <i><code>arn:partition:service:region:account:resource</code>. An empty region means a global service.</i></span></div>
+<div class="gi"><span class="ab">MFA <span class="seen">taught</span></span><span class="ex"><b>Multi-Factor Authentication</b> — <i>protects sign-in and any API call whose policy demands <code>aws:MultiFactorAuthPresent</code>. Not the credential itself.</i></span></div>
+<div class="gi"><span class="ab">TOTP <span class="seen">taught</span></span><span class="ex"><b>Time-based One-Time Password</b> — <i>the 6-digit authenticator-app kind. Your <code>al-iphone</code> and <code>root-phone-totp</code> devices.</i></span></div>
+<div class="gi"><span class="ab">FIDO2 / WebAuthn <span class="seen">taught</span></span><span class="ex"><b>the passkey standard</b> — <i>asymmetric, phishing-resistant. Root's other MFA device, held in Google Password Manager.</i></span></div>
+<div class="gi"><span class="ab">SigV4 <span class="seen">taught</span></span><span class="ex"><b>Signature Version 4</b> — <i>AWS request signing. Symmetric: AWS holds a copy of your secret, unlike SSH.</i></span></div>
+<div class="gi"><span class="ab">HMAC <span class="seen">taught</span></span><span class="ex"><b>Hash-based Message Authentication Code</b> — <i>the secret is the key you hash <em>with</em>, not the thing hashed.</i></span></div>
+<div class="gi"><span class="ab">OIDC <span class="seen">taught</span></span><span class="ex"><b>OpenID Connect</b> — <i>identity layer over OAuth 2.0. How GitHub Actions and EKS pods get AWS credentials with no stored secret.</i></span></div>
+<div class="gi"><span class="ab">JWT <span class="seen">taught</span></span><span class="ex"><b>JSON Web Token</b> — <i>signed claims. The ones that matter: <code>iss</code>, <code>sub</code>, <code>aud</code>, <code>exp</code>.</i></span></div>
+<div class="gi"><span class="ab">IRSA <span class="seen">taught</span></span><span class="ex"><b>IAM Roles for Service Accounts</b> — <i>EKS pods assume roles via OIDC. Your <code>app_role</code> is scoped this way, minus the <code>aud</code> condition.</i></span></div>
+<div class="gi"><span class="ab">SAML</span><span class="ex"><b>Security Assertion Markup Language</b> — <i>the older XML federation standard. Corporate SSO into AWS still often uses it.</i></span></div>
+<div class="gi"><span class="ab">SCP</span><span class="ex"><b>Service Control Policy</b> — <i>Organizations-only. Sets a permission <em>ceiling</em> for whole accounts; never grants anything.</i></span></div>
+<div class="gi"><span class="ab">RBAC / ABAC</span><span class="ex"><b>Role- / Attribute-Based Access Control</b> — <i>permissions by role, or by tag-matching conditions. ABAC scales better in large orgs.</i></span></div>
+<div class="gi"><span class="ab">IdC / SSO</span><span class="ex"><b>IAM Identity Center</b> (formerly AWS SSO) — <i>the role-assumption pattern from Lesson 2.5, with a login page in front.</i></span></div>
+<div class="gi"><span class="ab">AKIA / ASIA <span class="seen">taught</span></span><span class="ex"><b>access key prefixes</b> — <i><code>AKIA</code> = permanent IAM user key. <code>ASIA</code> = temporary STS credentials, needs a session token too.</i></span></div>
+<div class="gi"><span class="ab">IMDS</span><span class="ex"><b>Instance Metadata Service</b> — <i><code>169.254.169.254</code>. IMDSv1's lack of session tokens caused the 2019 Capital One breach; always require v2.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Encryption &amp; secrets</p><h2>Keys, and who holds them</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">KMS <span class="seen">taught</span></span><span class="ex"><b>Key Management Service</b> — <i>regional. Holds keys that never leave it; you send it small things, never your data.</i></span></div>
+<div class="gi"><span class="ab">CMK <span class="seen">taught</span></span><span class="ex"><b>Customer Master Key</b> — <i><strong>legacy term.</strong> AWS now says "KMS key" or "customer managed key". Your Terraform comments still say CMK, as does most of the internet.</i></span></div>
+<div class="gi"><span class="ab">DEK <span class="seen">taught</span></span><span class="ex"><b>Data Encryption Key</b> — <i>the 256-bit key that actually encrypts your object. Returned by <code>GenerateDataKey</code> twice: plaintext and wrapped.</i></span></div>
+<div class="gi"><span class="ab">SSE <span class="seen">taught</span></span><span class="ex"><b>Server-Side Encryption</b> — <i>SSE-S3 (AWS's key), SSE-KMS (a KMS key), SSE-C (you supply the key per request).</i></span></div>
+<div class="gi"><span class="ab">DSSE-KMS</span><span class="ex"><b>Dual-layer SSE</b> — <i>two independent encryption layers for regulated workloads. Roughly double the KMS cost.</i></span></div>
+<div class="gi"><span class="ab">CSE</span><span class="ex"><b>Client-Side Encryption</b> — <i>you encrypt before upload. AWS never sees plaintext — and never helps you recover it.</i></span></div>
+<div class="gi"><span class="ab">HSM</span><span class="ex"><b>Hardware Security Module</b> — <i>tamper-resistant key hardware. CloudHSM is the single-tenant option when KMS's shared model won't pass audit.</i></span></div>
+<div class="gi"><span class="ab">AES-256 <span class="seen">taught</span></span><span class="ex"><b>Advanced Encryption Standard</b> — <i>the symmetric cipher behind SSE. "AES256" in an S3 response means SSE-S3.</i></span></div>
+<div class="gi"><span class="ab">TLS <span class="seen">taught</span></span><span class="ex"><b>Transport Layer Security</b> — <i>encryption <em>in transit</em>. Independent of encryption at rest; enforce with <code>aws:SecureTransport</code>.</i></span></div>
+<div class="gi"><span class="ab">ACM</span><span class="ex"><b>AWS Certificate Manager</b> — <i>free public TLS certs that auto-renew, usable only by AWS services (ALB, CloudFront, API Gateway).</i></span></div>
+<div class="gi"><span class="ab">SSM</span><span class="ex"><b>Systems Manager</b> — <i>Parameter Store lives here: cheap config and secrets. Secrets Manager is the pricier one with rotation built in.</i></span></div>
+<div class="gi"><span class="ab">WORM <span class="seen">taught</span></span><span class="ex"><b>Write Once Read Many</b> — <i>S3 Object Lock. Blocks deletion even by root for a retention period. The real ransomware control.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Storage</p><h2>Where bytes live</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">S3 <span class="seen">taught</span></span><span class="ex"><b>Simple Storage Service</b> — <i>object store. Global namespace, regional data, flat keys.</i></span></div>
+<div class="gi"><span class="ab">EBS</span><span class="ex"><b>Elastic Block Store</b> — <i>a virtual disk for one EC2 instance. AZ-bound; a snapshot is how it crosses.</i></span></div>
+<div class="gi"><span class="ab">EFS <span class="seen">taught</span></span><span class="ex"><b>Elastic File System</b> — <i>NFS with real directories and instant rename — at roughly 13× S3's price per GB.</i></span></div>
+<div class="gi"><span class="ab">IA</span><span class="ex"><b>Infrequent Access</b> — <i>S3 Standard-IA, One Zone-IA. Cheaper storage, charged per retrieval, 30-day minimum.</i></span></div>
+<div class="gi"><span class="ab">CRR / SRR</span><span class="ex"><b>Cross- / Same-Region Replication</b> — <i>the only thing that survives losing a region or an account. Requires versioning.</i></span></div>
+<div class="gi"><span class="ab">ETag <span class="seen">taught</span></span><span class="ex"><b>Entity Tag</b> — <i>an object's version fingerprint. The MD5 for simple uploads — but <em>not</em> for multipart or SSE-KMS objects.</i></span></div>
+<div class="gi"><span class="ab">MPU <span class="seen">taught</span></span><span class="ex"><b>Multipart Upload</b> — <i>large objects in parts. Unfinished ones bill forever and are invisible in listings; abort them with a lifecycle rule.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Compute &amp; containers</p><h2>Where code runs</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">EC2</span><span class="ex"><b>Elastic Compute Cloud</b> — <i>virtual machines. The oldest and most configurable option, and the one you manage most.</i></span></div>
+<div class="gi"><span class="ab">ECS</span><span class="ex"><b>Elastic Container Service</b> — <i>AWS's own container orchestrator. Simpler than Kubernetes, AWS-only.</i></span></div>
+<div class="gi"><span class="ab">EKS <span class="seen">taught</span></span><span class="ex"><b>Elastic Kubernetes Service</b> — <i>managed Kubernetes. Control plane bills $0.10/hr whether or not anything runs — your August credit burn.</i></span></div>
+<div class="gi"><span class="ab">ECR <span class="seen">taught</span></span><span class="ex"><b>Elastic Container Registry</b> — <i>private Docker registry. In your Terraform, deliberately unsuffixed so all workspaces share one.</i></span></div>
+<div class="gi"><span class="ab">AMI</span><span class="ex"><b>Amazon Machine Image</b> — <i>the boot image for an EC2 instance. Region-scoped; must be copied to travel.</i></span></div>
+<div class="gi"><span class="ab">ASG</span><span class="ex"><b>Auto Scaling Group</b> — <i>keeps N instances alive across AZs and replaces unhealthy ones.</i></span></div>
+<div class="gi"><span class="ab">OCI</span><span class="ex"><b>Open Container Initiative</b> — <i>the image and runtime spec. "OCI image" means the standard Docker made and then standardised.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Networking</p><h2>Module 6, and most surprise bills</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">VPC</span><span class="ex"><b>Virtual Private Cloud</b> — <i>your private network inside a region. Everything with an IP lives in one.</i></span></div>
+<div class="gi"><span class="ab">AZ <span class="seen">taught</span></span><span class="ex"><b>Availability Zone</b> — <i>an independent failure domain. Names like <code>us-east-1a</code> are shuffled per account; AZ <em>IDs</em> are the stable ones.</i></span></div>
+<div class="gi"><span class="ab">CIDR</span><span class="ex"><b>Classless Inter-Domain Routing</b> — <i>the <code>10.0.0.0/16</code> notation. The <code>/n</code> counts fixed bits; smaller n = bigger network.</i></span></div>
+<div class="gi"><span class="ab">SG</span><span class="ex"><b>Security Group</b> — <i><strong>stateful</strong> instance firewall. Allow-only. Return traffic is automatic.</i></span></div>
+<div class="gi"><span class="ab">NACL</span><span class="ex"><b>Network Access Control List</b> — <i><strong>stateless</strong> subnet firewall. Allow <em>and</em> deny, and you must write both directions.</i></span></div>
+<div class="gi"><span class="ab">IGW / NAT</span><span class="ex"><b>Internet Gateway / Network Address Translation</b> — <i>IGW is free; NAT Gateway costs ~$0.045/hr <em>plus</em> ~$0.045/GB processed.</i></span></div>
+<div class="gi"><span class="ab">VPCe</span><span class="ex"><b>VPC Endpoint</b> — <i>reach AWS services without the internet. The S3 <em>Gateway</em> endpoint is free — use it instead of routing S3 traffic through NAT.</i></span></div>
+<div class="gi"><span class="ab">ENI</span><span class="ex"><b>Elastic Network Interface</b> — <i>a virtual NIC. Pods on EKS get real VPC IPs through these, which is why IP exhaustion is an EKS concern.</i></span></div>
+<div class="gi"><span class="ab">ALB / NLB</span><span class="ex"><b>Application / Network Load Balancer</b> — <i>ALB understands HTTP and routes on paths and headers; NLB is layer 4, faster, and preserves source IP.</i></span></div>
+<div class="gi"><span class="ab">CDN</span><span class="ex"><b>Content Delivery Network</b> — <i>CloudFront. Also the cheap path for egress: origin→CloudFront transfer is free.</i></span></div>
+<div class="gi"><span class="ab">WAF <span class="seen">taught</span></span><span class="ex"><b>Web Application Firewall</b> — <i>layer-7 filtering. Global when attached to CloudFront, regional on an ALB.</i></span></div>
+<div class="gi"><span class="ab">TGW / DX</span><span class="ex"><b>Transit Gateway / Direct Connect</b> — <i>hub for many VPCs; dedicated private line from your own datacentre.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Data stores</p><h2>Tables, and what they charge for</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">DDB <span class="seen">taught</span></span><span class="ex"><b>DynamoDB</b> — <i>managed NoSQL. Single-digit-millisecond reads if your access pattern matches the key design; painful if it doesn't.</i></span></div>
+<div class="gi"><span class="ab">PK / SK</span><span class="ex"><b>Partition Key / Sort Key</b> — <i>together the primary key. The partition key decides which physical partition holds the item — choose it badly and you get a hot partition.</i></span></div>
+<div class="gi"><span class="ab">GSI / LSI</span><span class="ex"><b>Global / Local Secondary Index</b> — <i>query by something other than the primary key. A GSI is a separate replica with its own capacity and cost.</i></span></div>
+<div class="gi"><span class="ab">RCU / WCU</span><span class="ex"><b>Read / Write Capacity Unit</b> — <i>provisioned mode. 1 WCU = one 1 KB write per second; 1 RCU = one 4 KB strongly-consistent read.</i></span></div>
+<div class="gi"><span class="ab">RRU / WRU</span><span class="ex"><b>Read / Write Request Unit</b> — <i>on-demand mode: same units, billed per request instead of reserved. ~$1.25 per million writes.</i></span></div>
+<div class="gi"><span class="ab">TTL</span><span class="ex"><b>Time To Live</b> — <i>DynamoDB deletes expired items for free, eventually — up to 48 hours late. Not a scheduler.</i></span></div>
+<div class="gi"><span class="ab">RDS</span><span class="ex"><b>Relational Database Service</b> — <i>managed Postgres/MySQL/etc. Aurora is AWS's own engine with storage split from compute.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Reliability &amp; observability</p><h2>Modules 12 and 13</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">SLI / SLO / SLA</span><span class="ex"><b>Indicator / Objective / Agreement</b> — <i>what you measure, the target you set, the contract with money attached. Your SLO should be stricter than your SLA.</i></span></div>
+<div class="gi"><span class="ab">RTO / RPO</span><span class="ex"><b>Recovery Time / Point Objective</b> — <i>how long until you're back, versus how much data you can afford to lose. Different questions; people conflate them.</i></span></div>
+<div class="gi"><span class="ab">MTTR / MTBF</span><span class="ex"><b>Mean Time To Recovery / Between Failures</b> — <i>modern SRE optimises the first; you cannot make failures stop.</i></span></div>
+<div class="gi"><span class="ab">p50 / p99</span><span class="ex"><b>percentile latency</b> — <i>p99 = the slowest 1%. Averages hide exactly the requests your users complain about.</i></span></div>
+<div class="gi"><span class="ab">CW <span class="seen">taught</span></span><span class="ex"><b>CloudWatch</b> — <i>metrics, logs, alarms. Custom metrics and log ingestion are where the bill comes from, not the dashboards.</i></span></div>
+<div class="gi"><span class="ab">OTel</span><span class="ex"><b>OpenTelemetry</b> — <i>vendor-neutral tracing and metrics. The reason you don't have to rewrite instrumentation when you change backend.</i></span></div>
+<div class="gi"><span class="ab">CloudTrail <span class="seen">taught</span></span><span class="ex"><b>the audit log of API calls</b> — <i>who called what, when, from where. Where a <code>Decrypt</code> or <code>AssumeRole</code> shows up with its caller identity.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Delivery &amp; supply chain</p><h2>Modules 8, 9 and 11</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">IaC <span class="seen">taught</span></span><span class="ex"><b>Infrastructure as Code</b> — <i>the infrastructure is a reviewable artefact, not a memory of what someone clicked.</i></span></div>
+<div class="gi"><span class="ab">HCL <span class="seen">taught</span></span><span class="ex"><b>HashiCorp Configuration Language</b> — <i>what your <code>.tf</code> files are written in.</i></span></div>
+<div class="gi"><span class="ab">CFN / CDK</span><span class="ex"><b>CloudFormation / Cloud Development Kit</b> — <i>AWS's own IaC, and a way to generate it from TypeScript or Python.</i></span></div>
+<div class="gi"><span class="ab">CI / CD</span><span class="ex"><b>Continuous Integration / Delivery</b> — <i>CI proves the change is sound; CD gets it to production.</i></span></div>
+<div class="gi"><span class="ab">SBOM</span><span class="ex"><b>Software Bill of Materials</b> — <i>the manifest of everything inside your image. Answers "are we affected?" in minutes rather than days.</i></span></div>
+<div class="gi"><span class="ab">CVE</span><span class="ex"><b>Common Vulnerabilities and Exposures</b> — <i>the public ID for a known flaw, e.g. <code>CVE-2021-44228</code> (Log4Shell).</i></span></div>
+<div class="gi"><span class="ab">SAST / DAST</span><span class="ex"><b>Static / Dynamic Application Security Testing</b> — <i>reading the code versus attacking the running thing.</i></span></div>
+<div class="gi"><span class="ab">GitOps</span><span class="ex"><b>git as the source of truth for deploys</b> — <i>a controller reconciles the cluster toward the repo, so drift is visible as a diff.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Kubernetes</p><h2>Module 10, from zero</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">K8s</span><span class="ex"><b>Kubernetes</b> — <i>"K" + 8 letters + "s". Not a word anyone says out loud except as "kates".</i></span></div>
+<div class="gi"><span class="ab">SA <span class="seen">taught</span></span><span class="ex"><b>ServiceAccount</b> — <i>a pod's identity inside the cluster. The <code>sub</code> claim in an IRSA token names one.</i></span></div>
+<div class="gi"><span class="ab">HPA / VPA</span><span class="ex"><b>Horizontal / Vertical Pod Autoscaler</b> — <i>more pods, or bigger pods. Horizontal is almost always the right instinct.</i></span></div>
+<div class="gi"><span class="ab">PDB</span><span class="ex"><b>Pod Disruption Budget</b> — <i>the minimum that must stay up during voluntary disruption — node drains, upgrades. Not crashes.</i></span></div>
+<div class="gi"><span class="ab">CRD</span><span class="ex"><b>Custom Resource Definition</b> — <i>teaches the API new object types. How operators extend Kubernetes.</i></span></div>
+<div class="gi"><span class="ab">CNI</span><span class="ex"><b>Container Network Interface</b> — <i>the pod networking plugin. On EKS it gives pods real VPC IPs, which is why subnet sizing matters.</i></span></div>
+</div>
+</section>
+<section data-g="">
+<div class="sec-head"><p class="eyebrow">Cost &amp; compliance</p><h2>Module 14, and the words lawyers use</h2></div>
+<div class="gl">
+<div class="gi"><span class="ab">FinOps</span><span class="ex"><b>cloud financial operations</b> — <i>treating spend as an engineering metric with an owner, not a monthly surprise.</i></span></div>
+<div class="gi"><span class="ab">RI / SP</span><span class="ex"><b>Reserved Instance / Savings Plan</b> — <i>commit to spend for 1–3 years for up to ~70% off. Savings Plans are the flexible successor.</i></span></div>
+<div class="gi"><span class="ab">TCO</span><span class="ex"><b>Total Cost of Ownership</b> — <i>including the engineer-days. The $10 S3 rename that costs three deploys is the example.</i></span></div>
+<div class="gi"><span class="ab">GDPR <span class="seen">taught</span></span><span class="ex"><b>General Data Protection Regulation</b> — <i>data protection, not "digital rights". Does <strong>not</strong> require EU data to stay in the EU.</i></span></div>
+<div class="gi"><span class="ab">SCC / DPF <span class="seen">taught</span></span><span class="ex"><b>Standard Contractual Clauses / EU-US Data Privacy Framework</b> — <i>the two lawful routes for transferring EU personal data to the US.</i></span></div>
+<div class="gi"><span class="ab">DORA <span class="seen">taught</span></span><span class="ex"><b>Digital Operational Resilience Act</b> — <i>EU financial-sector rules on ICT risk and third-party concentration. Bites harder than GDPR on cloud choice.</i></span></div>
+<div class="gi"><span class="ab">EIOPA / IVASS <span class="seen">taught</span></span><span class="ex"><b>EU insurance regulator / its Italian national counterpart</b> — <i>where cloud-outsourcing guidance for insurers actually comes from.</i></span></div>
+</div>
+</section>
+<footer>
+<p>Reference sheet · syllabus and progress log in <code>docs/AWS_COURSE.md</code> ·
+    term-pair drill in <code>docs/INTERVIEW_PRACTICE.md</code></p>
+<p><span class="chip ok">taught</span> marks what this course has already covered. Everything
+    else is ahead — Modules 6 (networking), 10 (Kubernetes) and 14 (cost) account for most of it.</p>
+</footer>
+</div>
+<script src="../../assets/js/00-alphabet-soup.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+.steps .step ul{margin:.5rem 0 0;padding-left:1.1rem;display:flex;flex-direction:column;gap:.35rem;}
+.steps .step li{font-size:.92rem;color:var(--ink-2);}
+.steps .step h3{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem;}
+.steps .step h3 .chip{font-weight:600;}
+.chip{color:var(--muted);background:var(--surface-2);border-color:var(--rule-strong);}
+.hours{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.8rem;}
+.hours .card .n{font-family:"IBM Plex Mono",monospace;font-size:1.6rem;font-weight:600;
+  color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1;}

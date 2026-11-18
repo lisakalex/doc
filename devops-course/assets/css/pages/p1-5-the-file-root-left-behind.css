@@ -1,0 +1,21 @@
+/* lesson 1.5: the file root left behind */
+.facts{display:flex;flex-wrap:wrap;gap:.5rem;}
+.fact{font-family:"IBM Plex Mono",monospace;font-size:.72rem;font-weight:500;padding:.22rem .55rem;border:1px solid var(--rule-strong);border-radius:4px;color:var(--ink-2);background:var(--surface);}
+.ladder{display:flex;flex-direction:column;border:1px solid var(--rule);border-radius:7px;overflow:hidden;background:var(--surface);}
+.rung{display:grid;grid-template-columns:2.2rem 1fr;gap:.8rem;padding:.85rem 1rem;border-bottom:1px solid var(--rule);}
+.rung:last-child{border-bottom:none;}
+.rung .s{font-family:"IBM Plex Mono",monospace;font-size:.8rem;font-weight:600;color:var(--accent);padding-top:.1rem;}
+.rung p{font-size:.93rem;color:var(--ink-2);}
+.rung .who{font-family:"IBM Plex Mono",monospace;font-size:.66rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.15rem;}
+ol.todo,ul.todo{margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.55rem;max-width:68ch;}
+ol.todo li,ul.todo li{font-size:.94rem;color:var(--ink-2);}
+h3 .muted{font-weight:400;color:var(--muted);font-size:.82em;}
+/* one mode string, split into its four fields */
+.bits{display:grid;grid-template-columns:3.2rem repeat(3,minmax(0,1fr));max-width:30rem;border:1px solid var(--rule-strong);border-radius:6px;overflow:hidden;background:var(--surface);}
+.bits span{display:flex;flex-direction:column;align-items:center;gap:.2rem;padding:.6rem .3rem;font-family:"IBM Plex Mono",monospace;font-size:1.15rem;font-weight:600;color:var(--ink);}
+.bits span+span{border-left:1px solid var(--rule-strong);}
+.bits small{font-size:.62rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+.bits .o{background:var(--accent-soft);color:var(--accent-ink);}
+.bits .g{background:var(--good-soft);color:var(--good);}
+.bits .x{background:var(--warn-soft);color:var(--warn);}
+td.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap;}

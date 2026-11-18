@@ -1,0 +1,16 @@
+/* lesson 0.1a: four causes, each with mechanism and fix */
+.kind{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.66rem;font-weight:600;
+  letter-spacing:.05em;padding:.16rem .45rem;border-radius:3px;white-space:nowrap;border:1px solid;}
+.kind.beh{color:var(--stop);background:var(--stop-soft);border-color:var(--stop-rule);}
+.kind.byt{color:var(--warn);background:var(--warn-soft);border-color:var(--warn-rule);}
+.cause{background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:1.2rem 1.2rem 1.1rem;
+  display:flex;flex-direction:column;gap:.8rem;}
+.cause .hd{display:flex;flex-wrap:wrap;align-items:baseline;gap:.6rem;}
+.cause .n{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--accent);}
+.cause ul{margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.45rem;max-width:65ch;}
+.cause li{font-size:.94rem;color:var(--ink-2);}
+.mech,.fix{border-left:3px solid var(--accent);padding:.55rem .85rem;background:var(--surface-2);border-radius:0 6px 6px 0;}
+.fix{border-left-color:var(--good);}
+.mech p,.fix p{font-size:.92rem;color:var(--ink-2);}
+.lbl{font-family:"IBM Plex Mono",monospace;font-size:.68rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-right:.4rem;}
+.fix .lbl{color:var(--good);}

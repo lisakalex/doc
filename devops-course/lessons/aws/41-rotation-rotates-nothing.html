@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Rotation Rotates Nothing</title>
+<link rel="icon" href="../../assets/img/favicon-module-4.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/41-rotation-rotates-nothing.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Module 04 · Lesson 4.1 · AWS + DevOps course</p>
+<h1>Rotation Rotates Nothing</h1>
+<p class="lede">Your repo has <code>enable_key_rotation = true</code> on the CMK that protects every
+      avatar in the bucket. This lesson is about what that line does, what it very deliberately does
+      <em>not</em> do, and why both halves are worth knowing before an auditor asks.</p>
+<div class="facts">
+<span class="fact">terraform/main.tf:29</span>
+<span class="fact">aws_kms_key.avatars</span>
+<span class="fact">rotation period 365 days</span>
+<span class="fact">deletion window 7 days</span>
+</div>
+</header>
+<section>
+<p class="eyebrow">Start with two sentences people say</p>
+<h2>Both of these are wrong, and wrong in the same way</h2>
+<div class="split">
+<div class="card">
+<span class="tag">Heard in a security review</span>
+<p>“We rotate the KMS key every year, so if last year's key material leaked, last year's
+          objects are safe now.”</p>
+</div>
+<div class="card">
+<span class="tag">Heard in a change review</span>
+<p>“Don't turn rotation on. We'd have to re-encrypt two million objects and update
+          everything that references the key.”</p>
+</div>
+</div>
+<p>One person thinks rotation does more than it does. The other thinks it costs more than it costs.
+      They have made the same mistake: treating <strong>the key</strong> and <strong>the key
+      material</strong> as one thing. They are two things, and almost everything surprising about KMS
+      rotation follows from separating them.</p>
+<div class="call">
+<h3>The rule</h3>
+<p>Rotation creates <strong>new key material</strong>. It does not create a new key, and it does
+        not touch a single byte of your data.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The mechanism</p>
+<h2>One key, a growing stack of materials</h2>
+</div>
+<p>A customer-managed key is a <em>logical resource</em>: an ARN, a key policy, a state, an alias or
+      two — and, hanging off it, a list of cryptographic materials. Rotation appends to that list.
+      Everything else about the key stays exactly as it was.</p>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="One key ARN with three key material versions; ciphertexts point at the version that encrypted them" role="img" viewbox="0 0 700 312">
+<defs>
+<marker id="ar" markerheight="7" markerwidth="7" orient="auto" refx="9" refy="5" viewbox="0 0 10 10">
+<path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"></path>
+</marker>
+</defs>
+<rect fill="none" height="272" rx="8" stroke="var(--rule-strong)" width="300" x="16" y="20"></rect>
+<rect fill="none" height="272" rx="8" stroke="var(--rule-strong)" stroke-dasharray="4 4" width="288" x="396" y="20"></rect>
+<g fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing=".06em">
+<text x="34" y="47">KMS KEY · ONE ARN, NEVER CHANGES</text>
+<text x="414" y="47">CIPHERTEXT IN YOUR BUCKET</text>
+</g>
+<g font-family="IBM Plex Mono, monospace" font-size="12.5">
+<rect fill="var(--accent-soft)" height="34" rx="5" stroke="var(--accent)" width="264" x="34" y="62"></rect>
+<text fill="var(--accent-ink)" x="46" y="84">key/8b1f…c39 · alias/avatars</text>
+<rect fill="var(--surface-2)" height="32" rx="5" stroke="var(--rule)" width="264" x="34" y="118"></rect>
+<text fill="var(--ink-2)" x="46" y="139">material v1  2024  retained</text>
+<rect fill="var(--surface-2)" height="32" rx="5" stroke="var(--rule)" width="264" x="34" y="162"></rect>
+<text fill="var(--ink-2)" x="46" y="183">material v2  2025  retained</text>
+<rect fill="var(--good-soft)" height="32" rx="5" stroke="var(--good-rule)" width="264" x="34" y="206"></rect>
+<text fill="var(--good)" x="46" y="227">material v3  2026  current</text>
+<rect fill="var(--surface)" height="32" rx="5" stroke="var(--rule)" width="256" x="412" y="118"></rect>
+<text fill="var(--ink-2)" x="424" y="139">old-avatar.png → v1</text>
+<rect fill="var(--surface)" height="32" rx="5" stroke="var(--rule)" width="256" x="412" y="162"></rect>
+<text fill="var(--ink-2)" x="424" y="183">last-year.png  → v2</text>
+<rect fill="var(--surface)" height="32" rx="5" stroke="var(--rule)" width="256" x="412" y="206"></rect>
+<text fill="var(--ink-2)" x="424" y="227">today.png      → v3</text>
+</g>
+<g fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="11">
+<text x="34" y="264">encrypt always uses the current material</text>
+<text x="34" y="281">decrypt uses the one the ciphertext names</text>
+</g>
+<g fill="none" marker-end="url(#ar)" stroke="var(--muted)">
+<path d="M408 134 L 304 134"></path>
+<path d="M408 178 L 304 178"></path>
+<path d="M408 222 L 304 222"></path>
+</g>
+</svg>
+</div>
+<figcaption>Each wrapped data key records which material version produced it. KMS picks that
+        version on <code>Decrypt</code>; you cannot choose, and you do not need to.</figcaption>
+</figure>
+<p>This is why <code>aws kms decrypt</code> takes no <code>--key-id</code> for a symmetric key: the
+      ciphertext blob names its own key and its own material version. Self-describing ciphertext is what
+      makes rotation invisible.</p>
+<h3>What rotation changes, exhaustively</h3>
+<div class="tw">
+<table>
+<thead><tr><th>Thing</th><th>After rotation</th></tr></thead>
+<tbody>
+<tr><td class="key">Key ARN / key ID</td><td>identical — nothing in Terraform, IAM or the bucket config refers to a material version</td></tr>
+<tr><td class="key">Key policy, alias, tags, state</td><td>identical</td></tr>
+<tr><td class="key">Existing objects</td><td>untouched; not re-encrypted, not rewritten, not even read</td></tr>
+<tr><td class="key">Existing wrapped data keys</td><td>untouched; still unwrappable by the retained older material</td></tr>
+<tr><td class="key">New writes</td><td>wrapped with the new material from the moment it is live</td></tr>
+<tr><td class="key">Your application code</td><td>no change — this is the entire design goal</td></tr>
+</tbody>
+</table>
+</div>
+<p class="note">So the change-review objection collapses: enabling rotation on a bucket holding two
+      million objects is a metadata flag. There is no sweep, no migration, no downtime, no code change.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The uncomfortable half</p>
+<h2>Old material is kept forever, by design</h2>
+</div>
+<p>AWS KMS retains <strong>every</strong> version of the material for a key with
+      <code>AWS_KMS</code> origin, and deletes it only when you delete the key itself. That is what makes
+      2024's objects readable in 2030 without a migration — and it is also what the security review
+      sentence gets wrong.</p>
+<div class="call warn">
+<h3>Say this out loud once</h3>
+<p>Rotation does not retire old material. It adds new material. Nothing about rotation makes older
+        ciphertext harder to read than it was yesterday.</p>
+</div>
+<p>So when someone asks “what does annual rotation protect us from?”, the honest answer is
+      narrow:</p>
+<div class="tw">
+<table>
+<thead><tr><th>Threat</th><th>Does rotation help?</th></tr></thead>
+<tbody>
+<tr><td>Key exhaustion — too much ciphertext under one key</td><td><span class="chip ok">yes</span> but a CMK only ever wraps 256-bit data keys; exhaustion is already a non-issue</td></tr>
+<tr><td>A compliance rule that says “rotate annually”</td><td><span class="chip ok">yes</span> this is the real reason most keys have it on</td></tr>
+<tr><td>A leaked <em>data</em> key from your app's memory</td><td><span class="chip exp">no</span> the wrapped key beside the object never changes; the leaked copy decrypts that object forever</td></tr>
+<tr><td>A key policy that grants too much</td><td><span class="chip exp">no</span> policy is a separate control surface</td></tr>
+<tr><td>A compromised IAM principal</td><td><span class="chip exp">no</span> it is still allowed to call <code>Decrypt</code></td></tr>
+<tr><td>“Make last year's data unreadable”</td><td><span class="chip exp">no</span> only key <em>deletion</em> does that, and it is all-or-nothing</td></tr>
+</tbody>
+</table>
+</div>
+<p>The AWS documentation states the sharp version of this in one line: <em>“Key rotation will
+      not mitigate the effect of a compromised data key.”</em> Rotation is hygiene and paperwork.
+      It is not a containment tool.</p>
+<h3>The containment tool you already met</h3>
+<p>In Lesson 3.2 you worked out that disabling the CMK makes every object in the bucket unreadable
+      instantly, with no sweep. That is still the fastest blast-radius control you have, and it is
+      reversible — which is exactly what rotation is not, and what deletion is not either.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Four states, one of them final</p>
+<h2>Enabled, disabled, pending deletion, gone</h2>
+</div>
+<div class="tw">
+<table>
+<thead><tr><th>State</th><th>Can decrypt?</th><th>Rotates?</th><th>Reversible?</th></tr></thead>
+<tbody>
+<tr><td class="key">Enabled</td><td>yes</td><td>on schedule</td><td>—</td></tr>
+<tr><td class="key">Disabled</td><td><strong>no</strong>, everything fails closed</td><td>no; a missed rotation runs as soon as you re-enable</td><td>yes, instantly</td></tr>
+<tr><td class="key">PendingDeletion</td><td><strong>no</strong></td><td>no; rotation status reads false and cannot be changed</td><td>yes — <code>cancel-key-deletion</code> restores the key and its rotation setting</td></tr>
+<tr><td class="key">Deleted</td><td>no, permanently</td><td>—</td><td><span class="chip exp">never</span></td></tr>
+</tbody>
+</table>
+</div>
+<p>Deleting a KMS key destroys every material version at once, and every object wrapped under any of
+      them becomes permanently unreadable. It is the only truly irreversible action you have met in this
+      course — worse than an S3 delete, which versioning can undo, and worse than a bucket delete,
+      which at least requires the objects to be gone first.</p>
+<div class="call stop">
+<h3>A design critique of your own repo</h3>
+<p><code>deletion_window_in_days = 7</code> is commented as minimising the billing tail on
+        <code>terraform destroy</code>, which is a sound choice for a teaching account you tear down often.
+        For anything holding real data, take the 30-day maximum: the window is your entire margin for
+        noticing the mistake, and it costs the same either way.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">When automatic rotation is not enough</p>
+<h2>Manual rotation, and the alias trap</h2>
+</div>
+<p>Automatic rotation only works on symmetric KMS-generated keys. For asymmetric keys, HMAC keys, keys
+      in a custom key store — or when a rule genuinely requires the old material to <em>stop
+      existing</em> — you rotate manually: create a new key, point new writes at it, re-encrypt what
+      matters, and only then schedule the old key for deletion.</p>
+<div class="steps">
+<div class="step"><div class="n">1</div><div>
+<h3>Create the new key and move the alias</h3>
+<p>The alias is a pointer. Moving <code>alias/&lt;bucket&gt;-avatars</code> to the new key changes what
+          <em>future</em> alias-based calls resolve to.</p></div></div>
+<div class="step"><div class="n">2</div><div>
+<h3>Check what actually references the key</h3>
+<p>Your bucket's default-encryption config is written with
+          <code class="brk">kms_master_key_id = aws_kms_key.avatars.arn</code> — the ARN, not the alias. Moving the
+          alias changes nothing for this bucket until that line changes too.</p></div></div>
+<div class="step"><div class="n">3</div><div>
+<h3>Re-encrypt deliberately</h3>
+<p>Nothing re-encrypts itself. A server-side copy of each object onto itself rewraps it under the
+          new key — and you pay the request charges from Lesson 3.3 to do it.</p></div></div>
+<div class="step"><div class="n">4</div><div>
+<h3>Keep the old key alive until nothing needs it</h3>
+<p>Any object still wrapped under the old key dies with it. Old versions in a versioned bucket
+          count.</p></div></div>
+</div>
+<p class="note">Manual rotation is the expensive one: it is the only variant that actually re-encrypts
+      data, and the only one that can make old ciphertext unreadable. That is the trade you are making,
+      not “better rotation”.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Cost, since Module 3 trained you to ask</p>
+<h2>Rotation's bill is bounded; requests are not</h2>
+</div>
+<p>KMS charges a monthly fee per key, and a further monthly fee for the <strong>first and second</strong>
+      rotation of the material. After the second rotation the storage charge stops growing — a key
+      rotated ten times costs the same as one rotated twice. Set against that, per-request charges scale
+      with traffic forever, which is why <code>bucket_key_enabled = true</code> from Lesson 3.2 saves
+      far more than rotation ever costs.</p>
+<div class="call">
+<h3>Connect it to 3.3</h3>
+<p>The Module 3.3 rule was that the surprising money is in <em>requests and floors</em>, not in
+        stored bytes. KMS is the same shape: the key fee is a rounding error, the
+        <code>GenerateDataKey</code> calls are the bill.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Hands-on · ~6 minutes · read-only apart from two cheap API calls</p>
+<h2>Ask your own key what it has been doing</h2>
+</div>
+<h3>1. What kind of key is it, and what state is it in?</h3>
+<div class="code"><span class="c"># the alias is built from the bucket name in terraform/main.tf:36</span>
+BUCKET=$(terraform -chdir=terraform output -raw s3_bucket_name)
+ALIAS=<span class="g">"alias/${BUCKET}-avatars"</span>
+
+aws kms describe-key --key-id <span class="w">$ALIAS</span> \
+  --query <span class="g">'KeyMetadata.{State:KeyState,Spec:KeySpec,Origin:Origin,MultiRegion:MultiRegion,Manager:KeyManager}'</span></div>
+<p class="note">Expect <code>Enabled</code>, <code>SYMMETRIC_DEFAULT</code>, <code>AWS_KMS</code>,
+      <code>false</code>, <code>CUSTOMER</code>. The last two matter: KMS-generated symmetric material is
+      exactly the case where automatic rotation is available.</p>
+<h3>2. Is rotation on, and when does it next fire?</h3>
+<div class="code">aws kms get-key-rotation-status --key-id <span class="w">$ALIAS</span></div>
+<p class="note"><code>KeyRotationEnabled: true</code> comes from your Terraform.
+      <code>RotationPeriodInDays</code> is 365 because you did not set one, and
+      <code>NextRotationDate</code> is measured from the day rotation was <em>enabled</em>, not from the
+      day the key was created.</p>
+<h3>3. How many materials exist so far?</h3>
+<div class="code">aws kms list-key-rotations --key-id <span class="w">$ALIAS</span></div>
+<p class="note">Almost certainly an empty list: the key is younger than a year, so it still has only
+      its original material. Worth seeing empty now, so the shape is familiar when it is not.</p>
+<h3>4. Prove the bucket stores the ARN, not the alias</h3>
+<div class="code">aws s3api head-object --bucket <span class="w">$BUCKET</span> --key <span class="w">&lt;some-object&gt;</span> \
+  --query <span class="g">'{Enc:ServerSideEncryption,Key:SSEKMSKeyId,BucketKey:BucketKeyEnabled}'</span></div>
+<p class="note">You get <code>aws:kms</code>, a full <code>arn:aws:kms:…:key/…</code> and
+      <code>true</code>. No alias, and no material version — the version lives inside the wrapped data
+      key, which S3 never shows you.</p>
+<h3>5. Watch a ciphertext name its own key</h3>
+<div class="code"><span class="c"># two API calls, well under a thousandth of a cent</span>
+aws kms encrypt --key-id <span class="w">$ALIAS</span> --plaintext <span class="g">"$(echo -n hello | base64)"</span> \
+  --query CiphertextBlob --output text | base64 -d &gt; /tmp/blob.bin
+
+<span class="c"># note what is missing from this command: --key-id</span>
+aws kms decrypt --ciphertext-blob fileb:///tmp/blob.bin \
+  --query <span class="g">'{Key:KeyId,Plaintext:Plaintext}'</span> --output json</div>
+<p class="note">KMS returns the key ARN it used, because the blob told it. That single property is
+      what lets rotation happen behind your back without breaking a single reader.</p>
+<h3>6. Confirm the source of truth</h3>
+<div class="code">grep -n <span class="g">'enable_key_rotation\|deletion_window\|kms_master_key_id'</span> terraform/main.tf</div>
+<p class="note">Three lines, three decisions: rotate annually, keep a 7-day escape hatch, and bind the
+      bucket to this key by ARN.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Run it yourself · no AWS account needed</p>
+<h2>Envelope encryption, by hand</h2>
+</div>
+<p>If “the same key twice” still feels like words rather than a mechanism, run this.
+      The CMK is a local key standing in for one inside KMS; every other step is what S3 and KMS
+      actually do. It needs no account, which matters when the stack is torn down.</p>
+<div class="code">uv run assets/scripts/envelope.py</div>
+<div class="code"><span class="c">── PutObject ─────────────────────────────────────────────</span>
+data key (Plaintext)              <span class="g">5a2d0edb55a67edc483a4c436a220878</span>…  (32 bytes)
+data key (CiphertextBlob)         <span class="w">f804d1a633f5bfdf13696dae05283eb9</span>…  (60 bytes)
+   ^ the SAME 32 bytes: usable, and sealed under the CMK
+
+object, encrypted                 8e719b8fb5e1072a5b525d11bbb5f260…  (94 bytes)
+
+stored in the bucket:             the ciphertext + the sealed key
+never stored anywhere:            the plaintext data key
+
+<span class="c">── GetObject ─────────────────────────────────────────────</span>
+data key, recovered by KMS        <span class="g">5a2d0edb55a67edc483a4c436a220878</span>…  (32 bytes)
+object, decrypted                 b'a 5 MB avatar, pretend…'</div>
+<p>The two highlighted values are identical. That is what <code>GenerateDataKey</code> returning
+      “the same key twice” means, made literal: 32 random bytes, handed back once usable
+      and once sealed under the CMK. The sealed form is 60 bytes rather than 32 because sealing adds
+      a nonce and an authentication tag — an envelope is bigger than the letter inside it.</p>
+<div class="steps">
+<div class="step"><div class="n">1</div><div>
+<h3>Mint 32 random bytes</h3>
+<p>That is all a data key is. Enough for AES-256, and nothing more magic than that.</p></div></div>
+<div class="step"><div class="n">2</div><div>
+<h3>Seal a copy under the CMK</h3>
+<p>“Wrapped” means encrypted with another key. This copy can travel and be stored;
+          only KMS can open it.</p></div></div>
+<div class="step"><div class="n">3</div><div>
+<h3>Encrypt the object with the usable copy</h3>
+<p>Your bytes never go near KMS. This is why a 4 KB request limit can protect petabytes.</p></div></div>
+<div class="step"><div class="n">4</div><div>
+<h3>Destroy the usable copy</h3>
+<p>The single line that makes the whole design work. Keep it and the CMK is decoration.</p></div></div>
+<div class="step"><div class="n">5</div><div>
+<h3>Store ciphertext and sealed key together</h3>
+<p>To read it back, S3 hands the sealed copy to KMS, gets the usable one, decrypts, and
+          forgets it again.</p></div></div>
+</div>
+<h3>Every rule in this lesson falls out of those five steps</h3>
+<div class="tw">
+<table>
+<thead><tr><th>Rule</th><th>Why, from the steps above</th></tr></thead>
+<tbody>
+<tr><td class="key">Disabling the CMK is instant and total</td><td>step 5 becomes impossible. The sealed copies are still there and nothing can open them — no sweep, no re-encryption</td></tr>
+<tr><td class="key">Rotation changes nothing already written</td><td>each object's sealed copy was sealed under the <em>old</em> material, which KMS retains, so it still opens</td></tr>
+<tr><td class="key">A leaked data key cannot be fixed at the CMK</td><td>the holder has the output of step 1. They skip steps 2 and 5 entirely — no KMS, no account, no permissions. Only giving the object a different data key helps</td></tr>
+</tbody>
+</table>
+</div>
+<p class="note">The script ends with an experiment: comment out the line that discards the
+      plaintext data key and watch that nothing breaks — which is exactly why S3 discarding it
+      is a decision rather than a side effect.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check yourself</p>
+<h2>Four questions</h2>
+</div>
+<p class="note">Answer out loud before opening each one. As in Module 3, say the mechanism <em>and</em>
+      the consequence — a half answer is the pattern that has cost you marks all course.</p>
+<details>
+<summary>An auditor asks you to prove that objects written in 2024 can no longer be decrypted with 2024's key material. Rotation has been on since day one. What do you tell them?</summary>
+<div class="answer">
+<p>That you cannot prove it, because it is not true. KMS retains every material version for the
+          life of the key, and 2024's objects are still wrapped under 2024's material; KMS selects that
+          version automatically on every read.</p>
+<p>The only way to make that material stop existing is to delete the key, which would destroy
+          every object under every version. If the requirement is real, it needs manual rotation: a new
+          key, a re-encryption pass over everything you intend to keep, then scheduled deletion of the old
+          key once nothing references it — old object versions included.</p>
+</div>
+</details>
+<details>
+<summary>You are asked to enable rotation on a CMK protecting two million objects. What breaks, what must change, and what does it cost?</summary>
+<div class="answer">
+<p>Nothing breaks and nothing must change. The key ARN, key policy, aliases and every reference in
+          Terraform, IAM and the bucket configuration are unaffected, and no object is re-encrypted —
+          new writes use the new material, old objects keep theirs.</p>
+<p>The cost is one extra monthly key-storage fee after the first rotation and one more after the
+          second, capped there. No request charges, because nothing re-reads the data.</p>
+</div>
+</details>
+<details>
+<summary>A data key leaks in a heap dump from the app. You rotate the CMK immediately. What have you actually achieved, and what is the blast radius?</summary>
+<div class="answer">
+<p>Close to nothing. The leaked key is plaintext and already outside KMS; the wrapped copy stored
+          beside the object is unchanged, and the object it protects can be decrypted forever by anyone
+          holding that leaked key. Rotation only changes what <em>future</em> data keys are wrapped with.</p>
+<p>The real answer is to re-encrypt the affected objects so they get fresh data keys, and to treat
+          the compromised principal as the incident.</p>
+<p><strong>The sting is the blast radius.</strong> With <code>bucket_key_enabled = true</code>, S3
+          takes a time-limited bucket-level key from KMS and derives object keys from it instead of calling
+          <code>GenerateDataKey</code> per object. That is the 99% request saving from Lesson 3.2 —
+          and it means a single leaked key covers every object written in that window, not one. The cost
+          optimisation widened the blast radius. Both things are true, and you should be able to say both
+          in the same breath.</p>
+</div>
+</details>
+<details>
+<summary>On a Friday, someone runs <code>schedule-key-deletion</code> on the avatars key by mistake. Walk through what is happening right now, and what you do.</summary>
+<div class="answer">
+<p>The key is in <code>PendingDeletion</code> and already unusable: every upload and download
+          fails closed immediately, exactly as if it had been disabled. Rotation status reads false and
+          cannot be changed while it is pending. The data is still intact — nothing has been
+          destroyed yet.</p>
+<p>Run <code>aws kms cancel-key-deletion</code>, then <code>enable-key</code>, because cancelling
+          returns the key to <code>Disabled</code>, not <code>Enabled</code>. Service resumes with no data
+          loss.</p>
+<p>Then look at the window: this repo's <code>deletion_window_in_days = 7</code> is the whole
+          margin for catching it, and a mistake made on a Friday before a week off is a mistake you find
+          too late. And the right follow-up is not just the window — it is a key policy that denies
+          <code>kms:ScheduleKeyDeletion</code> to everyone who does not need it.</p>
+</div>
+</details>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Carry these forward</p>
+<h2>Three sentences to memorise</h2>
+</div>
+<div class="split">
+<div class="card"><span class="tag">Mechanism</span>
+<p>Rotation adds material; it never removes any, and it never touches data.</p></div>
+<div class="card"><span class="tag">Containment</span>
+<p>Disabling is instant, total and reversible. Deleting is instant, total and final.</p></div>
+<div class="card"><span class="tag">Trade</span>
+<p>Bucket keys buy cheap requests with a wider data-key blast radius.</p></div>
+</div>
+<p class="note">Next: Lesson 4.2 — key policies and grants, where “who may use this key”
+      stops being a footnote of the IAM module and becomes the whole subject, including the cross-account
+      case your OIDC work in Module 2 sets up.</p>
+</section>
+<footer>
+<p>Module 4, Lesson 4.1 · AWS + DevOps course · 18 September 2026</p>
+<p>Repo material: <code>terraform/main.tf</code> lines 29–56 and 168–172 —
+      <code>aws_kms_key.avatars</code>, <code>aws_kms_alias.avatars</code>, the bucket's
+      server-side-encryption rule, and the <code>kms:Decrypt</code> / <code>kms:GenerateDataKey</code>
+      grant on the app role.</p>
+<p>Rotation behaviour, material retention and the rotation-pricing cap are stated in the AWS KMS
+      developer guide, “Rotate AWS KMS keys”.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

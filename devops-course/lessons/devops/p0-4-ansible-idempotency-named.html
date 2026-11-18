@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ansible Idempotency, Named</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/p0-4-ansible-idempotency-named.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Phase 0 · Lesson 0.4 · AWS + DevOps course</p>
+<h1>Ansible Idempotency, Named</h1>
+<p class="lede">You have run Ansible for two years and you know it is "idempotent". This lesson
+  makes that word precise: what Ansible checks before it acts, why <code>shell</code> and
+  <code>command</code> skip that check, and the four tools that put it back. You prove it on your
+  own laptop by running a playbook twice and reading one number.</p>
+<div class="facts">
+<span class="fact">~3 hours</span>
+<span class="fact">week 2</span>
+<span class="fact">laptop only, no AWS</span>
+<span class="fact">ansible-core 2.21.5</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The definition</p>
+<h2>Idempotent means two things, and the second gets forgotten</h2>
+</div>
+<p>An operation is idempotent when doing it twice leaves the system the same as doing it once.
+  For an Ansible playbook that splits into two separate promises:</p>
+<ol class="todo">
+<li><strong>Safe to re-run.</strong> The second run does no harm. It does not append a line
+  again, create a second user, or fail because the directory already exists.</li>
+<li><strong>Honest about it.</strong> The second run <em>reports</em> that nothing changed. Every
+  task says <code>ok</code>, not <code>changed</code>, and the recap ends in
+  <code>changed=0</code>.</li>
+</ol>
+<p>Most people stop at the first. The second matters as much, for two reasons. Handlers fire on
+  <code>changed</code>, so a task that always reports changed restarts your service on every run.
+  And the recap is your only signal that a server had drifted. If every run says
+  <code>changed=12</code>, the day a server really was wrong looks exactly like every other
+  day.</p>
+<div class="call">
+<h3>The one test that matters</h3>
+<p>Run the playbook twice against the same machine. The second run must end in
+  <code>changed=0</code>. That is the whole definition in one line, and it is the answer to give
+  in an interview.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The mechanism</p>
+<h2>What a module does that a shell line does not</h2>
+</div>
+<p>A module such as <code>lineinfile</code> is a small Python program that Ansible copies to the
+  host and runs. It describes a <em>state</em>, not an action: "this line is in this file", not
+  "append this line". Every well-written module follows the same four steps:</p>
+<div class="ladder">
+<div class="rung"><span class="s">1</span><p><span class="who">Read</span>Look at the current
+  state. Is the line in the file? What is the file's checksum? Does the user exist?</p></div>
+<div class="rung"><span class="s">2</span><p><span class="who">Compare</span>Compare it with the
+  state the task asked for.</p></div>
+<div class="rung"><span class="s">3</span><p><span class="who">Act on the difference only</span>If
+  they match, do nothing. If they differ, make the smallest change that closes the gap.</p></div>
+<div class="rung"><span class="s">4</span><p><span class="who">Report</span>Return
+  <code>changed: true</code> only if step 3 actually did something.</p></div>
+</div>
+<p><code>command</code> and <code>shell</code> cannot do steps 1 to 3. They receive a string and
+  run it. Ansible has no idea whether <code>echo "-Xmx512m" &gt;&gt; jvm.options</code> changes
+  anything, so it does the only safe thing for step 4: it assumes the command changed something
+  and reports <code>changed</code>, every time.</p>
+<p class="note"><code>command</code> runs the program directly, with no shell, so pipes,
+  <code>&gt;&gt;</code> and <code>$VAR</code> do not work in it. <code>shell</code> runs it through
+  <code>/bin/sh</code>, so they do. Neither one knows what the command does.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Seen on a real run</p>
+<h2>The quick way, run twice</h2>
+</div>
+<p>This playbook is the kind you write when a deadline is close. It configures a directory on your
+  own laptop, standing in for an app server. Every task works:</p>
+<div class="code"><code>- name: Set up the app box, the quick way
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    box: "{{ playbook_dir }}/box"
+  tasks:
+    - name: Make the app directory
+      ansible.builtin.shell: mkdir -p {{ box }}/app
+
+    - name: Set the heap size
+      ansible.builtin.shell: echo "-Xmx512m" >> {{ box }}/app/jvm.options
+
+    - name: Unpack the release
+      ansible.builtin.command: tar xzf {{ playbook_dir }}/app-1.0.tgz -C {{ box }}/app
+
+    - name: Show the JVM options
+      ansible.builtin.command: cat {{ box }}/app/jvm.options
+      notify: Restart app
+
+  handlers:
+    - name: Restart app
+      ansible.builtin.shell: date >> {{ box }}/restarts.log</code></div>
+<p>Run it twice. These are the real recaps from ansible-core 2.21.5:</p>
+<div class="code"><code><span class="c"># first run</span>
+localhost : ok=5  <span class="w">changed=5</span>  unreachable=0  failed=0  skipped=0
+<span class="c"># second run, nothing new to do</span>
+localhost : ok=5  <span class="r">changed=5</span>  unreachable=0  failed=0  skipped=0
+
+$ cat box/app/jvm.options
+-Xmx512m
+<span class="r">-Xmx512m</span>
+$ wc -l &lt; box/restarts.log
+<span class="r">2</span></code></div>
+<p>Three different failures are in that output:</p>
+<div class="tw"><table>
+<thead><tr><th>Task</th><th>What went wrong</th><th>Kind</th></tr></thead>
+<tbody>
+<tr><td class="key">Set the heap size</td><td><code>&gt;&gt;</code> appends, so the option is now in the file twice. Run it weekly for a year and there are 52 copies</td><td><span class="chip exp">harmful</span></td></tr>
+<tr><td class="key">Show the JVM options</td><td><code>cat</code> changes nothing, yet it reports changed and fires the handler. The app restarts on every run</td><td><span class="chip exp">harmful</span></td></tr>
+<tr><td class="key">Make the directory, unpack</td><td>Harmless to repeat, but reported as changed, so the recap can never reach zero</td><td><span class="chip imp">dishonest</span></td></tr>
+</tbody></table></div>
+<div class="call stop">
+<h3>A restart on every deploy</h3>
+<p>Scale the second row up to work. A playbook that runs against a cluster of Mule runtimes, with
+  a <code>shell</code> task notifying a restart handler, restarts every node on every run, even
+  when nothing changed. That is an outage window you scheduled by accident, and the recap gives
+  you no way to tell it apart from a real change.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The fixes, in order of preference</p>
+<h2>Four ways to put the check back</h2>
+</div>
+<p>Reach for them in this order. Each step down gives Ansible less information, so you write more
+  of the check yourself.</p>
+
+<h3>1. Use a module</h3>
+<p>Most <code>shell</code> lines in real playbooks have a module that does the same job with the
+  check built in. Use it whenever one exists:</p>
+<div class="tw"><table>
+<thead><tr><th>Instead of this in <code>shell</code></th><th>Use this module</th></tr></thead>
+<tbody>
+<tr><td><code>mkdir -p</code>, <code>chmod</code>, <code>chown</code>, <code>ln -s</code></td><td><code>ansible.builtin.file</code></td></tr>
+<tr><td><code>echo … &gt;&gt;</code>, <code>sed -i</code> on one line</td><td><code>ansible.builtin.lineinfile</code>, <code>replace</code>, <code>blockinfile</code></td></tr>
+<tr><td><code>cp</code>, writing a config with <code>cat &lt;&lt;EOF</code></td><td><code>ansible.builtin.copy</code>, <code>template</code></td></tr>
+<tr><td><code>curl -o</code>, <code>wget</code></td><td><code>ansible.builtin.get_url</code></td></tr>
+<tr><td><code>tar xzf</code>, <code>unzip</code></td><td><code>ansible.builtin.unarchive</code></td></tr>
+<tr><td><code>useradd</code>, <code>groupadd</code></td><td><code>ansible.builtin.user</code>, <code>group</code></td></tr>
+<tr><td><code>apt-get install</code>, <code>yum install</code></td><td><code>ansible.builtin.package</code>, <code>apt</code>, <code>dnf</code></td></tr>
+<tr><td><code>systemctl restart</code>, <code>enable</code></td><td><code>ansible.builtin.systemd_service</code>, in a handler</td></tr>
+</tbody></table></div>
+<p class="note">A module is not automatically idempotent: it is only as good as its step 1.
+  <code>unarchive</code>, for example, compares files inside the archive with files on disk, which
+  is a real check. <code>get_url</code> without a <code>checksum</code> only checks that the file
+  exists.</p>
+
+<h3>2. <code>creates</code> and <code>removes</code></h3>
+<p>When you really must run a command, tell Ansible which file the command leaves behind.
+  <code>creates: /path</code> means "skip this task if that path exists". <code>removes</code> is
+  the opposite: run only if it exists.</p>
+<div class="code"><code>- name: Unpack the release
+  ansible.builtin.command: tar xzf /tmp/app-1.0.tgz -C /opt/app
+  args:
+    creates: /opt/app/README</code></div>
+<div class="call warn">
+<h3>It checks that a file exists, nothing more</h3>
+<p>Change the archive to <code>app-1.1.tgz</code> and the task is skipped, because
+  <code>/opt/app/README</code> is still there from 1.0. The recap says <code>ok</code>, the server
+  still runs 1.0, and nobody notices. Point <code>creates</code> at something that only exists for
+  the version you want, such as <code>/opt/app/releases/1.1/</code>, and unpack each version into
+  its own directory. That is the same layout a <code>current</code> symlink deploy uses.</p>
+</div>
+
+<h3>3. <code>changed_when</code> and <code>failed_when</code></h3>
+<p>These do not stop the command from running. They tell Ansible how to <em>judge</em> the result,
+  from the return code or the output, which you capture with <code>register</code>:</p>
+<div class="pair">
+<div><p class="lab">Read-only: it never changes anything</p>
+<div class="code"><code>- name: Show the JVM options
+  ansible.builtin.command: cat /opt/app/jvm.options
+  register: opts
+  <span class="g">changed_when: false</span></code></div></div>
+<div><p class="lab">The command says what it did</p>
+<div class="code"><code>- name: Apply database migrations
+  ansible.builtin.command: /opt/app/bin/migrate
+  register: migrate
+  <span class="g">changed_when: "'Applied' in migrate.stdout"</span></code></div></div>
+</div>
+<p><code>failed_when</code> is the same idea for failure. <code>grep</code> exits with 1 when it
+  finds nothing, which Ansible treats as an error. If "not found" is a normal answer, say so:
+  <code>failed_when: result.rc not in [0, 1]</code>.</p>
+<p class="note"><code>changed_when: false</code> on a command that <em>does</em> change something
+  is a lie in the other direction. The handler never fires and the recap hides a real change. Use
+  it only on commands that read.</p>
+
+<h3>4. Check, then act</h3>
+<p>When the only way to know the state is to ask, ask in one task and act in the next:</p>
+<div class="code"><code>- name: Is the schema there?
+  ansible.builtin.command: test -f /opt/app/schema.done
+  register: schema
+  changed_when: false
+  failed_when: schema.rc not in [0, 1]
+  check_mode: false         <span class="c"># a read: safe to run even in a dry run</span>
+
+- name: Create the schema
+  ansible.builtin.shell: /opt/app/bin/init-schema &amp;&amp; touch /opt/app/schema.done
+  when: schema.rc == 1</code></div>
+<p>This is steps 1 to 3 of the module ladder, written by hand. It is also the most code to get
+  wrong, which is why it comes last.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Dry runs</p>
+<h2><code>--check</code> is only as honest as your modules</h2>
+</div>
+<p><code>ansible-playbook --check --diff</code> asks every task what it <em>would</em> do without
+  doing it. Modules answer from step 1 and step 2. A <code>command</code> or <code>shell</code> task
+  cannot answer, so in check mode it is <strong>skipped</strong>, unless it has
+  <code>creates</code> or <code>removes</code>, which give Ansible something to check.</p>
+<p>The result, on a real run against an empty directory, with the check-then-act pair above:</p>
+<div class="code"><code>$ ansible-playbook -i localhost, schema.yml --check   <span class="c"># output trimmed</span>
+TASK [Is the schema there?]   ok: [localhost]
+TASK [Create the schema]      skipping: [localhost]
+localhost : ok=1  <span class="w">changed=0</span>  skipped=1</code></div>
+<p>The dry run says nothing would change. A real run would create the schema. A playbook built
+  mostly from <code>shell</code> gives you a dry run that reports "nothing to do" while the real
+  run is about to do a lot. Without <code>check_mode: false</code> on the read, it is worse: the
+  read is skipped too, and the next task's <code>when</code> tests a result that never
+  existed.</p>
+<p class="note">Remember this in Phase 4. <code>terraform plan</code> is check mode built into the
+  tool from the start, and it works because every Terraform resource has to implement step 1.
+  There is no <code>shell</code> resource to hide behind, only provisioners, and the Terraform
+  documentation calls those a last resort for exactly this reason.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Proving it</p>
+<h2>Test idempotency like any other behaviour</h2>
+</div>
+<p>The two-run test can run in CI. <strong>Molecule</strong>, the standard testing tool for Ansible
+  roles, has an <code>idempotence</code> step that does exactly this: converge once, converge
+  again, fail if the second run reports any change. Without Molecule, the same check is a few lines
+  of shell after the second run:</p>
+<div class="code"><code>ansible-playbook -i inventory site.yml                 <span class="c"># converge</span>
+ansible-playbook -i inventory site.yml | tee second.log
+<span class="c"># any host with a non-zero count in its recap line fails the job</span>
+if grep -Eq '(changed|unreachable|failed)=[1-9]' second.log; then
+  echo "not idempotent"; exit 1
+fi</code></div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Build it</p>
+<h2>Make the quick playbook honest</h2>
+</div>
+<p>Everything runs on your laptop against a directory, so nothing on your system is touched.
+  Work in <code>devops-course/labs/p0-4/</code> so the files are committed and I can review them.</p>
+
+<h3>Part 1: set up</h3>
+<div class="code"><code>uv tool install ansible-core==2.21.5
+ansible-playbook --version            <span class="c"># expect: core 2.21.5</span>
+
+mkdir -p ~/IdeaProjects/devops-course/labs/p0-4 &amp;&amp; cd $_
+mkdir -p src &amp;&amp; echo "release 1.0" > src/README
+tar czf app-1.0.tgz -C src README</code></div>
+<p class="note"><code>-i localhost,</code> in the commands below is an inventory written inline.
+  The trailing comma is what makes Ansible read it as a list of hosts and not as a file name.
+  <code>connection: local</code> in the play runs the tasks directly, without SSH. Lesson 0.5 is
+  about why the version is pinned.</p>
+
+<h3>Part 2: watch it fail</h3>
+<ol class="todo">
+<li>Save the quick playbook from above as <code>naive.yml</code>.</li>
+<li>Run <code>ansible-playbook -i localhost, naive.yml</code> twice.</li>
+<li>Confirm the second recap says <code>changed=5</code>, the heap line is in
+  <code>box/app/jvm.options</code> twice, and <code>box/restarts.log</code> has two lines.</li>
+<li><code>rm -rf box</code> to start clean.</li>
+</ol>
+
+<h3>Part 3: fix it</h3>
+<p>Write <code>fixed.yml</code>, doing the same four jobs. Pick the fix for each task from the
+  four above, highest on the list that fits:</p>
+<ol class="todo">
+<li>The directory.</li>
+<li>The heap size, and move the <code>notify: Restart app</code> here, to the task whose change
+  really should restart the app.</li>
+<li>Unpacking the release. Try it two ways: <code>unarchive</code>, then <code>command</code>
+  with <code>creates</code>. <code>unarchive</code> needs its <code>dest</code> directory to
+  exist already, so task order matters. By default its <code>src</code> is a file on the
+  machine running Ansible, which it copies to the host first. Here both are your laptop, so
+  that works as it is.</li>
+<li>Showing the options, which must still run and print every time.</li>
+</ol>
+<p><strong>Done when:</strong> the first run reports changes and one restart, and the second run
+  ends <code>changed=0</code> with no new line in <code>restarts.log</code>.</p>
+
+<h3>Then break it on purpose</h3>
+<ol class="todo">
+<li>Make <code>app-1.1.tgz</code> with <code>release 1.1</code> in its README, and point the
+  <code>creates</code> version of the unpack task at it. Run it. Does
+  <code>box/app/README</code> say 1.1? What did the recap say?</li>
+<li>Fix it with a versioned directory: unpack into <code>box/app/releases/1.1/</code> and make
+  <code>creates</code> point inside it.</li>
+<li>Run <code>--check --diff</code> on a clean <code>box</code> and compare its recap with a real
+  run. Which tasks did the dry run skip?</li>
+</ol>
+
+<h3>Part 4: your own playbooks</h3>
+<p>This is the part that becomes a CV line and an interview story. In a playbook repository from
+  work, list every raw command task:</p>
+<div class="code"><code>grep -rnE '^\s*-?\s*(ansible\.builtin\.)?(shell|command|raw):' .</code></div>
+<p>For each one, write down which of the four fixes applies, or why none does. Bring me the
+  <em>count</em> and two or three examples described in your own words. Leave out anything
+  secret: hostnames, paths with customer names, and anything that looks like a password or a
+  token.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check</p>
+<h2>Five questions</h2>
+</div>
+<p>Out loud first, and end each one with "because…" and the consequence.</p>
+<details><summary>A playbook's second run reports <code>changed=7</code>, yet nothing on the server is different. Nothing broke, so why does it matter?</summary><div class="answer"><p><strong>Handlers fire on <code>changed</code></strong>, so any of those seven tasks that notifies a restart restarts the service on every run: an outage window nobody planned.</p><p>And the recap stops meaning anything. If every run says <code>changed=7</code>, a run where a server had really drifted looks exactly the same, so you lose the one signal Ansible gives you for free.</p></div></details>
+<details><summary>A task unpacks <code>app-1.1.tgz</code> with <code>command</code> and <code>creates: /opt/app/README</code>. You bump it to 1.2 and run. What happens?</summary><div class="answer"><p><strong>The task is skipped and the server stays on 1.1.</strong> <code>creates</code> only checks that the path exists, and the 1.1 README is still there. The recap says <code>ok</code>, so the failed upgrade is silent.</p><p>Fix: unpack each version into its own directory and point <code>creates</code> inside it, for example <code>/opt/app/releases/1.2/README</code>, or use <code>unarchive</code>, which compares the archive's contents with the files on disk.</p></div></details>
+<details><summary>What is the difference between <code>creates</code> and <code>changed_when: false</code>?</summary><div class="answer"><p><strong><code>creates</code> decides whether the command runs.</strong> If the path exists, the command does not run at all. <strong><code>changed_when</code> only decides what the report says.</strong> The command runs every time.</p><p>So <code>changed_when: false</code> is right for a command that only reads, and wrong for one that changes something: the change still happens, but the recap hides it and the handler never fires.</p></div></details>
+<details><summary>You run <code>--check</code> on a playbook made mostly of <code>shell</code> tasks and it reports <code>changed=0</code>. Can you trust it?</summary><div class="answer"><p><strong>No.</strong> In check mode, <code>command</code> and <code>shell</code> tasks without <code>creates</code> or <code>removes</code> are skipped, because Ansible cannot predict what a command will do. A skipped task counts as no change.</p><p>So the dry run is quiet about exactly the tasks most likely to do something. A dry run is only as honest as the modules in the playbook.</p></div></details>
+<details><summary>A task runs <code>grep -q ERROR /var/log/app.log</code> to decide whether to alert. When the log is clean, the whole play fails. Why, and what is the fix?</summary><div class="answer"><p><strong><code>grep</code> exits with 1 when it finds nothing</strong>, and Ansible treats any non-zero exit as a failure. Here "nothing found" is the good answer, not an error.</p><p>Fix: <code>register</code> the result, add <code>failed_when: result.rc not in [0, 1]</code> so only a real error (exit 2, such as a missing file) fails, and <code>changed_when: false</code> because reading a log changes nothing. Then act on it with <code>when: result.rc == 0</code>.</p></div></details>
+</section>
+
+<footer>
+<p>Sources: ansible-core 2.21 documentation for the <code>command</code>, <code>shell</code>,
+  <code>file</code>, <code>lineinfile</code>, <code>unarchive</code> and <code>get_url</code>
+  modules, error handling (<code>changed_when</code>, <code>failed_when</code>), handlers, and
+  check mode (<code>check_mode</code>, <code>--diff</code>); Molecule's <code>idempotence</code>
+  scenario step; Terraform documentation on provisioners. Every recap on this page comes from a
+  real run of ansible-core 2.21.5 (released 5 October 2026), checked 23 October 2026.</p>
+<p>Next: Lesson 0.5, Python that survives leaving your laptop: virtualenvs, pinned requirements,
+  and why the script failed on the server.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

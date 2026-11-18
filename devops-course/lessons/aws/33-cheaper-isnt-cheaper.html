@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cheaper Isn&#x27;t Cheaper</title>
+<link rel="icon" href="../../assets/img/favicon-module-3.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/33-cheaper-isnt-cheaper.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Module 03 · Lesson 3.3 · AWS + DevOps course</p>
+<h1>Cheaper Isn't Cheaper</h1>
+<p class="lede">Every storage class below Standard advertises a lower price per gigabyte and
+    attaches conditions that can make your bill go up. Your repo already avoids the worst of them
+    — probably without you knowing why.</p>
+<div class="facts">
+<span class="fact">terraform/main.tf</span>
+<span class="fact">us-east-1 list prices</span>
+<span class="fact">approximate, 2026</span>
+</div>
+</header>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The headline numbers</p>
+<h2>What the price list says</h2>
+</div>
+<p>Per GB per month, cheapest last. Read the right-hand columns first — that is where the
+    money actually is:</p>
+<div class="tw"><table>
+<thead><tr><th>Class</th><th>$/GB/mo</th><th>Minimum days</th><th>Retrieval</th><th>Availability</th></tr></thead>
+<tbody>
+<tr><td class="key">Standard</td><td class="num">0.023</td><td class="num">none</td><td class="num">free</td><td class="num">99.99%</td></tr>
+<tr><td class="key">Intelligent-Tiering</td><td class="num">0.023 → 0.004</td><td class="num">none</td><td class="num">free</td><td class="num">99.9%</td></tr>
+<tr><td class="key">Standard-IA</td><td class="num">0.0125</td><td class="num"><strong>30</strong></td><td class="num">$0.01/GB</td><td class="num">99.9%</td></tr>
+<tr><td class="key">One Zone-IA</td><td class="num">0.01</td><td class="num"><strong>30</strong></td><td class="num">$0.01/GB</td><td class="num">99.5%</td></tr>
+<tr><td class="key">Glacier Instant</td><td class="num">0.004</td><td class="num"><strong>90</strong></td><td class="num">$0.03/GB</td><td class="num">99.9%</td></tr>
+<tr><td class="key">Glacier Flexible</td><td class="num">0.0036</td><td class="num"><strong>90</strong></td><td class="num">minutes–hours</td><td class="num">99.99%</td></tr>
+<tr><td class="key">Deep Archive</td><td class="num">0.00099</td><td class="num"><strong>180</strong></td><td class="num">up to 12 h</td><td class="num">99.99%</td></tr>
+</tbody>
+</table></div>
+<p class="note">Durability is <strong>eleven nines for every class except One Zone-IA</strong>,
+    which keeps one copy in a single Availability Zone. Losing that AZ loses the data. The name
+    says so; people read it as "cheap Standard-IA" and do not notice.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The traps</p>
+<h2>Four charges that are not in the headline price</h2>
+</div>
+<div class="steps">
+<div class="step"><span class="n">1</span><div>
+<h3>Minimum storage duration</h3>
+<p>Delete a Standard-IA object after 5 days and you are billed for <strong>30</strong>.
+        Deep Archive bills <strong>180</strong>. Archiving anything short-lived costs more than
+        leaving it in Standard, and the cheaper the class the longer the sentence.</p>
+</div></div>
+<div class="step"><span class="n">2</span><div>
+<h3>Minimum billable object size — 128 KB</h3>
+<p>IA and Glacier bill every object as if it were at least 128 KB. A 10 KB file in
+        Standard-IA is charged as 128 KB. <strong>This is the one that reverses the maths</strong>,
+        and it is the trap your avatars would have walked into.</p>
+</div></div>
+<div class="step"><span class="n">3</span><div>
+<h3>Retrieval fees</h3>
+<p>$0.01/GB for IA, $0.03/GB for Glacier Instant. Read the data twice a month and the
+        cheaper class is no longer cheaper. Cold storage assumes the data is genuinely cold.</p>
+</div></div>
+<div class="step"><span class="n">4</span><div>
+<h3>Transition requests</h3>
+<p>Each lifecycle transition is a billable request — roughly $0.01 per 1,000 into IA,
+        $0.05 per 1,000 into Glacier. Moving two million small objects costs $20–$100 in requests
+        alone, paid up front, before any saving begins.</p>
+</div></div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Worked example · your bucket</p>
+<h2>Where "cheaper" goes backwards</h2>
+</div>
+<p>Say the avatars bucket holds <strong>100,000 avatars averaging 60 KB</strong> — about 6 GB.
+    Your app caps uploads at 5 MB, but real profile pictures are small. Three options, one month:</p>
+<div class="tw"><table>
+<thead><tr><th>Option</th><th>Billable size</th><th>Storage/mo</th><th>One-off</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr class="good"><td class="key">Leave in Standard</td><td class="num">6 GB</td><td class="num">$0.138</td><td class="num">—</td><td>baseline</td></tr>
+<tr class="bad"><td class="key">Transition to Standard-IA</td><td class="num"><strong>12.8 GB</strong><br/><span class="u-color-var-muted">128 KB × 100,000</span></td><td class="num"><strong>$0.160</strong></td><td class="num">$1.00<br/><span class="u-color-var-muted">transitions</span></td><td><strong>more expensive</strong>, plus retrieval fees, plus a 30-day sentence</td></tr>
+<tr class="good"><td class="key">Intelligent-Tiering <span class="u-color-var-muted">(yours)</span></td><td class="num">6 GB</td><td class="num">$0.138</td><td class="num">$1.00</td><td>no worse, no retrieval fees, and it adapts</td></tr>
+</tbody>
+</table></div>
+<div class="call stop">
+<h3>Read the middle row again</h3>
+<p>The class advertised at <strong>half</strong> the price of Standard produces a
+      <strong>higher</strong> bill. Nothing is wrong with the arithmetic — 100,000 objects of 60 KB
+      are billed as 100,000 objects of 128 KB. The saving per gigabyte is real; you simply get
+      charged for more than twice the gigabytes you have.</p>
+<p>This is the most common S3 cost mistake after forgetting about egress, and it is made by
+      people doing the responsible thing: moving old data to cheaper storage.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Your rule, examined</p>
+<h2>Why Intelligent-Tiering was the right call</h2>
+</div>
+<div class="code">rule {
+  id     = "transition-avatars-to-intelligent-tiering"
+  status = "Enabled"
+  filter { prefix = "avatars/" }
+  transition {
+    days          = 90
+    storage_class = <span class="k">"INTELLIGENT_TIERING"</span>
+  }
+}</div>
+<p>Intelligent-Tiering is the one class with <strong>no retrieval fee and no minimum storage
+    duration</strong>. You pay a small monitoring charge — about <strong>$0.0025 per 1,000 objects
+    per month</strong> — and S3 moves each object between tiers based on whether it is actually
+    being read. Frequent → Infrequent after 30 days untouched, Archive Instant after 90, and
+    straight back to Frequent the moment someone reads it, at no charge.</p>
+<p>That matches your access pattern exactly, and your Terraform comment already reasoned it
+    out: avatars are never overwritten, each upload gets a fresh UUID, so <em>age alone does not
+    mean an object is unused</em>. An active user's avatar can be two years old and fetched daily.
+    Any rule based on age would be guessing. Intelligent-Tiering does not guess — it measures.</p>
+<div class="call">
+<h3>And the 128 KB rule protects you here too</h3>
+<p>Objects under 128 KB are <strong>never auto-tiered</strong> by Intelligent-Tiering. They
+      stay at the Frequent Access rate — the same price as Standard — and carry no monitoring
+      charge. So for typical small avatars the rule does nothing at all: no saving, no penalty,
+      just the one-off transition request.</p>
+<p>Which means your rule earns its keep only on the <em>larger</em> uploads, the ones
+      approaching your 5 MB cap. That is the honest assessment, and it is still the right rule,
+      because the alternative — a Standard-IA transition — would have cost you money on every
+      small object. <strong>You avoided the trap by choosing the class that has no trap.</strong></p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The cheapest line in your Terraform</p>
+<h2>Aborting what never finished</h2>
+</div>
+<div class="code">rule {
+  id     = "abort-incomplete-multipart-uploads"
+  status = "Enabled"
+  filter {}
+  abort_incomplete_multipart_upload { days_after_initiation = 7 }
+}</div>
+<p>A multipart upload that fails halfway leaves its uploaded parts in the bucket. Those parts:</p>
+<div class="tw"><table>
+<tbody>
+<tr><td class="key">are billed</td><td>as ordinary storage, every month, forever</td></tr>
+<tr><td class="key">are invisible</td><td>to <code>aws s3 ls</code> and to the console object list</td></tr>
+<tr><td class="key">have no owner</td><td>no key exists to delete, because the object was never completed</td></tr>
+</tbody>
+</table></div>
+<p>They can only be found with <code>list-multipart-uploads</code> and removed with
+    <code>abort-multipart-upload</code> — or automatically, by the rule above. Accounts have
+    discovered terabytes of them years later. Seven days is a sensible window: long enough for a
+    legitimate retry, short enough that nothing accumulates.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The gap</p>
+<h2>Nothing expires on the versioned bucket</h2>
+</div>
+<p>You proved this on Thursday. You uploaded one 20-byte file twice and deleted it twice, and
+    the bucket kept <strong>four</strong> entries:</p>
+<div class="code">object        demo/a/b/c.txt  size=20  latest=False
+object        demo/a/b/c.txt  size=20  latest=False
+DELETE MARKER demo/a/b/c.txt           latest=True
+DELETE MARKER demo/a/b/c.txt           latest=False</div>
+<p>Only an explicit <code>delete-object --version-id</code> on each removed them. Nothing in
+    the state backend's Terraform would ever have cleaned them up, because it has
+    <strong>no lifecycle configuration at all</strong>.</p>
+<div class="call warn">
+<h3>The rule that is missing</h3>
+<p>On a versioned bucket, <code>aws s3 rm</code> never frees storage — it adds a tombstone
+      and keeps paying for the object underneath. The fix is a lifecycle rule, and it is two
+      clauses:</p>
+</div>
+<div class="code">rule {
+  id     = "expire-old-state-versions"
+  status = "Enabled"
+  filter {}
+
+  <span class="k">noncurrent_version_expiration</span> {
+    noncurrent_days           = 90   <span class="c"># delete superseded versions after 90 days</span>
+    newer_noncurrent_versions = 10   <span class="c"># …but always keep the 10 most recent</span>
+  }
+
+  <span class="k">expiration</span> {
+    expired_object_delete_marker = true  <span class="c"># tidy markers with nothing left under them</span>
+  }
+}</div>
+<p>The second clause is the one people miss. When every version under a delete marker has
+    expired, the marker itself remains — a tombstone for a grave with nothing in it. It costs
+    almost nothing but it slows every listing and clutters every audit.</p>
+<p>At 28,459 bytes across three versions, none of this matters on your bucket today. It
+    matters on a bucket where Terraform state is written fifty times a day by CI, which is what
+    the same backend looks like in a real team.</p>
+<div class="call">
+<h3>Why 90 days and 10 versions, rather than one or the other</h3>
+<p><code>noncurrent_days</code> alone would delete every old version on a quiet bucket that
+      has not been applied in three months — removing exactly the history you would want after a
+      long gap. <code>newer_noncurrent_versions</code> alone would keep ten versions forever, even
+      if the last nine were written in one bad afternoon. Together they mean: <em>keep at least
+      the last ten, and anything older than 90 days beyond that goes.</em></p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">How to decide, generally</p>
+<h2>Three questions, in this order</h2>
+</div>
+<div class="split">
+<div class="card">
+<span class="tag">first</span>
+<h3>How big are the objects?</h3>
+<p>Under 128 KB, every class below Standard bills you for 128 KB. Stop here — the answer
+        is Standard or Intelligent-Tiering. Most "we should archive this" proposals die on this
+        question.</p>
+</div>
+<div class="card">
+<span class="tag">second</span>
+<h3>How long do they live?</h3>
+<p>Shorter than the minimum duration and the cheaper class costs more. 30 days for IA,
+        90 for Glacier, 180 for Deep Archive.</p>
+</div>
+<div class="card">
+<span class="tag">third</span>
+<h3>Do you know the access pattern?</h3>
+<p>If yes, pick the class directly. If no — and you usually do not —
+        Intelligent-Tiering measures it for you instead of making you guess.</p>
+</div>
+</div>
+<p class="u-margin-top-1rem">Only after all three does the price per gigabyte matter. Starting
+    from the price list and working backwards is how people end up with the middle row of the
+    table above.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Hands-on · ~5 minutes · read-only, costs nothing</p>
+<h2>Check your own bucket</h2>
+<p class="note">Warm the session first: <code>aws sts get-caller-identity --profile admin</code>.
+      Everything below only reads. <code>B=prima-tech-challenge-lisakalex-tfstate</code></p>
+</div>
+<div class="steps">
+<div class="step"><span class="n">1</span><div>
+<h3>Confirm the gap</h3>
+<p><code>aws s3api get-bucket-lifecycle-configuration --bucket $B --profile admin</code>
+        — expect <code>NoSuchLifecycleConfiguration</code>. That error <em>is</em> the finding.</p>
+</div></div>
+<div class="step"><span class="n">2</span><div>
+<h3>Check for orphaned multipart uploads</h3>
+<p><code>aws s3api list-multipart-uploads --bucket $B --profile admin</code> — empty output
+        means none. On an old bucket with no abort rule, this is where the surprise lives.</p>
+</div></div>
+<div class="step"><span class="n">3</span><div>
+<h3>See an object's storage class</h3>
+<p><code>aws s3api head-object --bucket $B --key senior-sre-tech-challenge/terraform.tfstate --profile admin</code>
+        — note that <code>StorageClass</code> is <strong>absent</strong>. Absent means STANDARD;
+        S3 only names the class when it is something else.</p>
+</div></div>
+<div class="step"><span class="n">4</span><div>
+<h3>Add up what versioning is actually storing</h3>
+<p><code>aws s3api list-object-versions --bucket $B --profile admin --query 'sum(Versions[].Size)'</code>
+        — you are billed for this number, not for the 181 bytes that <code>aws s3 ls</code> shows.</p>
+</div></div>
+<div class="step"><span class="n">5</span><div>
+<h3>Price it</h3>
+<p>Multiply that total by $0.023 per GB per month. Then note that the KMS key beside it
+        costs $1/month — <strong>the key protecting your state costs orders of magnitude more than
+        the state.</strong> Which is the right lesson about optimising storage classes on small data.</p>
+</div></div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check yourself</p>
+<h2>Four questions</h2>
+<p class="note">From memory, without opening the lesson. Two of these are arithmetic — do the
+      arithmetic rather than guessing the direction.</p>
+</div>
+<details>
+<summary>A colleague proposes moving 5 million log files, average 8 KB, from Standard to Glacier Instant Retrieval to "save 80%". What happens to the bill?</summary>
+<div class="answer"><p>Work out the billable size first, then the transition cost, then the minimum duration. Three separate charges, and only one of them is the price per GB.</p></div>
+</details>
+<details>
+<summary>Why does Intelligent-Tiering have no retrieval fee, when Standard-IA does? What is it charging for instead?</summary>
+<div class="answer"><p>Both classes have to make money on data that is read more than expected. They chose different mechanisms — one charges for being wrong, the other charges a flat fee for watching.</p></div>
+</details>
+<details>
+<summary>Your CI runs <code>terraform apply</code> 50 times a day on a versioned state bucket with no lifecycle rules. What is the shape of the bill after a year, and what does <code>aws s3 ls</code> show?</summary>
+<div class="answer"><p>Count the objects created, then ask which of them are visible. The gap between what you are billed for and what you can see is the whole point.</p></div>
+</details>
+<details>
+<summary>One Zone-IA is cheaper than Standard-IA and has the same eleven nines of durability. Why is it not the obvious default?</summary>
+<div class="answer"><p>Eleven nines is a statement about a failure mode. Ask which failure mode, and what is different about where the copies live.</p></div>
+</details>
+</section>
+<footer>
+<p>Module 03, Lesson 3.3 · syllabus, progress log and full revision Q&amp;A in <code>docs/AWS_COURSE.md</code></p>
+<p>This closes <strong>Module 3 — S3</strong>. Next: <strong>Module 4 — KMS</strong>, where the
+    key that has been the second lock in every lesson since 3.2 becomes the subject: envelope
+    encryption in detail, key policies, grants, rotation, and the cost of getting it wrong.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

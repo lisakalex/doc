@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Jenkins to GitHub Actions</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/p0-2-jenkins-to-github-actions.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Phase 0 · Lesson 0.2 · AWS + DevOps course</p>
+<h1>Jenkins to GitHub Actions</h1>
+<p class="lede">You maintain two Jenkins pipelines in production. GitHub Actions has the same
+  concepts under different names, and the renaming takes an afternoon. What catches Jenkins people
+  out is four places where the <em>mechanism</em> is different, and every one of them can quietly
+  break build-once-deploy-many.</p>
+<div class="facts">
+<span class="fact">~4 hours</span>
+<span class="fact">week 1</span>
+<span class="fact">builds Interchange's first workflow</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The renaming</p>
+<h2>Same concepts, three dialects</h2>
+</div>
+<p>GitLab CI is in the third column because UK adverts ask for it too. Read across a row: if you
+  can explain the Jenkins cell, you already understand the other two.</p>
+<div class="tw"><table>
+<thead><tr><th>Jenkins</th><th>GitHub Actions</th><th>GitLab CI</th></tr></thead>
+<tbody>
+<tr><td class="key">Jenkinsfile</td><td><code>.github/workflows/*.yml</code>, one or many</td><td><code>.gitlab-ci.yml</code>, exactly one (plus <code>include:</code>)</td></tr>
+<tr><td class="key">Controller</td><td>GitHub itself. You never see it</td><td>GitLab itself</td></tr>
+<tr><td class="key">Agent + label</td><td>Runner, chosen by <code>runs-on:</code></td><td>Runner, chosen by <code>tags:</code>, plus <code>image:</code> for the container</td></tr>
+<tr><td class="key">Executor</td><td>One job per runner at a time</td><td><code>concurrent</code> in the runner's config</td></tr>
+<tr><td class="key">Stage</td><td>Job (its own machine) or step (same machine)</td><td>Stage (an ordering), holding jobs</td></tr>
+<tr><td class="key"><code>sh '...'</code></td><td><code>run:</code></td><td><code>script:</code></td></tr>
+<tr><td class="key">Plugin</td><td>Action: <code>uses: owner/repo@ref</code></td><td>Mostly plain shell; <code>include:</code> templates, CI/CD components</td></tr>
+<tr><td class="key">Credentials store</td><td>Secrets, per repo or per environment</td><td>CI/CD variables, masked and protected</td></tr>
+<tr><td class="key"><code>parameters { }</code></td><td><code>workflow_dispatch: inputs:</code></td><td>Variables on a manual pipeline run</td></tr>
+<tr><td class="key"><code>when { branch 'main' }</code></td><td><code>if: github.ref == 'refs/heads/main'</code></td><td><code>rules: - if: $CI_COMMIT_BRANCH == "main"</code></td></tr>
+<tr><td class="key"><code>input 'Deploy?'</code></td><td><code>environment:</code> with required reviewers</td><td><code>when: manual</code>, or protected environment approvals</td></tr>
+<tr><td class="key"><code>stash</code> / <code>archiveArtifacts</code></td><td><code>actions/upload-artifact</code> / <code>download-artifact</code></td><td><code>artifacts: paths:</code>, passed to later stages automatically</td></tr>
+<tr><td class="key"><code>post { always { } }</code></td><td><code>if: always()</code> on a step or job</td><td><code>after_script:</code>, or <code>when: always</code></td></tr>
+<tr><td class="key"><code>disableConcurrentBuilds()</code></td><td><code>concurrency:</code> group</td><td><code>resource_group:</code></td></tr>
+<tr><td class="key">Shared library</td><td>Reusable workflow, composite action</td><td><code>include:</code> + <code>extends:</code></td></tr>
+<tr><td class="key">Webhook, <code>pollSCM</code>, <code>cron</code></td><td><code>on: push</code>, <code>pull_request</code>, <code>schedule</code></td><td>Pipelines run on every push by default; schedules in the UI</td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Worked example</p>
+<h2>A pipeline shaped like yours, translated</h2>
+</div>
+<p>Not your employer's pipeline, but the same shape: build and test, publish the jar to JFrog,
+  deploy it to UAT with Ansible, wait for a human, deploy the same version to production.</p>
+<div class="pair">
+<div><p class="lab">Jenkinsfile</p>
+<div class="code"><code>pipeline {
+  agent { label 'maven-jdk21' }
+  options { disableConcurrentBuilds() }
+  environment {
+    JFROG = credentials('jfrog-deployer')
+  }
+  stages {
+    stage('Build') {
+      steps {
+        sh 'mvn -B verify'
+        script {
+          env.VERSION = sh(returnStdout: true,
+            script: 'mvn -q help:evaluate ' +
+              '-Dexpression=project.version ' +
+              '-DforceStdout').trim()
+        }
+      }
+    }
+    stage('Publish') {
+      when { branch 'main' }
+      steps { sh 'mvn -B deploy -DskipTests' }
+    }
+    stage('Deploy UAT') {
+      when { branch 'main' }
+      steps {
+        sh "ansible-playbook deploy.yml " +
+           "-e env=uat -e version=${VERSION}"
+      }
+    }
+    stage('Approve') {
+      when { branch 'main' }
+      steps { input 'Deploy to production?' }
+    }
+    stage('Deploy prod') {
+      when { branch 'main' }
+      steps {
+        sh "ansible-playbook deploy.yml " +
+           "-e env=prod -e version=${VERSION}"
+      }
+    }
+  }
+}</code></div></div>
+<div><p class="lab">.github/workflows/release.yml</p>
+<div class="code"><code>name: release
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - id: v
+        run: |
+          v=$(./mvnw -q help:evaluate \
+            -Dexpression=project.version -DforceStdout)
+          echo "version=$v" &gt;&gt; "$GITHUB_OUTPUT"
+      - name: Build, test, and publish on main
+        run: |
+          goal=verify
+          [ "$GITHUB_REF" = refs/heads/main ] &amp;&amp; goal=deploy
+          ./mvnw -B -ntp "$goal"
+        env:
+          JFROG_USER: ${{ secrets.JFROG_USER }}
+          JFROG_TOKEN: ${{ secrets.JFROG_TOKEN }}
+
+  deploy-uat:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, uat]
+    environment: uat
+    steps:
+      - uses: actions/checkout@v7
+      - run: &gt;
+          ansible-playbook deploy.yml -e env=uat
+          -e version=${{ needs.build.outputs.version }}
+
+  deploy-prod:
+    needs: [build, deploy-uat]
+    runs-on: [self-hosted, prod]
+    environment: production   # reviewers = input
+    steps:
+      - uses: actions/checkout@v7
+      - run: &gt;
+          ansible-playbook deploy.yml -e env=prod
+          -e version=${{ needs.build.outputs.version }}</code></div></div>
+</div>
+<p class="note">Tags like <code>@v7</code> are shown for readability. The fourth difference below
+  is why Interchange pins every action to a commit SHA instead. The JFrog secrets are stored
+  credentials, exactly like Jenkins's; Lesson 0.3 removes them.</p>
+<p>Line by line it is a translation. Three choices in it are not obvious, and each one is answering
+  one of the differences below: <strong>build and publish happen in one job</strong>, the
+  <strong>deploy jobs run on self-hosted runners</strong>, and <strong>the deploy jobs pass a version
+  number, never a jar they built</strong>.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Where the mechanism differs</p>
+<h2>Four things that are not just renaming</h2>
+</div>
+
+<div class="diff">
+<div class="hd"><span class="n">1</span><h3>Every job is a fresh machine</h3></div>
+<p>A Jenkins agent is a long-lived server. The workspace from the last build is still on disk, and
+  <code>~/.m2</code> has two years of downloads in it. A GitHub-hosted runner is a new VM for
+  <em>every job</em>, thrown away when the job ends.</p>
+<ul>
+<li><strong>Nothing carries between jobs.</strong> A file built in job <code>build</code> does not
+  exist in job <code>deploy</code> unless you pass it with <code>upload-artifact</code> and
+  <code>download-artifact</code>, or through a registry.</li>
+<li><strong>The Maven cache starts empty.</strong> Without <code>cache: maven</code> on
+  <code>setup-java</code>, every job downloads Spring and Camel from scratch.</li>
+<li><strong>Jobs run in parallel unless you say otherwise.</strong> Three jobs with no
+  <code>needs:</code> all start at once, on three machines. Jenkins stages run in order by default;
+  Actions jobs do not.</li>
+</ul>
+<div class="mech"><p><span class="lbl">Because</span>the unit of isolation is the job, not the
+  pipeline. Steps share a machine; jobs never do.</p></div>
+<div class="fix"><p><span class="lbl">Upside</span>no drift. Cause 2 from
+  <a href="p0-1a-same-commit-different-bytes.html">Lesson 0.1a</a>, two agents with different JDK
+  patches, mostly disappears when every build starts from the same image.</p></div>
+</div>
+
+<div class="diff">
+<div class="hd"><span class="n">2</span><h3>Splitting a stage into a job can rebuild your artifact</h3></div>
+<p>In the Jenkinsfile, Publish runs <code>mvn deploy</code> after Build ran <code>mvn verify</code>.
+  That re-runs the whole lifecycle, but in the same workspace, so it mostly reuses
+  <code>target/</code>. Translate those two stages into two <em>jobs</em> and the second one is a
+  fresh machine: it re-resolves dependencies, recompiles and repackages. The jar in JFrog is no
+  longer the jar that was tested.</p>
+<p>The same trap, bigger: a deploy job that runs <code>mvn package</code> so it has something to
+  deploy. That is rebuilding per environment, the exact failure Lesson 0.1 exists to prevent, and in
+  YAML it looks perfectly reasonable.</p>
+<div class="mech"><p><span class="lbl">Because</span>"same pipeline" stopped meaning "same
+  machine". Anything a job produces from source, it produces again.</p></div>
+<div class="fix"><p><span class="lbl">Fix</span>build, test and publish in <strong>one job</strong>,
+  as the example does with <code>goal=deploy</code>. Later jobs receive a <strong>version</strong>
+  (or, from Phase 2, an image <strong>digest</strong>) and fetch that exact artifact. No job after
+  <code>build</code> ever runs a compiler.</p></div>
+</div>
+
+<div class="diff">
+<div class="hd"><span class="n">3</span><h3>A GitHub-hosted runner is outside your network</h3></div>
+<p>Your Jenkins agents sit inside the company network, next to the Mule servers. GitHub's runners
+  are on the public internet. A deploy job on <code>ubuntu-24.04</code> cannot reach
+  <code>10.20.0.15</code>, and should not be able to.</p>
+<ul>
+<li><strong>Self-hosted runner.</strong> You install the runner agent on a machine inside the
+  network; it dials <em>out</em> to GitHub and asks for work, so no inbound firewall hole is needed.
+  That is what <code>runs-on: [self-hosted, uat]</code> selects. Same idea as an inbound Jenkins
+  agent.</li>
+<li><strong>Cloud targets.</strong> For AWS this mostly goes away: the deploy calls AWS's public
+  APIs, and the question becomes how the job proves who it is. That is OIDC, next lesson.</li>
+</ul>
+<div class="mech"><p><span class="lbl">Because</span>the controller and the runners are GitHub's
+  machines, not yours. Where the work runs decides what it can reach.</p></div>
+</div>
+
+<div class="diff">
+<div class="hd"><span class="n">4</span><h3>An action is someone else's code, run with your token</h3></div>
+<p>A Jenkins plugin is installed once by an administrator. An action is fetched from another
+  GitHub repository <strong>on every run</strong>, at whatever <code>@v7</code> points to today, and
+  it runs with your <code>GITHUB_TOKEN</code> and any secrets the job can see.</p>
+<p><code>@v7</code> is a git tag, and a git tag can be moved. In March 2025 an attacker who got
+  write access to <code>tj-actions/changed-files</code>, used by tens of thousands of repositories,
+  repointed its version tags at a commit that printed the runner's secrets into the build logs
+  (CVE-2025-30066). Every workflow using a tag picked it up on its next run. Workflows pinned to a
+  commit SHA did not.</p>
+<div class="mech"><p><span class="lbl">Because</span>a tag is a mutable pointer and a SHA is a
+  content hash. This is Lesson 0.1's image tag versus digest, one layer up.</p></div>
+<div class="fix"><p><span class="lbl">Fix</span>pin every action to a full 40-character commit
+  SHA, with the version as a comment: <code>uses: actions/checkout@3d3c42e… # v7.0.1</code>.
+  Set <code>permissions: contents: read</code> at the top so the token can do almost nothing by
+  default. Let Dependabot (<code>package-ecosystem: github-actions</code>) raise PRs that bump the
+  SHAs.</p></div>
+</div>
+
+<div class="call warn">
+<h3>The approval gate, and a catch on private repos</h3>
+<p>A Jenkins <code>input</code> inside an agent block holds an executor the whole time it waits.
+  A job waiting on a GitHub environment's required reviewers holds no runner at all. But on GitHub's
+  Free, Pro and Team plans, required reviewers only work on <strong>public</strong> repositories.
+  Interchange is private for now, so it cannot have that gate yet. Making it public, which a
+  portfolio eventually needs anyway, turns it on.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The third dialect</p>
+<h2>The same pipeline in GitLab CI</h2>
+</div>
+<p>Two structural differences. <strong>Stages are an explicit ordered list</strong>, and jobs in
+  the same stage run in parallel. And <strong>artifacts flow to later stages
+  automatically</strong>; here a <code>dotenv</code> report passes the version along.</p>
+<div class="code"><code>stages: [build, uat, prod]
+
+build:
+  stage: build
+  image: eclipse-temurin:21-jdk        # pin by digest for real
+  script:
+    - echo "VERSION=$(./mvnw -q help:evaluate -Dexpression=project.version -DforceStdout)" &gt; build.env
+    - goal=verify; [ "$CI_COMMIT_BRANCH" = main ] &amp;&amp; goal=deploy
+    - ./mvnw -B -ntp "$goal"
+  artifacts:
+    reports:
+      dotenv: build.env                  # later jobs get $VERSION
+
+deploy-uat:
+  stage: uat
+  tags: [uat-network]                    # a runner inside the network
+  environment: uat
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - ansible-playbook deploy.yml -e env=uat -e version=$VERSION
+
+deploy-prod:
+  stage: prod
+  tags: [prod-network]
+  environment: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual                       # the input step
+  script:
+    - ansible-playbook deploy.yml -e env=prod -e version=$VERSION</code></div>
+<p class="note">GitLab's approval rules on protected environments are a paid-tier feature;
+  <code>when: manual</code> is the free version: anyone with permission to run the job can press
+  the button.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Build it</p>
+<h2>Interchange's first workflow</h2>
+</div>
+<p>You write this one; I review it. Create <code>.github/workflows/ci.yml</code> in Interchange.
+  The directory is already there with a <code>.gitkeep</code> in it. It is done when:</p>
+<ol class="todo">
+<li>It runs on every push to <code>main</code> and on every pull request.</li>
+<li>One job on <code>ubuntu-24.04</code>, Temurin 21 from <code>actions/setup-java</code>, with
+  the Maven cache on.</li>
+<li>It runs <code>./mvnw -B -ntp verify</code>, then <code>./mvnw -B -ntp -P release validate</code>,
+  so the SNAPSHOT rule from Lesson 0.1 is enforced by CI, not by memory.</li>
+<li><code>permissions: contents: read</code> at the top.</li>
+<li>A <code>concurrency:</code> group per branch with <code>cancel-in-progress: true</code>, so
+  pushing twice quickly does not run two builds of a stale commit.</li>
+<li>Every <code>uses:</code> pinned to a full commit SHA with the version as a comment. Look the
+  SHA up yourself:
+  <code>gh api repos/actions/checkout/commits/v7.0.1 --jq .sha</code></li>
+<li>It goes green on a push. Watch it with <code>gh run watch</code>.</li>
+</ol>
+<div class="call">
+<h3>Then break it on purpose</h3>
+<p>On a branch, add any <code>-SNAPSHOT</code> dependency to one service's POM and open a pull
+  request. The release check should go red. Read why with
+  <code>gh run view --log-failed</code>, find the enforcer's message, then close the PR and delete
+  the branch. A check you have never seen fail is a check you are only hoping works.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The exercise from the plan</p>
+<h2>Your own pipeline, translated</h2>
+</div>
+<p>From memory, sketch your work's build and deploy pipelines as a Jenkinsfile: stages, agent
+  labels, credentials, approvals. Use made-up names and no real hosts or secrets. Then translate it
+  to an Actions workflow and answer three questions in writing:</p>
+<ol class="todo">
+<li>Which stages became separate jobs, and does any later job now rebuild something? (Difference 2.)</li>
+<li>Which jobs need a self-hosted runner, and why? (Difference 3.)</li>
+<li>Which Jenkins plugins did you rely on, and what replaces each one? Is the replacement a
+  third-party action you would have to pin? (Difference 4.)</li>
+</ol>
+<p class="note">This is also the interview answer to "have you used GitHub Actions?": "Not in
+  production. I run Jenkins in production, and here is what changes when you move it."</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check</p>
+<h2>Five questions</h2>
+</div>
+<p>Out loud first, and end each answer with "because…".</p>
+<details><summary>You translate a Jenkinsfile into three jobs, <code>build</code>, <code>test</code> and <code>deploy</code>, with no <code>needs:</code> anywhere. What happens on the next push?</summary><div class="answer"><p><strong>All three start at the same moment, on three different machines.</strong> <code>deploy</code> runs before anything is built and has nothing to deploy. <code>test</code> has no build output either, so it either fails or quietly compiles its own copy.</p><p>Because Actions jobs are parallel by default and isolated from each other: no shared workspace, no ordering. Order comes only from <code>needs:</code>, and files move between jobs only through artifacts or a registry.</p></div></details>
+<details><summary>Your Jenkins pipeline runs <code>mvn verify</code> in Build and <code>mvn deploy -DskipTests</code> in Publish. In Actions you make Publish its own job. What changed, and why does it matter?</summary><div class="answer"><p><strong>Publish now rebuilds from scratch on a different machine.</strong> It re-resolves every dependency into an empty cache, recompiles and repackages. Every cause from Lesson 0.1a is back in play, and the jar that reaches JFrog is not the one whose tests passed.</p><p>Because in Jenkins both stages shared one workspace on one agent, and in Actions a job shares nothing. Fix: build, test and publish in one job, and give later jobs a version or digest, never source code to compile.</p></div></details>
+<details><summary>Your deploy job on <code>ubuntu-24.04</code> times out connecting to the UAT server. The same playbook works from Jenkins. Why?</summary><div class="answer"><p><strong>GitHub-hosted runners are on the public internet; your Jenkins agents are inside the company network.</strong> The UAT server is not reachable from outside, which is correct.</p><p>Fix: a self-hosted runner inside the network, selected with <code>runs-on: [self-hosted, uat]</code>. It connects out to GitHub to pick up jobs, so no inbound firewall rule is needed. Because where the job runs decides what it can reach.</p></div></details>
+<details><summary>A workflow uses <code>some-org/notify-slack@v2</code>. What is the risk, and what are the three fixes?</summary><div class="answer"><p><strong><code>v2</code> is a movable git tag on someone else's repository</strong>, and the code it points to runs inside your job with your token and your secrets. If that repository is compromised and the tag repointed, your next run executes the attacker's code. That is what happened with <code>tj-actions/changed-files</code> in March 2025.</p><p>Fixes: pin to a full commit SHA with the version as a comment; set <code>permissions: contents: read</code> so the token is nearly powerless by default; let Dependabot propose SHA bumps you review. Because a SHA is a content hash and cannot be repointed, the same reason you promote an image by digest.</p></div></details>
+<details><summary>In GitLab CI, what decides which machine runs a job, and what replaces Jenkins's <code>input</code> step?</summary><div class="answer"><p><strong><code>tags:</code> picks the runner</strong> (the label equivalent) and, on Docker-based runners, <code>image:</code> picks the container the job runs in. <strong><code>when: manual</code></strong> replaces <code>input</code>: the job waits until someone presses play. Protected environments with approval rules are the stricter, paid-tier version.</p><p>Because GitLab, like Actions, separates "where" (runner tags) from "what" (the job), and approval is a property of the job or environment rather than a step that blocks a running agent.</p></div></details>
+</section>
+
+<footer>
+<p>Sources: GitHub Actions documentation (workflow syntax, <code>actions/setup-java</code>,
+  self-hosted runners, deployments and environments: required reviewers on private repositories
+  need GitHub Enterprise); GitLab CI/CD YAML reference (<code>rules</code>, <code>when: manual</code>,
+  dotenv reports, <code>resource_group</code>); the Jenkins Pipeline syntax reference; GitHub's
+  security hardening guide on pinning actions to a full-length commit SHA; the
+  <code>tj-actions/changed-files</code> advisory, CVE-2025-30066. Action versions checked
+  14 October 2026: checkout v7.0.1, setup-java v6.0.1.</p>
+<p>Next: Lesson 0.3, Pipeline secrets and OIDC (week 2). Jenkins credentials, Parameter Store and
+  Secrets Manager: what each one actually guarantees, then OIDC so the workflow holds no key at all,
+  and path filters so one service's change rebuilds one service.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

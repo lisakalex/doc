@@ -1,0 +1,154 @@
+/* 01-aws-mental-model: page-specific rules only; shared design system is in assets/css/lesson.css */
+/* ---------- type ---------- */
+h1,h2,h3{
+  font-family:Archivo,"IBM Plex Sans",system-ui,sans-serif;
+  text-wrap:balance;
+  margin:0;
+  letter-spacing:-0.021em;
+}
+p code,li code,td code,th code{
+  font-size:.87em;
+  background:var(--surface-2);
+  border:1px solid var(--rule);
+  border-radius:4px;
+  padding:.06em .34em;
+  white-space:nowrap;
+}
+/* phone: long commands must wrap rather than push the page sideways */
+@media (max-width:30rem){p code,li code,td code,th code{white-space:normal;overflow-wrap:anywhere;}}
+
+/* ---------- masthead ---------- */
+.masthead{
+  display:flex;
+  flex-direction:column;
+  gap:1.15rem;
+  padding-bottom:2rem;
+  border-bottom:3px solid var(--ink);
+}
+.masthead .lede{margin-top:.15rem;}
+.facts{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.45rem .55rem;
+  margin-top:.3rem;
+}
+.fact{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:.73rem;
+  letter-spacing:.02em;
+  color:var(--muted);
+  border:1px solid var(--rule);
+  border-radius:2px;
+  padding:.24rem .5rem;
+  background:var(--surface);
+}
+
+/* ---------- sections ---------- */
+section{display:flex;flex-direction:column;gap:1.15rem;scroll-margin-top:1rem;counter-reset:q;}
+
+/* ---------- code ---------- */
+.code{
+  background:var(--code-bg);
+  color:var(--code-ink);
+  border-radius:7px;
+  padding:1.05rem 1.15rem;
+  overflow-x:auto;
+  font-family:"IBM Plex Mono",monospace;
+  font-size:.815rem;
+  line-height:1.72;
+  white-space:pre;
+  border:1px solid var(--rule);
+}
+
+/* ---------- segmented record (ARN / auth header) ---------- */
+.record{
+  overflow-x:auto;
+  background:var(--surface);
+  border:1px solid var(--rule);
+  border-radius:7px;
+  padding:1.15rem 1.15rem 1rem;
+}
+.seg-row{display:flex;align-items:flex-end;gap:.28rem;min-width:min-content;}
+.seg{display:flex;flex-direction:column;gap:.42rem;min-width:0;}
+.seg-tok{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:.85rem;
+  font-weight:500;
+  padding:.42rem .55rem;
+  border:1px solid var(--rule-strong);
+  border-bottom:2px solid var(--accent);
+  border-radius:4px 4px 0 0;
+  background:var(--surface-2);
+  white-space:nowrap;
+  color:var(--ink);
+}
+.seg-tok.empty{
+  color:var(--warn);
+  border-bottom-color:var(--warn);
+  background:var(--warn-soft);
+  font-style:italic;
+}
+.seg-lab{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:.66rem;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+  padding:0 .1rem;
+}
+.seg-lab.hi{color:var(--warn);font-weight:600;}
+.colon{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:.95rem;
+  color:var(--muted);
+  padding-bottom:1.55rem;
+}
+
+/* ---------- tables ---------- */
+.tw{overflow-x:auto;border:1px solid var(--rule);border-radius:7px;background:var(--surface);}
+td.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.bar{
+  display:inline-block;height:.42rem;border-radius:2px;background:var(--accent);
+  vertical-align:middle;margin-left:.5rem;opacity:.55;
+}
+.bar.far{background:var(--warn);opacity:.75;}
+
+/* ---------- callouts ---------- */
+.call{
+  border:1px solid var(--rule);
+  border-left:3px solid var(--accent);
+  background:var(--surface);
+  border-radius:0 7px 7px 0;
+  padding:.95rem 1.1rem;
+  display:flex;flex-direction:column;gap:.45rem;
+}
+
+/* ---------- split ---------- */
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(15.5rem,1fr));gap:1rem;}
+.card h3{color:var(--ink);}
+
+/* ---------- keepers ---------- */
+.keepers{display:flex;flex-direction:column;gap:0;border:1px solid var(--rule);border-radius:7px;overflow:hidden;background:var(--surface);}
+.keeper{display:grid;grid-template-columns:auto 1fr;gap:.9rem;padding:.95rem 1.1rem;border-bottom:1px solid var(--rule);}
+.keeper:last-child{border-bottom:none;}
+.keeper .dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);margin-top:.52rem;}
+.keeper p{font-size:.95rem;color:var(--ink-2);}
+.keeper b{color:var(--ink);font-weight:600;}
+
+/* ---------- self test ---------- */
+details{
+  background:var(--surface);
+  border:1px solid var(--rule);
+  border-radius:7px;
+  padding:0;
+  overflow:hidden;
+counter-increment:q;}
+
+/* former inline style attributes */
+.u-color-var-muted{color:var(--muted) !important;}
+.u-margin-top-35rem{margin-top:-.35rem !important;}
+.u-width-1-7rem{width:1.7rem !important;}
+.u-width-1-9rem{width:1.9rem !important;}
+.u-width-2-8rem{width:2.8rem !important;}
+.u-width-5-0rem{width:5.0rem !important;}

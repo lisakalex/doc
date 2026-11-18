@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mule Without Keys</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/mule-without-keys.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Design note · standalone — not part of the AWS course</p>
+<h1>Mule Without Keys</h1>
+<p class="lede">Reaching AWS Secrets Manager or Parameter Store from Mule without storing a
+    long-lived AWS access key. Written for an estate with <strong>standalone hybrid</strong>
+    runtimes on your own servers and <strong>CloudHub</strong> applications — because those two
+    can reach very different places, and pretending otherwise produces a design that quietly
+    fails on one of them.</p>
+<div class="facts">
+<span class="fact">standalone hybrid</span>
+<span class="fact">CloudHub</span>
+<span class="fact">2026-09-16</span>
+</div>
+</header>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The answer, before the detail</p>
+<h2>One runtime can do this. The other cannot.</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Runtime</th><th>Where it runs</th><th>Best achievable</th><th>Mechanism</th></tr></thead>
+<tbody>
+<tr><td class="key">standalone hybrid</td><td>your servers</td><td><span class="chip ok">no stored AWS key</span></td><td><strong>IAM Roles Anywhere</strong> — X.509 exchanged for temporary credentials</td></tr>
+<tr><td class="key">CloudHub</td><td><strong>MuleSoft's</strong> AWS account</td><td><span class="chip imp">a stored credential, or no AWS access at all</span></td><td>no customer workload identity to federate from</td></tr>
+</tbody>
+</table></div>
+<p>That asymmetry is the whole design. You own the on-premises hosts, so you can give them an
+    identity. You do not own the CloudHub workers, so you cannot — which means the useful goal is
+    <strong>no keys where it is achievable, and tightly scoped keys where it is not</strong>,
+    rather than one uniform approach that is weakest everywhere.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check this first</p>
+<h2>The connector decides whether any of this is possible</h2>
+</div>
+<p>Some MuleSoft AWS connectors expose only <em>Access Key</em> and <em>Secret Key</em> fields.
+    If yours does, it will force a static credential regardless of how good your federation is,
+    and the design is dead before it starts.</p>
+<p>You need an authentication option equivalent to <strong>"Default AWS Credentials Provider
+    Chain"</strong> or a role-based mode. That is what lets the underlying AWS Java SDK resolve
+    credentials from the environment instead of from connector fields.</p>
+<div class="verify">
+<h3>verify before designing</h3>
+<ul>
+<li>Open the connector in Exchange and confirm it offers the default provider chain or a role option.</li>
+<li>If it does not, the fallback is calling the AWS API over HTTPS with SigV4 from a Java module — workable, but substantially more code to own.</li>
+<li>Check whether an <strong>SSM / Parameter Store</strong> connector exists at all. Secrets Manager has a first-class connector; SSM may not, and that alone may decide which store you use.</li>
+</ul>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Part 1 · standalone hybrid</p>
+<h2>IAM Roles Anywhere</h2>
+</div>
+<p>OIDC federation is the usual answer for workloads outside AWS, but it needs a token issuer
+    — a Kubernetes API server, SPIRE, a CI provider. A standalone Mule runtime on a VM has none of
+    those. <strong>Roles Anywhere is the route that fits</strong>: the host proves itself with a
+    certificate from a CA you already operate.</p>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="Your certificate authority is registered in AWS as a Roles Anywhere trust anchor. It issues a short-lived X.509 certificate to the Mule host. The aws_signing_helper on that host presents the certificate to AWS STS and receives temporary credentials, which the AWS Java SDK inside Mule picks up from the default credential chain and uses to call Secrets Manager." role="img" viewbox="0 0 900 300">
+<defs>
+<marker id="m" markerheight="7" markerwidth="7" orient="auto-start-reverse" refx="9" refy="5" viewbox="0 0 10 10">
+<path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+</marker>
+</defs>
+<text fill="var(--accent)" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.3" x="24" y="28">ONE-OFF SETUP</text>
+<g fill="none" stroke="currentColor" stroke-width="1.4">
+<rect height="56" rx="5" width="168" x="24" y="44"></rect>
+<rect height="56" rx="5" width="220" x="330" y="44"></rect>
+</g>
+<g fill="currentColor" font-family="IBM Plex Sans, sans-serif">
+<text font-size="12.5" font-weight="600" text-anchor="middle" x="108" y="68">your CA / PKI</text>
+<text font-size="11" opacity=".68" text-anchor="middle" x="108" y="87">already exists</text>
+<text font-size="12.5" font-weight="600" text-anchor="middle" x="440" y="68">Roles Anywhere trust anchor</text>
+<text font-size="11" opacity=".68" text-anchor="middle" x="440" y="87">+ profile + IAM role</text>
+</g>
+<line color="var(--accent)" marker-end="url(#m)" stroke="var(--accent)" stroke-width="1.5" x1="192" x2="324" y1="72" y2="72"></line>
+<text fill="var(--accent)" font-family="IBM Plex Mono, monospace" font-size="10.5" text-anchor="middle" x="258" y="62">register once</text>
+<line stroke="var(--rule)" stroke-width="1" x1="24" x2="876" y1="126" y2="126"></line>
+<text fill="var(--good)" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.3" x="24" y="152">EVERY HOUR, AUTOMATICALLY</text>
+<g fill="none" stroke="currentColor" stroke-width="1.4">
+<rect height="78" rx="5" width="168" x="24" y="168"></rect>
+<rect height="78" rx="5" width="150" x="286" y="168"></rect>
+<rect height="78" rx="5" width="150" x="530" y="168"></rect>
+<rect height="78" rx="5" width="150" x="726" y="168"></rect>
+</g>
+<g fill="currentColor" font-family="IBM Plex Sans, sans-serif">
+<text font-size="12.5" font-weight="600" text-anchor="middle" x="108" y="194">Mule host</text>
+<text font-size="11" opacity=".68" text-anchor="middle" x="108" y="213">short-lived X.509</text>
+<text font-size="11" opacity=".68" text-anchor="middle" x="108" y="231">key in TPM if possible</text>
+<text font-size="12.5" font-weight="600" text-anchor="middle" x="361" y="200">signing helper</text>
+<text font-size="11" opacity=".68" text-anchor="middle" x="361" y="219">credential_process</text>
+<text font-size="12.5" font-weight="600" text-anchor="middle" x="605" y="200">AWS STS</text>
+<text font-size="11" opacity=".68" text-anchor="middle" x="605" y="219">checks the anchor</text>
+<text font-size="12.5" font-weight="600" text-anchor="middle" x="801" y="194">temporary creds</text>
+<text font-size="11" opacity=".68" text-anchor="middle" x="801" y="213">expire in ~1 hour</text>
+<text font-size="11" opacity=".68" text-anchor="middle" x="801" y="231">read by the SDK chain</text>
+</g>
+<g fill="none" marker-end="url(#m)" stroke="currentColor" stroke-width="1.5">
+<line x1="192" x2="280" y1="207" y2="207"></line>
+<line x1="436" x2="524" y1="207" y2="207"></line>
+</g>
+<line color="var(--good)" marker-end="url(#m)" stroke="var(--good)" stroke-width="1.6" x1="680" x2="720" y1="207" y2="207"></line>
+<text fill="currentColor" font-family="IBM Plex Sans, sans-serif" font-size="12" opacity=".72" text-anchor="middle" x="450" y="284">No AWS access key exists anywhere on this host, at any point.</text>
+</svg>
+</div>
+<figcaption>The certificate replaces the access key. The improvement is not that a file
+      disappears — it is that <strong>this file expires, can be hardware-bound, and can be
+      revoked</strong>, and an <code>AKIA</code> key is none of those.</figcaption>
+</figure>
+<h3>The wiring is one file</h3>
+<p>The signing helper implements AWS's <code>credential_process</code> contract, so the Java
+    SDK inside Mule picks up credentials with <strong>no application code change</strong>:</p>
+<div class="code"><span class="c"># ~/.aws/config on the Mule host</span>
+[profile mule]
+<span class="k">credential_process</span> = /opt/aws/aws_signing_helper credential-process \
+  --certificate      /etc/pki/mule.crt \
+  --private-key      /etc/pki/mule.key \
+  --trust-anchor-arn arn:aws:rolesanywhere:eu-west-1:111122223333:trust-anchor/… \
+  --profile-arn      arn:aws:rolesanywhere:eu-west-1:111122223333:profile/… \
+  --role-arn         arn:aws:iam::111122223333:role/mule-secrets-reader</div>
+<p>Then give the Mule runtime the profile. For a standalone runtime managed by the service
+    wrapper, that is an environment entry in the wrapper configuration:</p>
+<div class="code"><span class="c"># $MULE_HOME/conf/wrapper.conf</span>
+set.AWS_PROFILE=mule
+set.AWS_REGION=eu-west-1</div>
+<div class="verify">
+<h3>verify</h3>
+<ul>
+<li>Confirm the exact directive your runtime's wrapper uses for environment variables, and that it is inherited by the JVM — <code>set.NAME=value</code> is the Tanuki wrapper convention but check your version.</li>
+<li>Test outside Mule first: <code>AWS_PROFILE=mule aws sts get-caller-identity</code> on the host. If that returns an <code>assumed-role</code> ARN, the hard part is done.</li>
+</ul>
+</div>
+<h3>Two things that make this genuinely strong</h3>
+<div class="split">
+<div class="card">
+<span class="tag">issue short, renew often</span>
+<h3>Certificate lifetime</h3>
+<p>Days, not years, renewed automatically by your PKI. A compromised certificate expires
+        without anyone doing anything. This is the property an access key can never have.</p>
+</div>
+<div class="card">
+<span class="tag">PKCS#11</span>
+<h3>Key in a TPM or HSM</h3>
+<p>Roles Anywhere supports PKCS#11, so the private key never exists as a readable file.
+        <strong>This is the step that makes "no stored secret" literally true</strong> rather than
+        approximately true.</p>
+</div>
+</div>
+<h3>Scope the role to the certificate</h3>
+<p>Roles Anywhere surfaces certificate attributes as principal tags, so the trust policy can
+    name <em>which</em> certificate may assume the role — the same discipline as pinning
+    <code>sub</code> and <code>aud</code> in an OIDC trust policy:</p>
+<div class="code">"Condition": {
+  "StringEquals": { <span class="k">"aws:PrincipalTag/x509Subject/CN"</span>: "mule-prod-01" }
+}</div>
+<p>Without a condition like this, any certificate your CA has ever issued can assume the role —
+    including the one on a developer laptop. A CA is a wide trust boundary; narrow it here.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Part 2 · CloudHub</p>
+<h2>Why the same trick does not work here</h2>
+</div>
+<p>A CloudHub worker runs inside <strong>MuleSoft's</strong> AWS account, not yours. That single
+    fact removes both federation routes:</p>
+<div class="tw"><table>
+<tbody>
+<tr><td class="key">instance role</td><td>belongs to MuleSoft's account, and grants nothing in yours</td></tr>
+<tr><td class="key">IAM Roles Anywhere</td><td>requires a certificate and private key placed on the host — you do not control the host</td></tr>
+<tr><td class="key">OIDC federation</td><td>requires a workload identity token the platform issues to your app</td></tr>
+</tbody>
+</table></div>
+<div class="verify">
+<h3>verify — this is the one to check yourself</h3>
+<ul>
+<li>Confirm whether your CloudHub version exposes <strong>any</strong> workload identity token usable for <code>AssumeRoleWithWebIdentity</code>. If it does, that changes this section entirely and you should design around it instead.</li>
+<li>I would not rely on my answer here — platform capabilities move, and this is exactly the kind of thing that gains a feature between releases.</li>
+</ul>
+</div>
+<p>Assuming it does not, you have three options, and the first is better than it sounds:</p>
+<div class="steps">
+<div class="step"><span class="n">1</span><div>
+<h3>Give CloudHub no AWS access at all</h3>
+<p>Ask why the CloudHub app needs to read an AWS secret. Often it needs the <em>thing the
+        secret unlocks</em>, not the secret. Put that capability behind an internal API served from
+        the on-premises tier — which already has a real AWS identity — and let CloudHub call it
+        over your existing connectivity.</p>
+<p><strong>The credential never leaves the environment that can hold it safely.</strong>
+        This is usually the right answer and it is usually dismissed too quickly.</p>
+</div></div>
+<div class="step"><span class="n">2</span><div>
+<h3>Let Anypoint hold what CloudHub needs</h3>
+<p>If the value is genuinely needed in CloudHub and is not an AWS credential, keep it in
+        Anypoint's own secure configuration rather than fetching it from AWS. One store, one
+        owner, no synchronisation problem.</p>
+</div></div>
+<div class="step"><span class="n">3</span><div>
+<h3>A stored AWS credential, scoped hard</h3>
+<p>If neither works, accept level 3 deliberately rather than by accident, and make the
+        blast radius small.</p>
+</div></div>
+</div>
+<p>If you land on option 3, the credential should be able to do exactly one thing:</p>
+<div class="code">{ "Effect": "Allow",
+  "Action": ["secretsmanager:GetSecretValue"],
+  "Resource": "arn:aws:secretsmanager:eu-west-1:111122223333:secret:cloudhub/orders-*" },
+{ "Effect": "Allow",
+  "Action": ["kms:Decrypt"],
+  "Resource": "arn:aws:kms:eu-west-1:111122223333:key/…" }</div>
+<div class="call warn">
+<h3>Four things to do alongside it</h3>
+<p><strong>Wildcard the ARN suffix.</strong> Secrets Manager appends six random characters
+      that change if the secret is recreated — <code>secret:cloudhub/orders-*</code>, not the full
+      ARN, or the policy silently stops matching one day.</p>
+<p><strong>Rotate it on a calendar.</strong> There is no automation path here; put it in a
+      schedule and treat a missed rotation as a finding.</p>
+<p><strong>Alarm on use from anywhere unexpected.</strong> CloudTrail records the source IP
+      of every call. That credential should only ever be used from CloudHub's ranges — anything
+      else is an incident, and it is the only detection you get.</p>
+<p><strong>Write down that it is level 3 and why.</strong> An accepted risk with a reason is
+      an engineering decision. The same risk undocumented is an oversight, and the difference is
+      entirely visible in a review.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Both runtimes</p>
+<h2>Fetch once, not per message</h2>
+</div>
+<p>Whatever the credential path, do not call AWS on every message. It adds a network round trip
+    to your latency, costs per request, and will eventually throttle under load.</p>
+<div class="tw"><table>
+<tbody>
+<tr><td class="key">cache with a TTL</td><td>Object Store with an expiry of minutes to hours, sized to how often the value can change</td></tr>
+<tr><td class="key">re-fetch on auth failure</td><td>if the downstream rejects the credential, invalidate the cache entry and retry <strong>once</strong></td></tr>
+<tr><td class="key">never at property-resolution time</td><td>secure properties resolve at <strong>startup</strong>, so a value read that way is frozen until redeploy</td></tr>
+</tbody>
+</table></div>
+<div class="call">
+<h3>That last row is the one that surprises people</h3>
+<p>If the secret arrives as a <code>secure::</code> property placeholder, the application
+      reads it once when it deploys. Rotate the value in AWS and the running app carries on with
+      the old one until someone redeploys — and the failure appears days later, at an unrelated
+      moment, looking like a connectivity problem.</p>
+<p>Fetching <em>inside the flow</em> with a cache is what makes rotation invisible. It is a
+      deliberate design choice, not the default.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Which store</p>
+<h2>Parameter Store unless something rotates</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th></th><th>Parameter Store SecureString</th><th>Secrets Manager</th></tr></thead>
+<tbody>
+<tr><td class="key">cost</td><td class="num"><strong>free</strong></td><td class="num">$0.40 per secret / month</td></tr>
+<tr><td class="key">rotation</td><td>none</td><td>built in, but see below</td></tr>
+<tr><td class="key">Mule connector</td><td><strong>verify it exists</strong></td><td>first-class connector available</td></tr>
+<tr><td class="key">encryption</td><td>KMS — same two-lock permission model</td><td>KMS — same</td></tr>
+</tbody>
+</table></div>
+<p>For your estate, rotation is largely manual anyway: nothing automated can reach a database
+    on your own network without either exposing it or building a tunnel, and CloudHub cannot be
+    rotated into. So Secrets Manager's headline feature is mostly unavailable to you, and
+    <strong>Parameter Store is the honest default</strong> — provided a connector exists.</p>
+<p>If no SSM connector exists, use Secrets Manager rather than hand-writing SigV4 to save
+    $4.80 a year. That is the wrong trade, and it is the sort of decision that looks clever in a
+    design document and expensive in a maintenance window.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Before you build</p>
+<h2>Verification checklist</h2>
+<p class="note">Everything here that I could not confirm from your environment. Confirm these
+      before committing to the design — several would change it.</p>
+</div>
+<div class="verify">
+<h3>confirm</h3>
+<ul>
+<li>The AWS connector offers a <strong>default credential provider chain</strong> or role option, not just key fields.</li>
+<li>Whether an <strong>SSM / Parameter Store</strong> connector exists for your runtime version.</li>
+<li>Whether <strong>CloudHub</strong> exposes any workload identity token usable for web-identity federation.</li>
+<li>The wrapper directive that sets environment variables for your standalone runtime, and that the JVM inherits them.</li>
+<li>That your CA can issue <strong>short-lived</strong> certificates automatically — if renewal is manual, you have replaced one long-lived secret with another.</li>
+<li>Whether your hosts have a <strong>TPM</strong> usable through PKCS#11. Without it the private key is a readable file, and the design is "much better" rather than "no stored secret".</li>
+</ul>
+</div>
+</section>
+<footer>
+<p>Standalone design note — deliberately <strong>not</strong> part of the AWS course and
+    not listed in <code>docs/AWS_COURSE.md</code>. Kept at
+    <code>docs/mule-without-keys.html</code>.</p>
+<p>Related course material, if useful: <strong>Lesson 2.6</strong> on the levels of secret
+    management and rotation mechanics, and <strong>Lesson 2.4</strong> on scoping a federated trust
+    policy with <code>sub</code> and <code>aud</code> — the same discipline as pinning a
+    certificate subject above.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

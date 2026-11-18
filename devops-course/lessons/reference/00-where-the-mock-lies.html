@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Where the Mock Lies</title>
+<link rel="icon" href="../../assets/img/favicon-reference.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/00-where-the-mock-lies.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Reference sheet · AWS + DevOps course</p>
+<h1>Where the Mock Lies</h1>
+<p class="lede">You can run most of this course's hands-on work with no AWS account, no credentials and
+      no spend — the real <code>aws</code> CLI against a local fake, with the repo's own buckets, tables,
+      key and role already in it. What you cannot do is trust all of it. A mock that refuses the wrong
+      things teaches you wrong things, and this one succeeds in four places where AWS would refuse.</p>
+<div class="facts">
+<span class="fact">uv run assets/scripts/sandbox.py</span>
+<span class="fact">moto 5, server mode</span>
+<span class="fact">23 behaviours measured</span>
+<span class="fact">$0.00</span>
+</div>
+</header>
+<section>
+<p class="eyebrow">The one command</p>
+<h2>A local account, seeded to match your Terraform</h2>
+<div class="code"><span class="c"># terminal 1 — boots moto in server mode and creates what terraform/ creates</span>
+uv run assets/scripts/sandbox.py
+
+<span class="c"># terminal 2 — point the CLI at it, then run the lessons</span>
+export AWS_CONFIG_FILE=assets/scripts/sandbox.aws.config
+aws kms describe-key --key-id alias/prima-tech-challenge-avatars <span class="w">--profile sandbox</span> \
+    --query <span class="g">'KeyMetadata.[KeyState,Origin,KeyManager]'</span> --output text
+<span class="c"># Enabled   AWS_KMS   CUSTOMER</span></div>
+<p>Every command in every lesson works unchanged except for one word: where the lesson says
+      <code>--profile admin</code>, say <code>--profile sandbox</code>. No endpoint flags, no
+      <code>awslocal</code> wrapper — the AWS CLI reads <code>endpoint_url</code> straight out of the
+      profile.</p>
+<p>The sandbox is seeded with the resources <code>terraform/main.tf</code> and
+      <code>terraform/state-backend/</code> really create, under the same names: the avatars CMK with
+      rotation on and its alias, both buckets versioned and encrypted with that key and fully
+      public-access-blocked, the <code>users</code> table keyed on <code>email</code>, the
+      <code>prima-tech-challenge-tfstate-lock</code> table keyed on <code>LockID</code>, and
+      <code>prima-app-role</code> carrying its three real statements.</p>
+<div class="tw"><table>
+<thead><tr><th>Tool</th><th>What it is</th><th>What it is for</th></tr></thead>
+<tbody>
+<tr><td class="key">moto, as a library</td><td>in-process fake, <code>@mock_aws</code></td><td>Your <code>app/tests/</code> suite already uses it, and so do <code>envelope.py</code> and <code>access_patterns.py</code>.</td></tr>
+<tr><td class="key">moto, server mode</td><td>the same fake over HTTP on <code>:5055</code></td><td>The real CLI. This is what <code>sandbox.py</code> runs.</td></tr>
+<tr><td class="key">LocalStack CE</td><td>container on <code>:4566</code></td><td>Running the application itself. <code>docker-compose.yml</code> already has the profile: <code>docker compose --profile localstack up</code>.</td></tr>
+</tbody>
+</table></div>
+<p class="note">State lives in memory. Stopping the server deletes the account, which is the one way this
+      is better than AWS: there is no teardown step and no bill to check afterwards.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Measured, not assumed</p>
+<h2>What it gets right, module by module</h2>
+</div>
+<p>Every row below was probed against moto 5 before being written down, and
+      <code>uv run assets/scripts/sandbox.py --fidelity</code> prints the same table so you can re-measure
+      after an upgrade.</p>
+<div class="tw"><table>
+<thead><tr><th>Module</th><th>What the lesson does</th><th></th><th>Behaviour</th></tr></thead>
+<tbody>
+<tr><td class="key">2</td><td><code>sts get-caller-identity</code></td><td><span class="chip ok">real</span></td><td>returns an <code>arn:aws:sts:</code> identity</td></tr>
+<tr><td class="key">2</td><td><code>sts assume-role</code></td><td><span class="chip exp">fake</span></td><td>a <code>Deny</code> in the trust policy is ignored; it always succeeds</td></tr>
+<tr><td class="key">2</td><td>explicit <code>Deny</code> beats <code>Allow</code></td><td><span class="chip off">absent</span></td><td>no IAM evaluation at all — every call is permitted</td></tr>
+<tr><td class="key">2</td><td><code>iam simulate-principal-policy</code></td><td><span class="chip off">absent</span></td><td>not implemented</td></tr>
+<tr><td class="key">3</td><td>put/get object, presigned URLs</td><td><span class="chip ok">real</span></td><td></td></tr>
+<tr><td class="key">3</td><td>versioning and delete markers</td><td><span class="chip ok">real</span></td><td>versions kept, marker created on delete</td></tr>
+<tr><td class="key">3</td><td>lifecycle rules, storage classes</td><td><span class="chip imp">partial</span></td><td>accepted and stored; no transition ever runs</td></tr>
+<tr><td class="key">3</td><td>bucket policy with an explicit <code>Deny</code></td><td><span class="chip ok">real</span></td><td>returns 403</td></tr>
+<tr><td class="key">3</td><td>bucket policy with only an <code>Allow</code></td><td><span class="chip exp">fake</span></td><td>no implicit deny — unlisted keys are still served</td></tr>
+<tr><td class="key">4</td><td><code>create-key</code>, <code>Origin</code>, <code>KeyState</code></td><td><span class="chip ok">real</span></td><td><code>AWS_KMS</code>, <code>Enabled</code></td></tr>
+<tr><td class="key">4</td><td><code>enable-key-rotation</code> and its status</td><td><span class="chip ok">real</span></td><td><code>KeyRotationEnabled</code> flips to true</td></tr>
+<tr><td class="key">4</td><td><code>list-key-rotations</code></td><td><span class="chip imp">partial</span></td><td>works by key ID; always an empty list</td></tr>
+<tr><td class="key">4</td><td>rotation status refusing an alias</td><td><span class="chip ok">real</span></td><td>AWS takes key ID or ARN only here, and so does moto</td></tr>
+<tr><td class="key">4</td><td><code>generate-data-key</code>, encrypt, decrypt</td><td><span class="chip ok">real</span></td><td>32-byte data key, round trip works</td></tr>
+<tr><td class="key">4</td><td><code>schedule-key-deletion</code></td><td><span class="chip ok">real</span></td><td><code>PendingDeletion</code> and the deletion date both correct</td></tr>
+<tr><td class="key">4</td><td><code>cancel-key-deletion</code> leaves it <code>Disabled</code></td><td><span class="chip ok">real</span></td><td>the two-step recovery behaves exactly as taught</td></tr>
+<tr><td class="key">4</td><td>a <code>Disabled</code> key refusing to decrypt</td><td><span class="chip exp">fake</span></td><td>decrypt keeps working; the outage never happens</td></tr>
+<tr><td class="key">4</td><td>a key policy denying <code>kms:Decrypt</code></td><td><span class="chip exp">fake</span></td><td>stored, never evaluated</td></tr>
+<tr><td class="key">4</td><td>ciphertext being opaque</td><td><span class="chip exp">fake</span></td><td>the blob is <code>base64(key-id + plaintext)</code></td></tr>
+<tr><td class="key">5</td><td>GetItem, Query, Scan, pagination</td><td><span class="chip ok">real</span></td><td></td></tr>
+<tr><td class="key">5</td><td><code>ScannedCount</code> vs <code>Count</code></td><td><span class="chip ok">real</span></td><td>Lesson 5.1's evidence works: 2 scanned, 1 returned</td></tr>
+<tr><td class="key">5</td><td>conditional writes</td><td><span class="chip ok">real</span></td><td><code>ConditionalCheckFailedException</code> raised correctly</td></tr>
+<tr><td class="key">5</td><td><code>ConsumedCapacity</code></td><td><span class="chip exp">fake</span></td><td>always 1.0, whatever the item size</td></tr>
+<tr><td class="key">5</td><td><code>on_demand_throughput</code> maximum</td><td><span class="chip off">absent</span></td><td>the field is dropped from <code>describe-table</code></td></tr>
+<tr><td class="key">5</td><td>throttling, hot partitions, adaptive capacity</td><td><span class="chip off">absent</span></td><td>no capacity model exists to exceed</td></tr>
+</tbody>
+</table></div>
+<p><span class="chip exp">fake</span> is the only column that can hurt you. The others are honest:
+      a command that errors tells you to stop, and a value that is stored but inert is visibly inert.
+      A call that <em>succeeds</em> where AWS would refuse lets you finish a lesson with the opposite
+      conclusion to the one it was teaching.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The three that matter</p>
+<h2>Where it will mislead you, specifically</h2>
+</div>
+<h3>1 · Nothing is denied, ever</h3>
+<p>There is no IAM evaluation. Not a partial one — none. Create a role whose trust policy denies every
+      principal on earth, then assume it:</p>
+<div class="code"><span class="c"># trust policy: { "Effect": "Deny", "Principal": { "AWS": "*" }, "Action": "sts:AssumeRole" }</span>
+aws sts assume-role --role-arn arn:aws:iam::123456789012:role/denyrole \
+    --role-session-name probe --profile sandbox
+<span class="g">arn:aws:sts::123456789012:assumed-role/denyrole/probe</span> <span class="c"># AWS: AccessDenied</span></div>
+<p>So <strong>Module 2 is the one part of this course you cannot do hands-on for free.</strong> Lesson
+      2.3 (explicit deny wins), 2.4 (the missing claim) and 2.2 (how role assumption works) all turn on a
+      refusal that never comes. The policy simulator, which Lesson 2.3 uses as its instrument, is not
+      implemented at all.</p>
+<p>LocalStack can enforce IAM — identity policies, resource policies, permissions boundaries and SCPs
+      together, with an error naming the policy that denied you — behind <code>ENFORCE_IAM=1</code>. It is
+      a paid feature, not in Community. moto has its own access control behind
+      <code>INITIAL_NO_AUTH_ACTION_COUNT</code>, which its documentation describes as "very basic".
+      Neither is a substitute for reading the evaluation rules and reasoning.</p>
+<h3>2 · A disabled key still decrypts</h3>
+<p>Lesson 4.2's claim is that disabling a key is the one action that is instant, total and fully
+      reversible — the kill switch. Here it kills nothing:</p>
+<div class="code">aws kms disable-key --key-id $KID --profile sandbox
+aws kms encrypt --key-id $KID --plaintext "$(echo -n hello | base64)" --profile sandbox
+<span class="g">NjllNTQzOWItOWFhYS00MTVmLTgwMWUtOGUxOTI0MDc3YjgzaGVsbG8=</span> <span class="c"># AWS: KMSInvalidStateException</span></div>
+<p>And look at that blob. Base64-decode it and you get the key ID followed by the word
+      <code>hello</code>. The sandbox's "ciphertext" is a concatenation, so it will faithfully demonstrate
+      the <em>shape</em> of envelope encryption — which is what <code>envelope.py</code> uses it for — and
+      will tell you nothing whatsoever about confidentiality.</p>
+<div class="call">
+<h3>The half that is real is the useful half</h3>
+<p>Every KMS <em>state transition</em> is faithful. <code>Enabled</code> →
+        <code>schedule-key-deletion</code> → <code>PendingDeletion</code> with a correct seven-day
+        deletion date → <code>cancel-key-deletion</code> → <code>Disabled</code>, which is precisely the
+        two-step recovery in Lesson 4.3's fourth revision question, and you can now walk it on a
+        keyboard instead of in your head. What the sandbox omits is the consequence of the state, not
+        the state.</p>
+</div>
+<h3>3 · Capacity is a constant</h3>
+<div class="code">900-byte item   ConsumedCapacity 1.0     <span class="c"># AWS: 1 WCU</span>
+10 KB item      ConsumedCapacity <span class="w">1.0</span> <span class="c"># AWS: 10 WCU</span></div>
+<p>Which erases most of Lesson 5.2. The 28.9% break-even, the 3,000-read / 1,000-write per-partition
+      ceiling, burst capacity, adaptive capacity, the four kinds of throttling — none of it has a model
+      behind it here. This is exactly why <code>access_patterns.py</code> computes read units in Python
+      from item sizes rather than reading <code>ConsumedCapacity</code> out of the response: the number
+      moto returns is a placeholder, and a lesson built on it would have been a lesson built on 1.0.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">What is simply not there</p>
+<h2>The modules this cannot reach</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Missing</th><th>Affects</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>EKS, ECS, RDS, CloudFront</td><td>Modules 7, 10</td><td>LocalStack Pro only. Kubernetes has its own answer: <code>kind</code> or <code>minikube</code> runs the <code>helm/</code> chart locally for free, with no AWS in the picture.</td></tr>
+<tr><td>Config, Organizations, Control Tower, GuardDuty</td><td>Module 11, DOP-C02 Domain 6</td><td>LocalStack Pro only.</td></tr>
+<tr><td>Cost Explorer, billing, Budgets</td><td>Module 14</td><td>Cannot be simulated at all. A mock has no bill. Module 14 needs a real account or nothing, which is its own lesson.</td></tr>
+<tr><td>VPC behaviour — routing, NAT, security groups</td><td>Module 6</td><td>The API calls succeed and the objects exist; no packet is ever routed, so nothing can be tested by reachability.</td></tr>
+</tbody>
+</table></div>
+<p>The pattern across all four: <strong>anything whose lesson is a consequence rather than a
+      configuration</strong>. The sandbox is excellent at "what did I declare" and poor at "what happens
+      because of it".</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The rule</p>
+<h2>How to use an instrument with a known bias</h2>
+</div>
+<div class="steps">
+<div class="step"><div class="n">1</div><div>
+<h3>Run the fidelity table first, not the lesson</h3>
+<p><code>uv run assets/scripts/sandbox.py --fidelity</code>. If the behaviour you are about to exercise
+        is in the <span class="chip exp">fake</span> column, the sandbox cannot answer your question and
+        a success proves nothing.</p>
+</div></div>
+<div class="step"><div class="n">2</div><div>
+<h3>Treat a refusal as evidence and a success as a question</h3>
+<p>When the mock refuses, it is almost always right — refusals are the part that has to be written
+        deliberately. When it succeeds, ask whether AWS would have.</p>
+</div></div>
+<div class="step"><div class="n">3</div><div>
+<h3>Re-measure after upgrading</h3>
+<p>The table is a snapshot of moto 5. <span class="chip exp">fake</span> rows are the ones most likely
+        to become real, because they are bugs people file. That is a good thing to notice rather than
+        assume.</p>
+</div></div>
+<div class="step"><div class="n">4</div><div>
+<h3>Keep the real account for the consequences</h3>
+<p>If an account is available at all, spend it on the four things above — a denied IAM call, a
+        disabled key breaking a running service, a throttled table, a bill. Everything else can be done
+        here for nothing.</p>
+</div></div>
+</div>
+<div class="call warn">
+<h3>A worked example of the rule, from building this page</h3>
+<p><code>get-key-rotation-status</code> refused an alias and I assumed the mock was broken. The KMS
+        API reference says the parameter takes "the key ID or key ARN" — no alias — so the refusal was
+        correct and my command was wrong. It is the same family as
+        <code>cancel-key-deletion</code> in Lesson 4.3, which also takes a key ID or ARN and never an
+        alias. The mock taught me something true by saying no.</p>
+</div>
+</section>
+<footer>
+<p>Reference sheet · AWS + DevOps course · 4 October 2026</p>
+<p>Runnable: <code>uv run assets/scripts/sandbox.py</code> to boot and seed it,
+      <code>--fidelity</code> for the table above, <code>--install-profile</code> to put
+      <code>[profile sandbox]</code> in <code>~/.aws/config</code>. Config at
+      <code>assets/scripts/sandbox.aws.config</code>. The application path is
+      <code>docker compose --profile localstack up</code>, which was already in the repo.</p>
+<p>Every row in the fidelity table was produced by running the operation against moto 5 in server mode
+      through the AWS CLI v2 and comparing the result with the AWS API reference for that operation —
+      not from moto's own coverage docs, which list which calls exist rather than which behave. Checked
+      against primary sources: the KMS API reference for <code>GetKeyRotationStatus</code> and key states,
+      the DynamoDB documentation for capacity-unit arithmetic, the LocalStack documentation for IAM policy
+      enforcement and its plan requirement, and moto's documentation for its own access control.</p>
+<p>Companion to every hands-on section in Modules 2–5, and the reason those sections can continue now
+      that the account is torn down.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

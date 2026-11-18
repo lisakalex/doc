@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Where You Actually Are</title>
+<link rel="icon" href="../../assets/img/favicon-reference.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/00-placement.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Placement · AWS + DevOps course</p>
+<h1>Where You Actually Are</h1>
+<p class="lede">Thirty-two questions that separate having read about something from having fixed it at
+  two in the morning, plus eight about what you have actually run. It marks itself as you go and tells
+  you which parts of the course to skip.</p>
+<div class="facts">
+<span class="fact">40 questions</span>
+<span class="fact">about an hour</span>
+<span class="fact">marks itself</span>
+<span class="fact">nothing is sent anywhere</span>
+</div>
+</header>
+<section>
+<div class="sec-head">
+<p class="eyebrow">How to take it</p>
+<h2>Mark yourself honestly, because the only person it can mislead is you</h2>
+</div>
+<p>Each question opens to a model answer. Read the question, answer it in your head <em>first</em> — out
+  loud is better — then open it and mark which of three you were.</p>
+<div class="split">
+<div class="card"><span class="tag">0 points</span><p><strong>New to me.</strong> You did not know this,
+  or you knew a word and not the mechanism.</p></div>
+<div class="card"><span class="tag">1 point</span><p><strong>I know the idea.</strong> You could explain
+  it correctly to someone. You have not had to use it under pressure.</p></div>
+<div class="card"><span class="tag">2 points</span><p><strong>I have debugged this for real.</strong>
+  This has cost you an evening at some point. You would recognise it again from the symptoms.</p></div>
+</div>
+<div class="call warn">
+<h3>The one way to get a useless result</h3>
+<p>Marking 1 when you mean 0, because the answer looked familiar once you read it. Recognition is not
+  recall, and an interviewer will not show you the answer first. If reading the answer is the first time
+  the mechanism made sense, that is a 0 and a 0 is useful — it is the difference between a course that
+  teaches you something and a course that bores you.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Part A · not scored</p>
+<h2>What you have actually run</h2>
+</div>
+<p>This part changes the plan more than the quiz does. Eight weeks of Kubernetes means something
+  different to someone who has never held a pager than to someone who has.</p>
+<div class="u-display-flex-flex-direction-column-gap-7rem">
+<fieldset class="xp" id="xp-yrs"><legend class="qt">How long have you been responsible for software that other people depended on while it ran?</legend><div class="opts">
+<label class="opt"><input id="xp-yrs-0" name="xp-yrs" type="radio" value="Not yet"/><span>Not yet</span></label>
+<label class="opt"><input id="xp-yrs-1" name="xp-yrs" type="radio" value="Under a year"/><span>Under a year</span></label>
+<label class="opt"><input id="xp-yrs-2" name="xp-yrs" type="radio" value="One to three years"/><span>One to three years</span></label>
+<label class="opt"><input id="xp-yrs-3" name="xp-yrs" type="radio" value="Three to five years"/><span>Three to five years</span></label>
+<label class="opt"><input id="xp-yrs-4" name="xp-yrs" type="radio" value="More than five"/><span>More than five</span></label>
+</div></fieldset>
+<fieldset class="xp" id="xp-acc"><legend class="qt">What production access have you held?</legend><div class="opts">
+<label class="opt"><input id="xp-acc-0" name="xp-acc" type="radio" value="None"/><span>None</span></label>
+<label class="opt"><input id="xp-acc-1" name="xp-acc" type="radio" value="Read-only — logs and dashboards"/><span>Read-only — logs and dashboards</span></label>
+<label class="opt"><input id="xp-acc-2" name="xp-acc" type="radio" value="Deploy, with someone watching"/><span>Deploy, with someone watching</span></label>
+<label class="opt"><input id="xp-acc-3" name="xp-acc" type="radio" value="Deploy and roll back on my own authority"/><span>Deploy and roll back on my own authority</span></label>
+</div></fieldset>
+<fieldset class="xp" id="xp-onc"><legend class="qt">On-call?</legend><div class="opts">
+<label class="opt"><input id="xp-onc-0" name="xp-onc" type="radio" value="Never"/><span>Never</span></label>
+<label class="opt"><input id="xp-onc-1" name="xp-onc" type="radio" value="Informally — people phoned me"/><span>Informally — people phoned me</span></label>
+<label class="opt"><input id="xp-onc-2" name="xp-onc" type="radio" value="A real rota with a pager"/><span>A real rota with a pager</span></label>
+</div></fieldset>
+<fieldset class="xp" id="xp-sys"><legend class="qt">The largest system you have operated, not written</legend><div class="opts">
+<label class="opt"><input id="xp-sys-0" name="xp-sys" type="radio" value="Personal projects"/><span>Personal projects</span></label>
+<label class="opt"><input id="xp-sys-1" name="xp-sys" type="radio" value="One application and its database"/><span>One application and its database</span></label>
+<label class="opt"><input id="xp-sys-2" name="xp-sys" type="radio" value="Several services that call each other"/><span>Several services that call each other</span></label>
+<label class="opt"><input id="xp-sys-3" name="xp-sys" type="radio" value="A platform other teams build on"/><span>A platform other teams build on</span></label>
+</div></fieldset>
+<fieldset class="xp" id="xp-iac"><legend class="qt">Infrastructure as code</legend><div class="opts">
+<label class="opt"><input id="xp-iac-0" name="xp-iac" type="radio" value="Haven't written any"/><span>Haven't written any</span></label>
+<label class="opt"><input id="xp-iac-1" name="xp-iac" type="radio" value="Followed tutorials"/><span>Followed tutorials</span></label>
+<label class="opt"><input id="xp-iac-2" name="xp-iac" type="radio" value="Written it for myself"/><span>Written it for myself</span></label>
+<label class="opt"><input id="xp-iac-3" name="xp-iac" type="radio" value="Shared state with other engineers applying it too"/><span>Shared state with other engineers applying it too</span></label>
+</div></fieldset>
+<fieldset class="xp" id="xp-ctr"><legend class="qt">Containers in production — not docker-compose on your laptop</legend><div class="opts">
+<label class="opt"><input id="xp-ctr-0" name="xp-ctr" type="radio" value="No"/><span>No</span></label>
+<label class="opt"><input id="xp-ctr-1" name="xp-ctr" type="radio" value="Docker on a VM I managed"/><span>Docker on a VM I managed</span></label>
+<label class="opt"><input id="xp-ctr-2" name="xp-ctr" type="radio" value="An orchestrator: Kubernetes, ECS or Nomad"/><span>An orchestrator: Kubernetes, ECS or Nomad</span></label>
+</div></fieldset>
+<fieldset class="xp" id="xp-cid"><legend class="qt">Continuous delivery</legend><div class="opts">
+<label class="opt"><input id="xp-cid-0" name="xp-cid" type="radio" value="Used pipelines someone else built"/><span>Used pipelines someone else built</span></label>
+<label class="opt"><input id="xp-cid-1" name="xp-cid" type="radio" value="Modified existing pipelines"/><span>Modified existing pipelines</span></label>
+<label class="opt"><input id="xp-cid-2" name="xp-cid" type="radio" value="Designed one from nothing"/><span>Designed one from nothing</span></label>
+</div></fieldset>
+<fieldset class="xp" id="xp-inc"><legend class="qt">Incidents</legend><div class="opts">
+<label class="opt"><input id="xp-inc-0" name="xp-inc" type="radio" value="Never been in one"/><span>Never been in one</span></label>
+<label class="opt"><input id="xp-inc-1" name="xp-inc" type="radio" value="Been in the room"/><span>Been in the room</span></label>
+<label class="opt"><input id="xp-inc-2" name="xp-inc" type="radio" value="Led the response"/><span>Led the response</span></label>
+<label class="opt"><input id="xp-inc-3" name="xp-inc" type="radio" value="Written the postmortem others read"/><span>Written the postmortem others read</span></label>
+</div></fieldset>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<div class="areahead">
+<p class="eyebrow">Part B · area 1 of 8</p>
+<p class="tally" id="tally-linux">— <b>0</b>/8 · <span class="verdict"></span></p>
+</div>
+<h2>Linux and the network underneath everything</h2>
+</div>
+<details id="d-linux-1"><summary><code>df</code> says the filesystem is full. <code>du</code> on the same mount adds up to far less. What is going on, and how do you get the space back without rebooting?</summary><div class="answer"><p>A process still holds an open file descriptor on a file that has been unlinked. The directory entry is gone, so <code>du</code> cannot see it, but the inode and its blocks survive until the last descriptor closes.</p><p><code>lsof +L1</code> lists files with no remaining links. Truncating through the descriptor — <code class="brk">: &gt; /proc/&lt;pid&gt;/fd/&lt;n&gt;</code> — frees the blocks without killing the process. Restarting the process works too and is usually what you do at 3am. The classic cause is a log file rotated by deletion rather than by <code>copytruncate</code> or a signal.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="linux" id="m-linux-1-0" name="m-linux-1" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="linux" id="m-linux-1-1" name="m-linux-1" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="linux" id="m-linux-1-2" name="m-linux-1" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-linux-2"><summary>A container listens on <code>0.0.0.0:8080</code>. From the host, <code>curl localhost:8080</code> hangs. Name the layers you would check, in the order you would check them.</summary><div class="answer"><p>Inside out. <strong>Is it actually listening</strong> — <code>ss -ltnp</code> in the container's namespace; a process bound to <code>127.0.0.1</code> inside a container is unreachable from anywhere else, which is the most common version of this. <strong>Is the port published</strong> — <code>-p 8080:8080</code>, and docker's <code>PublishAllPorts</code> is not the default. <strong>Is the host firewall passing it</strong> — iptables or nftables, and on a cloud VM the security group too. <strong>Is anything else on the port</strong>.</p><p>The useful habit is bisecting: <code>curl</code> from inside the container first. That one test splits the problem in half.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="linux" id="m-linux-2-0" name="m-linux-2" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="linux" id="m-linux-2-1" name="m-linux-2" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="linux" id="m-linux-2-2" name="m-linux-2" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-linux-3"><summary>A request to an internal hostname takes almost exactly five seconds, every time, and then succeeds. What does that number tell you?</summary><div class="answer"><p>A timeout, not slowness. Five seconds is the default DNS resolver timeout on most Linux systems — the first nameserver in <code>/etc/resolv.conf</code> is not answering, and the resolver falls through to the second after it gives up.</p><p>Round numbers in latency are nearly always a timeout somewhere. Real work produces untidy numbers. Three seconds, five seconds, thirty seconds and sixty seconds are worth recognising on sight; so is the IPv6-then-IPv4 fallback that produces the same shape.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="linux" id="m-linux-3-0" name="m-linux-3" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="linux" id="m-linux-3-1" name="m-linux-3" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="linux" id="m-linux-3-2" name="m-linux-3" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-linux-4"><summary>What does the kernel's OOM killer choose, and how would you change its mind?</summary><div class="answer"><p>It scores every process — roughly resident memory, adjusted by <code>oom_score_adj</code> — and kills the highest. It does not kill the process that allocated last, which is why the database dies when a batch job is the real culprit.</p><p><code>/proc/&lt;pid&gt;/oom_score_adj</code> biases it, from −1000 (never) to +1000. In Kubernetes you do not set it directly: the QoS class does, and a pod with equal requests and limits (Guaranteed) is the last to be chosen while a Burstable pod exceeding its request goes first. Worth knowing that cgroup memory limits produce a <em>different</em> kill — the container is killed by its own cgroup, not by the system OOM killer, and the host logs look nothing alike.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="linux" id="m-linux-4-0" name="m-linux-4" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="linux" id="m-linux-4-1" name="m-linux-4" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="linux" id="m-linux-4-2" name="m-linux-4" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+</section>
+<section>
+<div class="sec-head">
+<div class="areahead">
+<p class="eyebrow">Part B · area 2 of 8</p>
+<p class="tally" id="tally-aws">— <b>0</b>/8 · <span class="verdict"></span></p>
+</div>
+<h2>AWS, past the service names</h2>
+</div>
+<details id="d-aws-1"><summary>When is an IAM role the only option, and not merely the better one?</summary><div class="answer"><p>Whenever the thing that needs credentials cannot safely hold one: an EC2 instance, a Lambda, a container, a CI job, a user from another account or an identity provider. A role is assumed and the credentials it returns expire; a user carries a key that does not.</p><p>“Only” matters in cross-account access — a policy in account B can name a principal in account A, but A still assumes a role in B to act there. And for anything federated, there is no user object at all.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="aws" id="m-aws-1-0" name="m-aws-1" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="aws" id="m-aws-1-1" name="m-aws-1" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="aws" id="m-aws-1-2" name="m-aws-1" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-aws-2"><summary>An instance in a private subnet must read from S3 without its traffic leaving through the NAT gateway. What do you create, and what is the failure you should expect?</summary><div class="answer"><p>A gateway VPC endpoint for S3, which installs a prefix-list route in the subnet's route table. It costs nothing, unlike the NAT gateway's per-gigabyte charge, which is usually the real reason.</p><p>The failure: it routes only to S3 in that region, and anything relying on the public path breaks quietly. If a bucket policy or endpoint policy restricts by <code>aws:SourceVpce</code> and you get it wrong, access disappears with an <code>AccessDenied</code> that names nothing useful. And an interface endpoint is a different thing — an ENI with an hourly charge — which is what you need for most other services.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="aws" id="m-aws-2-0" name="m-aws-2" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="aws" id="m-aws-2-1" name="m-aws-2" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="aws" id="m-aws-2-2" name="m-aws-2" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-aws-3"><summary>A role has a policy granting <code>s3:GetObject</code> on the bucket. The call still returns <code>AccessDenied</code>. Name several independent causes.</summary><div class="answer"><p>Any of: an explicit <code>Deny</code> in the bucket policy, an SCP at the organisation level, a permissions boundary on the role, a session policy narrower than the role, the object being owned by another account, KMS — the key policy must allow <code>kms:Decrypt</code> separately and the object policy says nothing about it, the resource ARN missing <code>/*</code> so it grants the bucket and not its contents, a VPC endpoint policy, or Block Public Access when the path depended on it.</p><p>The structure worth holding: an explicit Deny anywhere beats every Allow, and the request must be allowed by <em>every</em> policy type that applies, not by any one of them.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="aws" id="m-aws-3-0" name="m-aws-3" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="aws" id="m-aws-3-1" name="m-aws-3" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="aws" id="m-aws-3-2" name="m-aws-3" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-aws-4"><summary>An instance profile carrying broad permissions, versus a long-lived access key with the same permissions. Which is worse, and in what way?</summary><div class="answer"><p>The instance profile is better in the ways that usually matter: credentials rotate automatically, never appear in a repository, and are scoped to one instance you can terminate.</p><p>It is worse in one specific way, and knowing it is the mark of having thought about it: anything that can make the instance issue an HTTP request can read them. A server-side request forgery bug against <code>169.254.169.254</code> hands the whole role to the internet, and there is no password to fail. IMDSv2's session tokens exist precisely for this; requiring it is one of the highest-value settings in an AWS account.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="aws" id="m-aws-4-0" name="m-aws-4" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="aws" id="m-aws-4-1" name="m-aws-4" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="aws" id="m-aws-4-2" name="m-aws-4" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+</section>
+<section>
+<div class="sec-head">
+<div class="areahead">
+<p class="eyebrow">Part B · area 3 of 8</p>
+<p class="tally" id="tally-tf">— <b>0</b>/8 · <span class="verdict"></span></p>
+</div>
+<h2>Terraform and the state problem</h2>
+</div>
+<details id="d-tf-1"><summary>What is in the state file, and why can Terraform not simply read the cloud each time?</summary><div class="answer"><p>State maps your resource addresses to real resource IDs, and records the attributes as of the last apply. Without it Terraform cannot know that <code>aws_instance.web</code> means <em>that</em> instance rather than a new one — the cloud has no record of your naming.</p><p>It also stores what the configuration looked like, which is how a plan can tell “someone changed this outside Terraform” from “you changed the configuration”. And it holds every attribute of every resource, which is why state contains secrets and belongs in an encrypted bucket.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="tf" id="m-tf-1-0" name="m-tf-1" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="tf" id="m-tf-1-1" name="m-tf-1" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="tf" id="m-tf-1-2" name="m-tf-1" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-tf-2"><summary>Two engineers run <code>apply</code> within a minute of each other against an S3 backend with no lock configured. Describe what you end up with.</summary><div class="answer"><p>Both read the same state, both plan against it, both write. The second write wins and the first engineer's resources are now absent from state while existing in the cloud — orphaned, invisible, still billing. A later apply may try to create them again and fail on a name conflict, which is how people find out.</p><p>Native S3 state locking is now available through a lock file in the bucket; the DynamoDB table is the older mechanism and still widespread. Versioning on the bucket is what lets you recover, and it is the reason to turn it on before you need it.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="tf" id="m-tf-2-0" name="m-tf-2" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="tf" id="m-tf-2-1" name="m-tf-2" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="tf" id="m-tf-2-2" name="m-tf-2" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-tf-3"><summary>A plan shows a resource being destroyed and recreated when you expected an update. How do you find out why, and what can you do about it?</summary><div class="answer"><p>The plan marks the triggering attribute with <code># forces replacement</code>. That is the answer — read the plan rather than guess. <code>terraform plan -out</code> then <code>terraform show -json</code> gives it mechanically when the diff is long.</p><p>Remedies, in order of preference: change the configuration so the immutable attribute does not change; <code class="brk">lifecycle { create_before_destroy = true }</code> when the resource can be doubled briefly; <code>ignore_changes</code> when something outside Terraform legitimately owns that field; <code>moved</code> blocks when it is only the address that changed. <code>prevent_destroy</code> is a guard rail, not a fix.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="tf" id="m-tf-3-0" name="m-tf-3" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="tf" id="m-tf-3-1" name="m-tf-3" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="tf" id="m-tf-3-2" name="m-tf-3" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-tf-4"><summary>Something was created by hand in the console. Bring it under Terraform without an outage.</summary><div class="answer"><p>Write the configuration to match what exists, then <code>import</code> — as an <code>import</code> block in modern Terraform, which makes the import itself reviewable, or <code>terraform import</code> for the older workflow. Then plan, and <strong>expect the first plan to be wrong</strong>: it shows every attribute where your configuration disagrees with reality. Iterate on the configuration until the plan is empty.</p><p>The empty plan is the whole test. Applying before you get there is how you cause the outage you were avoiding.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="tf" id="m-tf-4-0" name="m-tf-4" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="tf" id="m-tf-4-1" name="m-tf-4" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="tf" id="m-tf-4-2" name="m-tf-4" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+</section>
+<section>
+<div class="sec-head">
+<div class="areahead">
+<p class="eyebrow">Part B · area 4 of 8</p>
+<p class="tally" id="tally-k8s">— <b>0</b>/8 · <span class="verdict"></span></p>
+</div>
+<h2>Containers and Kubernetes</h2>
+</div>
+<details id="d-k8s-1"><summary>Why does the order of lines in a Dockerfile change how long a build takes?</summary><div class="answer"><p>Each instruction produces a layer, and layers cache by the instruction plus the contents it brings in. The cache is invalidated from the first changed layer downwards — so <code>COPY . .</code> before <code>npm install</code> means every source edit reinstalls every dependency.</p><p>Copy the dependency manifest, install, then copy the source. The same reasoning drives multi-stage builds: the toolchain need not be in the image you ship, and a smaller image pulls faster on every node that has never seen it.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="k8s" id="m-k8s-1-0" name="m-k8s-1" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="k8s" id="m-k8s-1-1" name="m-k8s-1" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="k8s" id="m-k8s-1-2" name="m-k8s-1" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-k8s-2"><summary>A pod is in <code>CrashLoopBackOff</code>. What are your first commands, and what is each ruling out?</summary><div class="answer"><p><code>kubectl describe pod</code> — events first, because image pull failures, failed mounts and scheduling problems all surface here and none of them are in the logs. <code>kubectl logs --previous</code> — the crashed container's output, not the one currently restarting. <code>kubectl get events --sort-by=.lastTimestamp</code> for the surrounding context.</p><p>Then the split that matters: did it start and exit, or never start? Exit code 0 means it ran to completion and the restart policy brought it back — the command is wrong for a long-running process. 137 is SIGKILL, usually the memory limit. 1 is the application's own failure, and the logs will say.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="k8s" id="m-k8s-2-0" name="m-k8s-2" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="k8s" id="m-k8s-2-1" name="m-k8s-2" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="k8s" id="m-k8s-2-2" name="m-k8s-2" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-k8s-3"><summary>A rollout completes, readiness probes pass, and users see 502s for about half a minute. Why?</summary><div class="answer"><p>Endpoint propagation lags pod deletion. When a pod is terminated, the kubelet sends SIGTERM and the endpoint controller removes it from Service endpoints, and those happen in parallel — kube-proxy or the ingress controller may keep sending traffic for a second or two after the process has begun shutting down.</p><p>The fixes are unglamorous: a <code>preStop</code> sleep of a few seconds so the pod stays up while endpoints converge, a <code>terminationGracePeriodSeconds</code> longer than the longest request, and an application that actually handles SIGTERM by draining rather than exiting immediately. A readiness probe that fails fast on shutdown helps; an ingress that balances to pod IPs directly makes the window shorter and more obvious.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="k8s" id="m-k8s-3-0" name="m-k8s-3" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="k8s" id="m-k8s-3-1" name="m-k8s-3" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="k8s" id="m-k8s-3-2" name="m-k8s-3" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-k8s-4"><summary>You set <code>limits.cpu</code> and no request. What have you done? And what is the difference between a pod being throttled and being OOMKilled?</summary><div class="answer"><p>Kubernetes defaults the request to the limit, so you have reserved the whole limit on the node — usually not what was intended, and it makes the pod Guaranteed rather than Burstable.</p><p>CPU is compressible: exceeding the limit throttles the process, which shows as latency and never as an error. Memory is not: exceeding the limit kills the container, exit 137, no grace. That asymmetry is the whole reason CPU limits are argued about and memory limits are not — a CPU limit can make a healthy service slow for no benefit, while a memory limit stops one pod taking down a node.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="k8s" id="m-k8s-4-0" name="m-k8s-4" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="k8s" id="m-k8s-4-1" name="m-k8s-4" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="k8s" id="m-k8s-4-2" name="m-k8s-4" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+</section>
+<section>
+<div class="sec-head">
+<div class="areahead">
+<p class="eyebrow">Part B · area 5 of 8</p>
+<p class="tally" id="tally-cicd">— <b>0</b>/8 · <span class="verdict"></span></p>
+</div>
+<h2>Delivery pipelines</h2>
+</div>
+<details id="d-cicd-1"><summary>Beyond the obvious security objection, what is wrong with a deploy that runs from an engineer's laptop credentials?</summary><div class="answer"><p>It is not reproducible and it is not attributable. Nobody else can run it, the environment that produced the artefact is unique to one machine, and when it goes wrong there is no record of what ran with which inputs. The security problem is real, but the reason it blocks a team is that the deploy cannot be reviewed, repeated, or rolled back by anyone else.</p><p>The answer is a short-lived identity issued to the pipeline — OIDC federation from the CI provider into an IAM role, with no stored key at all.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="cicd" id="m-cicd-1-0" name="m-cicd-1" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="cicd" id="m-cicd-1-1" name="m-cicd-1" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="cicd" id="m-cicd-1-2" name="m-cicd-1" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-cicd-2"><summary>Rolling, blue/green and canary. What does each cost, and which asks most of your monitoring?</summary><div class="answer"><p>Rolling is cheapest and slowest to undo: both versions serve at once, and rollback means another rolling update. Blue/green doubles the infrastructure for the duration and buys an instant switch back; it needs the database to be compatible with both versions, which is the part that bites. Canary sends a small share of real traffic to the new version and needs the most from monitoring, because the entire mechanism is a decision made from metrics — if you cannot measure error rate and latency for the canary separately, you have a slow rolling deploy with extra steps.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="cicd" id="m-cicd-2-0" name="m-cicd-2" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="cicd" id="m-cicd-2-1" name="m-cicd-2" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="cicd" id="m-cicd-2-2" name="m-cicd-2" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-cicd-3"><summary>The pipeline was green and the deploy still broke production. Name the gaps that allow that.</summary><div class="answer"><p>Tests that do not exercise the changed path. A test environment unlike production in a way that matters — data volume, concurrency, network policy, IAM. Configuration and secrets that differ per environment and are not themselves tested. A migration that is fine on an empty table and locks a large one. Something outside the artefact that changed: a base image tag, a dependency resolved at build time, an upstream API. And load, which almost no pipeline tests.</p><p>The honest summary is that green means “the things we thought to check still pass”, and production is the first place the code meets reality.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="cicd" id="m-cicd-3-0" name="m-cicd-3" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="cicd" id="m-cicd-3-1" name="m-cicd-3" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="cicd" id="m-cicd-3-2" name="m-cicd-3" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-cicd-4"><summary>What properties make a deploy safe to run on a Friday afternoon?</summary><div class="answer"><p>It can be undone quickly without a human deciding how. Its blast radius is bounded — a canary, a feature flag, one cell. It is observable within minutes, not hours, so the alert comes while someone is still there. The database change is backward-compatible, so rolling back the code does not require rolling back data. And it is small, because small changes have small failure modes.</p><p>Teams that cannot deploy on Friday do not have a Friday problem. They have a rollback problem.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="cicd" id="m-cicd-4-0" name="m-cicd-4" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="cicd" id="m-cicd-4-1" name="m-cicd-4" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="cicd" id="m-cicd-4-2" name="m-cicd-4" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+</section>
+<section>
+<div class="sec-head">
+<div class="areahead">
+<p class="eyebrow">Part B · area 6 of 8</p>
+<p class="tally" id="tally-obs">— <b>0</b>/8 · <span class="verdict"></span></p>
+</div>
+<h2>Observability and being on call</h2>
+</div>
+<details id="d-obs-1"><summary>Metric, log, trace. Which one tells you why a single request was slow, and why?</summary><div class="answer"><p>The trace. A metric is an aggregate and has already thrown away the individual request; a log line tells you what one component did but not where the time went across components. A trace carries a span per hop with timings, so the slow segment is visible rather than inferred.</p><p>In practice: the metric tells you something is wrong, the trace tells you where, the log tells you what. Skipping straight to logs is the common failure, and it is why people grep for an hour.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="obs" id="m-obs-1-0" name="m-obs-1" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="obs" id="m-obs-1-1" name="m-obs-1" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="obs" id="m-obs-1-2" name="m-obs-1" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-obs-2"><summary>A 99.9% availability objective. How much downtime is that a month, and what is the error budget <em>for</em>?</summary><div class="answer"><p>0.1% of about 43,200 minutes — roughly <strong>43 minutes a month</strong>. 99.99% is about four minutes, which is why the extra nine is expensive.</p><p>The budget is a decision-making device, not a target. Budget remaining means you can take risks — ship faster, run an experiment. Budget spent means the next work is reliability work. Its real function is to end the argument between the people who want to ship and the people who want stability, by making it arithmetic.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="obs" id="m-obs-2-0" name="m-obs-2" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="obs" id="m-obs-2-1" name="m-obs-2" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="obs" id="m-obs-2-2" name="m-obs-2" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-obs-3"><summary>An alert fires every night at 02:00 and has never once been real. What do you do?</summary><div class="answer"><p>Fix it or delete it, today. An alert nobody acts on trains everyone to ignore alerts, including the one that matters — the cost is not the interruption, it is the next real page being dismissed.</p><p>What you do not do is silence it indefinitely and leave it in place, or add a filter that hides the symptom while the condition still occurs. If it represents something real but not urgent, it is a ticket, not a page. The discipline: every page should be actionable, and if you cannot say what the responder should do, it is not a page.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="obs" id="m-obs-3-0" name="m-obs-3" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="obs" id="m-obs-3-1" name="m-obs-3" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="obs" id="m-obs-3-2" name="m-obs-3" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-obs-4"><summary>P50 latency is unchanged. P99 has tripled. What produces that shape?</summary><div class="answer"><p>Something that affects a minority of requests, so the median never sees it. Garbage collection pauses. A cold cache for rare keys. One slow replica or one bad node taking a share of traffic. Lock contention that only matters above a concurrency threshold. A retry storm on a small fraction. Connection-pool exhaustion, where most requests get a connection instantly and the unlucky ones wait.</p><p>A uniform cause — more load everywhere, a slower dependency on every call — moves the median too. The median staying flat is the information.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="obs" id="m-obs-4-0" name="m-obs-4" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="obs" id="m-obs-4-1" name="m-obs-4" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="obs" id="m-obs-4-2" name="m-obs-4" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+</section>
+<section>
+<div class="sec-head">
+<div class="areahead">
+<p class="eyebrow">Part B · area 7 of 8</p>
+<p class="tally" id="tally-code">— <b>0</b>/8 · <span class="verdict"></span></p>
+</div>
+<h2>Scripting, and knowing when to stop</h2>
+</div>
+<details id="d-code-1"><summary><code>set -euo pipefail</code>. What does each part do, and which one surprises people?</summary><div class="answer"><p><code>-e</code> exits on an unchecked non-zero status. <code>-u</code> errors on an unset variable. <code>-o pipefail</code> makes a pipeline fail if any stage fails rather than only the last.</p><p><code>-e</code> is the surprise, because its exceptions are not obvious: it does not trigger inside a condition, in a <code>&amp;&amp;</code> chain, or for any command whose status you test — so <code>cmd || true</code> is fine but <code>if cmd; then</code> silently continues on failure. People assume it means “stop on any error” and it does not.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="code" id="m-code-1-0" name="m-code-1" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="code" id="m-code-1-1" name="m-code-1" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="code" id="m-code-1-2" name="m-code-1" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-code-2"><summary>Fifty thousand records to pull from a rate-limited API that intermittently returns 500s. Describe the shape of the program, not the code.</summary><div class="answer"><p>Bounded concurrency rather than one at a time or all at once. Retry with exponential backoff and jitter, on a defined set of statuses — 429 and 5xx, never 4xx. Respect <code>Retry-After</code> when it is sent. Checkpoint progress so a crash at record 40,000 does not start again. Make each unit idempotent so a retry cannot duplicate. Log enough to resume. And a hard ceiling on total attempts so a broken endpoint does not loop forever.</p><p>Jitter is the part most people omit, and it is what stops every client retrying in lockstep.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="code" id="m-code-2-0" name="m-code-2" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="code" id="m-code-2-1" name="m-code-2" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="code" id="m-code-2-2" name="m-code-2" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-code-3"><summary>Why is parsing <code>kubectl get pods</code> output with <code>awk</code> fragile, and what do you do instead?</summary><div class="answer"><p>Column positions and widths are presentation, not an interface. They change between versions, shift when a name is long, and differ when a field is empty. Any tool that prints for humans will eventually print something your script did not expect.</p><p><code>-o json</code> with <code>jq</code>, or <code>-o jsonpath</code>, or <code>--template</code>. The general rule applies well beyond kubectl: if a command offers structured output, the human-readable output is not an API.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="code" id="m-code-3-0" name="m-code-3" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="code" id="m-code-3-1" name="m-code-3" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="code" id="m-code-3-2" name="m-code-3" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-code-4"><summary>When do you stop writing bash?</summary><div class="answer"><p>Honest markers: when you need a data structure beyond a flat list; when you are parsing anything with quoting or nesting; when error handling has to do more than exit; when it needs tests; when it has outlived the problem it was written for, or has two people editing it. Arrays and arithmetic in bash are possible and they are a signal.</p><p>Bash is excellent at gluing commands together and bad at everything else. The failure mode is not writing bash — it is a 600-line bash script that nobody will touch and nobody can test.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="code" id="m-code-4-0" name="m-code-4" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="code" id="m-code-4-1" name="m-code-4" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="code" id="m-code-4-2" name="m-code-4" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+</section>
+<section>
+<div class="sec-head">
+<div class="areahead">
+<p class="eyebrow">Part B · area 8 of 8</p>
+<p class="tally" id="tally-data">— <b>0</b>/8 · <span class="verdict"></span></p>
+</div>
+<h2>State, and the ways it fails</h2>
+</div>
+<details id="d-data-1"><summary>Why is retrying a failed write dangerous, and what makes it safe?</summary><div class="answer"><p>Because a failure can mean the write did not happen, or that it happened and the acknowledgement was lost. The client cannot tell those apart, so a retry may apply the operation twice.</p><p>Idempotency makes it safe: a client-supplied key the server deduplicates on, a conditional write that fails if the state is not what you expected, or an operation that is naturally idempotent — setting a value rather than incrementing one. Payment APIs put an idempotency key in the request header for exactly this reason, and it is the pattern worth stealing.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="data" id="m-data-1-0" name="m-data-1" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="data" id="m-data-1-1" name="m-data-1" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="data" id="m-data-1-2" name="m-data-1" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-data-2"><summary>A read replica is forty seconds behind. Which user-visible bugs does that produce?</summary><div class="answer"><p>Read-your-own-writes failures, and they are maddening to report: a user saves a change, the page reloads from a replica, and the change is gone. They save again and now there are two. Pagination that shifts underneath a cursor. A job that reads a row it just wrote and finds nothing. Checks that pass on a stale replica and should have failed.</p><p>The mitigations are routing reads after a write to the primary for a window, a session-consistency token, or simply not reading from a replica for anything that drives a decision.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="data" id="m-data-2-0" name="m-data-2" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="data" id="m-data-2-1" name="m-data-2" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="data" id="m-data-2-2" name="m-data-2" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-data-3"><summary>A backup and a disaster recovery plan are not the same thing. What is the difference, and what do RPO and RTO mean?</summary><div class="answer"><p>A backup is a copy. A recovery plan is a tested sequence that gets a working system back, including the things that are not in the database — DNS, certificates, secrets, the order services must start in, and who has the authority to decide.</p><p>RPO is how much data you can afford to lose, which sets backup frequency. RTO is how long you can afford to be down, which sets the mechanism. The question that separates a plan from a wish is <em>when did you last restore from it</em> — an untested backup is a belief, not a capability.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="data" id="m-data-3-0" name="m-data-3" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="data" id="m-data-3-1" name="m-data-3" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="data" id="m-data-3-2" name="m-data-3" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+<details id="d-data-4"><summary>You put a cache in front of the database. Name failure modes that are worse than having no cache.</summary><div class="answer"><p>The stampede: the cache expires a hot key, every request misses at once, and the database takes a load it has never seen — mitigated by request coalescing or a probabilistic early refresh. The silent dependency: the system has been running on cache hits for months and nobody knows the database can no longer serve the full load, so a cache restart is now an outage. Stale data outliving its usefulness because invalidation was never built. And the cache becoming a second source of truth, where the two disagree and the cache wins.</p><p>Caching trades a correctness problem for a capacity problem. That is often the right trade, but it is a trade.</p>
+<div class="mark"><span class="lab">Mark yourself</span>
+<label class="opt"><input data-area="data" id="m-data-4-0" name="m-data-4" type="radio" value="0"/><span>New to me</span></label>
+<label class="opt"><input data-area="data" id="m-data-4-1" name="m-data-4" type="radio" value="1"/><span>I know the idea</span></label>
+<label class="opt"><input data-area="data" id="m-data-4-2" name="m-data-4" type="radio" value="2"/><span>I have debugged this for real</span></label>
+</div></div></details>
+</section>
+<section id="results">
+<div class="sec-head">
+<p class="eyebrow">Your result</p>
+<h2>What the course should be for you</h2>
+</div>
+<div class="score">
+<div class="scard"><span class="n" id="s-total">0</span><span class="t">of 64 points</span>
+<div class="bar"><i class="u-width-0" id="s-bar"></i></div></div>
+<div class="scard"><span class="n" id="s-done">0</span><span class="t">of 32 questions marked</span></div>
+<div class="scard"><span class="n" id="s-real">0</span><span class="t">marked “debugged for real”</span></div>
+<div class="scard"><span class="n" id="s-new">0</span><span class="t">marked “new to me”</span></div>
+</div>
+<div class="call" id="band"><h3>Placement</h3><p id="band-text">Mark some questions and this fills in.</p></div>
+<div class="tw"><table>
+<thead><tr><th>Area</th><th>Score</th><th>What to do with it</th></tr></thead>
+<tbody id="area-rows"></tbody>
+</table></div>
+<p class="note">Scoring: 0–2 in an area means start it from the beginning. 3–5 means do it, but
+  you will move quickly and the value is in the failure modes rather than the concepts. 6–8 means
+  skip the teaching and keep the check questions — if you can answer those cold, the module has nothing
+  for you.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Send it back</p>
+<h2>Paste this into the chat and the syllabus gets rebuilt around it</h2>
+</div>
+<p>Nothing on this page leaves your browser. Copy the summary and paste it in, and the 32-module plan
+  gets re-cut: modules dropped, modules deepened, and the project brief aimed at whatever the weakest
+  three areas turn out to be.</p>
+<div class="btnrow">
+<button class="btn" id="copy">Copy my result</button>
+<button class="btn ghost" id="reset">Clear all answers</button>
+<span class="note" id="copy-note"></span>
+</div>
+<textarea aria-label="Your result as text" class="out" id="summary" readonly=""></textarea>
+</section>
+<footer>
+<p>Forty questions, written against the three job-market surveys in this course: the areas are weighted
+  to what adverts actually ask for, which is why Terraform and Kubernetes get as much room as AWS, and
+  why on-call practice is here at all.</p>
+<p>Marks are kept in this browser only, so you can close the page and come back. Nothing is uploaded.</p>
+</footer>
+</div>
+<script src="../../assets/js/00-placement.js"></script>
+</body>
+</html>

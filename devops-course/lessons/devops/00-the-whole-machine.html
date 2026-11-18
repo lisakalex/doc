@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Whole Machine</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/00-the-whole-machine.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Orientation &#183; Terraform and Kubernetes &#183; AWS + DevOps course</p>
+<h1>The Whole Machine</h1>
+<p class="lede">A guided read of the <code>aws-sre</code> specimen: three Terraform layers totalling 101
+  resource blocks, a Helm chart of thirteen templates, twenty-one add-on manifests, three environments and a gated promotion
+  chain. This is the shape of both tools taken from working code, before phases 4 and 5 teach them properly. Read it as a
+  map, not a manual.</p>
+<div class="facts">
+<span class="fact">3 Terraform layers</span>
+<span class="fact">3 environments</span>
+<span class="fact">13 chart templates</span>
+<span class="fact">6 cluster add-ons</span>
+<span class="fact">never applied</span>
+<span class="fact">costs nothing to read</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Before anything else</p>
+<h2>What is here, and the one thing that is not</h2>
+</div>
+<p>The repository is a complete small production system: a Python API that stores users in DynamoDB and
+  avatars in S3, the AWS infrastructure for it, a Helm chart to run it on Kubernetes, and a CI pipeline
+  that tests, scans, builds and pushes the image.</p>
+<div class="call">
+<h3>Three Terraform layers, not one</h3>
+<p>The repository splits its infrastructure into three root modules, each with its own state file,
+      applied in order. That split is the first thing to understand, because it is a decision almost
+      every real project makes and almost no tutorial explains.</p>
+<div class="tw"><table>
+<thead><tr><th>Layer</th><th>State</th><th>Holds</th><th>Changes</th></tr></thead>
+<tbody>
+<tr><td class="key"><code>state-backend/</code></td><td>local</td><td>The S3 bucket and lock table the other two store state in</td><td>once</td></tr>
+<tr><td class="key"><code>cluster/</code></td><td><code>cluster/terraform.tfstate</code></td><td>VPC, EKS, nodes, add-ons, load balancer controller IAM &#8212; 43 resources</td><td>a few times a year</td></tr>
+<tr><td class="key"><code>terraform/</code></td><td><code>terraform.tfstate</code></td><td>S3, DynamoDB, KMS, ECR, CI identity, the app's IRSA role &#8212; 16 resources</td><td>weekly</td></tr>
+</tbody>
+</table></div>
+<p><strong>Why split at all.</strong> Different lifecycles, and different blast radius.
+      <code>terraform destroy</code> in <code>cluster/</code> removes a cluster; in the root module it
+      removes a bucket. Those should not be the same command. One state file would also mean every
+      routine application change plans against a VPC and a control plane it has no business touching,
+      and a ten-minute cluster apply holding the lock an application deploy needs.</p>
+<p><strong>And they meet through outputs, not copied values.</strong> The root module reads the cluster
+      layer's state with a <code>terraform_remote_state</code> data source to get the OIDC provider ARN
+      its IRSA trust policy names. An issuer typed into a tfvars file by hand cannot notice that the
+      cluster it names has been replaced &#8212; the role keeps trusting a provider that no longer
+      exists, pods stop getting credentials, and nothing in the configuration changed to explain it.</p>
+</div>
+<div class="call warn">
+<h3>What it would cost to run, which is why you should not</h3>
+<p>The EKS control plane is $0.10/hour with no free tier &#8212; about <strong>$73 a month</strong>.
+      Two <code>t3.large</code> nodes are roughly $120, a NAT gateway about $32 plus data. Call it
+      <strong>$230 a month standing still</strong>.</p>
+<p>Everything on this page can be read, validated and rendered for nothing:
+      <code>terraform validate</code>, <code>terraform plan</code>, <code>helm template</code>. The
+      Kubernetes half also runs on <code>kind</code> for free, which is what the CI pipeline does.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Terraform</p>
+<h2>Four ideas, and that is most of it</h2>
+</div>
+<div class="ladder">
+<div class="rung"><span class="s">1 &#183; DESIRED STATE</span>
+<p>You describe what should exist, not the steps to create it. There is no &#8220;create bucket&#8221;
+  command anywhere &#8212; there is a description of a bucket, and Terraform works out whether to
+  create, change or leave it. Run it twice and the second run does nothing.</p></div>
+<div class="rung"><span class="s">2 &#183; PROVIDER</span>
+<p>A plugin that translates that description into API calls. <code>hashicorp/aws</code> here, pinned to
+  <code>~&gt; 6.60</code> in <code>providers.tf</code>. Terraform itself knows nothing about AWS; every
+  resource type comes from the provider.</p></div>
+<div class="rung"><span class="s">3 &#183; STATE</span>
+<p>A file mapping your names to real IDs: <code>aws_s3_bucket.avatars</code> &#8594; the actual bucket.
+  Without it Terraform cannot tell &#8220;this already exists&#8221; from &#8220;make a new one&#8221;,
+  because the cloud has no record of your naming. It also contains every attribute of every resource,
+  which is why it holds secrets and belongs in an encrypted, versioned bucket.</p></div>
+<div class="rung"><span class="s">4 &#183; PLAN THEN APPLY</span>
+<p><code>terraform plan</code> compares three things &#8212; your code, the state, and what is really
+  in AWS &#8212; and prints the difference. <code>apply</code> performs it. The plan is the safety
+  feature: it is the only infrastructure tool-chain step where you see the change before it happens.</p></div>
+</div>
+<p class="note">Everything else &#8212; modules, workspaces, <code>for_each</code>, providers for
+  thirty other clouds &#8212; is built on those four. If they are solid, the rest is syntax.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Terraform, here</p>
+<h2>The files, in reading order</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>File</th><th>Lines</th><th>What it is for</th></tr></thead>
+<tbody><tr><td class="key"><code>terraform/providers.tf</code></td><td>45</td><td>Which provider, which version, and where state lives. <code>backend "s3" {}</code> is empty on purpose &#8212; a backend block cannot read variables, so it is filled in at <code>init</code> time. The <code>dynamic "endpoints"</code> block is the neat bit: one variable flips every AWS call to LocalStack on your laptop.</td></tr>
+<tr><td class="key"><code>terraform/variables.tf</code></td><td>43</td><td>The inputs. Note <code>account_id</code>, <code>eks_oidc</code> and the two GitHub IDs have <strong>no default</strong>. That is deliberate: a wrong default here points at the wrong AWS account silently, so the author made Terraform refuse to run without them.</td></tr>
+<tr><td class="key"><code>terraform/main.tf</code></td><td>175</td><td>The real work. A KMS key, an S3 bucket and its five companion resources, a DynamoDB table, and the IAM role a Kubernetes pod assumes. Also the workspace logic that gives each environment its own suffixed copy.</td></tr>
+<tr><td class="key"><code>terraform/ecr.tf</code></td><td>45</td><td>The container registry CI pushes to, with a lifecycle policy so old images do not accumulate forever. <code>image_tag_mutability = "IMMUTABLE"</code> &#8212; the registry refuses to let a tag be moved.</td></tr>
+<tr><td class="key"><code>terraform/iam-github-oidc.tf</code></td><td>105</td><td>How GitHub Actions gets into AWS with no stored key. The trust policy pins the exact repo and branch by immutable numeric ID.</td></tr>
+<tr><td class="key"><code>terraform/outputs.tf</code></td><td>24</td><td>The handoff. Four values that the Helm chart and CI need &#8212; bucket name, table name, the IAM role ARN, the ECR URL. This file is the seam between Terraform and Kubernetes.</td></tr>
+<tr><td class="key"><code>terraform/state-backend/</code></td><td>119</td><td>A second, separate Terraform project whose only job is to create the S3 bucket and lock table that the first one stores its state in. Applied once, before anything else, with local state.</td></tr>
+<tr><td class="key"><code>cluster/vpc.tf</code></td><td>262</td><td>Three AZs, private subnets for nodes and public ones for load balancers. The <code>kubernetes.io/role/elb</code> tags are not decoration &#8212; the load balancer controller finds its subnets by reading them, and an Ingress with no address is usually a missing tag. Gateway endpoints for S3 and DynamoDB keep that traffic off the NAT gateway, which is normally the largest line item they remove from a bill.</td></tr>
+<tr><td class="key"><code>cluster/eks.tf</code></td><td>213</td><td>The control plane, all five log types on, Secrets envelope-encrypted with a customer-managed key, and <strong>the OIDC provider that every IRSA role in the repository trusts</strong>. Access is API-mode entries rather than the old <code>aws-auth</code> ConfigMap, which was editable by anyone with cluster-admin, invisible to CloudTrail, and one malformed line away from locking everybody out permanently.</td></tr>
+<tr><td class="key"><code>cluster/eks-nodes.tf</code></td><td>156</td><td>A managed node group behind a launch template whose real purpose is four lines: <code>http_tokens = "required"</code> and a metadata hop limit of 1. See the box below.</td></tr>
+<tr><td class="key"><code>cluster/eks-addons.tf</code></td><td>113</td><td>The four add-ons a cluster is unusable without &#8212; CNI, CoreDNS, kube-proxy, EBS CSI &#8212; each with its own IRSA role rather than borrowing the node's. The CNI's <code>enableNetworkPolicy</code> is what makes a NetworkPolicy actually block a packet.</td></tr>
+<tr><td class="key"><code>cluster/alb-controller.tf</code></td><td>143</td><td>IAM only. The controller itself is a Helm release, deliberately not a Terraform resource.</td></tr>
+<tr><td class="key"><code>cluster/irsa.tf</code></td><td>42</td><td>One trust-policy shape, built once and used three times. Worth reading closely: it is the pattern every IRSA role in AWS follows.</td></tr>
+<tr><td class="key"><code>cluster-state.tf</code></td><td>88</td><td>How the application layer reads the cluster layer. The <code>terraform_remote_state</code> data source, and the app's own IRSA trust policy built from it.</td></tr>
+<tr><td class="key"><code>cluster/env.tf</code></td><td>83</td><td>Workspace &#8594; environment, the name prefix every resource derives from, the tags everything inherits, and three <code>check</code> blocks that warn on a plan. Read this before anything else in the layer: it is what makes one configuration serve dev, staging and production.</td></tr>
+<tr><td class="key"><code>cluster/cluster-autoscaler.tf</code></td><td>73</td><td>The IAM half of the component that was missing. Its scaling permissions are conditioned on an ASG tag, so the dev cluster's autoscaler cannot resize production's node groups &#8212; they are ASGs in the same account and the API call does not care who asked.</td></tr>
+<tr><td class="key"><code>cluster/dns-tls.tf</code></td><td>138</td><td>An ACM certificate validated by DNS, and external-dns scoped to one hosted zone. DNS validation rather than email is the difference between a certificate that renews itself and one that expires at 2am on a bank holiday.</td></tr>
+<tr><td class="key"><code>cluster/external-secrets.tf</code></td><td>90</td><td>Read-only access to <code>&lt;prefix&gt;/&lt;environment&gt;/*</code> in Secrets Manager. The prefix is the whole control: <code>*</code> here would let the dev cluster read production's credentials, with nothing about the API call looking wrong.</td></tr>
+<tr><td class="key"><code>terraform/env.tf</code></td><td>61</td><td>The same workspace mapping, plus an honest comment about why the <code>default</code> workspace keeps unsuffixed names forever: an S3 bucket cannot be renamed and a DynamoDB table cannot be renamed.</td></tr>
+<tr><td class="key"><code>terraform/backup.tf</code></td><td>259</td><td>A vault with a governance-mode lock, a daily/35-day plan, a weekly/1-year plan that moves to cold storage, selection by tag, and a weekly restore <em>test</em>. The comment at the top explains what point-in-time recovery does not cover.</td></tr>
+<tr><td class="key"><code>terraform/secrets.tf</code></td><td>71</td><td>Creates the secret container and never looks at its value again. The <code>ignore_changes = [secret_string]</code> is the important line &#8212; without it, an unrelated apply restores the placeholder over a rotated credential.</td></tr></tbody>
+</table></div>
+<div class="call">
+<h3>The two things that surprise everyone, both visible in <code>main.tf</code></h3>
+<p><strong>One bucket is six resources.</strong> The bucket, its encryption, its ownership controls,
+  its public-access block, its lifecycle rules, and the KMS key. Terraform resources map to AWS API
+  calls, not to how you think about the object. When you read Terraform, count concepts rather than
+  <code>resource</code> blocks &#8212; 175 lines here is about four ideas.</p>
+<p><strong>Nothing declares an order, and the order is still correct.</strong> The KMS key must exist
+  before the encryption rule that points at it. Terraform knows because
+  <code>aws_kms_key.avatars.arn</code> appears inside that rule, and every such reference is an edge in
+  a graph it builds and then walks &#8212; in parallel wherever there is no edge. You write
+  <code>depends_on</code> only for the rare dependency no reference expresses.</p>
+</div>
+<div class="call stop">
+<h3>The four most important lines in the cluster layer</h3>
+<p>In <code>cluster/eks-nodes.tf</code>:</p>
+<div class="code"><code>http_tokens                 = "required"<br/>http_put_response_hop_limit = 1</code></div>
+<p><strong>The first forces IMDSv2.</strong> A caller must <code>PUT</code> for a session token before
+      it can read anything. A server-side request forgery bug &#8212; an application that fetches a URL
+      an attacker chose &#8212; can issue a <code>GET</code> but not a <code>PUT</code>. IMDSv1 hands
+      the node's role to the internet; IMDSv2 does not. That difference is the Capital One breach,
+      roughly 100 million records.</p>
+<p><strong>The second is counter-intuitive and just as important.</strong> The response gets an IP TTL
+      of 1, so it reaches a process on the host and dies before it can cross the extra hop into a
+      container. Pods therefore cannot read the node's credentials at all &#8212; which is exactly
+      right when every pod that needs AWS has its own IRSA role. Raising it to 2 to &#8220;fix&#8221; a
+      pod that cannot reach AWS gives every pod on that node the node's identity.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Kubernetes</p>
+<h2>Three ideas, and they are not the ones people expect</h2>
+</div>
+<div class="ladder">
+<div class="rung"><span class="s">1 &#183; AN API, NOT A TOOL</span>
+<p>Kubernetes is a database of objects with an API in front of it. <code>kubectl apply</code> writes an
+  object. That is the whole interaction. Nothing you type runs a container.</p></div>
+<div class="rung"><span class="s">2 &#183; CONTROLLERS RECONCILE</span>
+<p>Separate processes watch for objects they care about and work continuously to make reality match
+  them. You wrote <code>replicas: 2</code>; a controller notices there is one and starts another. It
+  never finishes &#8212; it is a loop, not a command, which is why a deleted pod comes back and a
+  drained node refills.</p></div>
+<div class="rung"><span class="s">3 &#183; LABELS JOIN EVERYTHING</span>
+<p>There are no foreign keys. A Service finds pods by <em>matching labels</em>, and so do the HPA, the
+  PodDisruptionBudget and the NetworkPolicy. Get a label wrong and nothing errors &#8212; the Service
+  simply has no endpoints and every request fails. That is the most common Kubernetes bug there is.</p></div>
+</div>
+<p>Once those three are in place the object catalogue is just vocabulary. Here is the chart's:</p>
+<div class="tw"><table>
+<thead><tr><th>Object</th><th>What it does</th><th>Worth knowing</th></tr></thead>
+<tbody><tr><td class="key">Deployment</td><td>"I want 2 copies of this container running." A controller then makes that true and keeps it true &#8212; kill a pod and another appears.</td><td>Without it you have no self-healing and no rolling updates.</td></tr>
+<tr><td class="key">Service</td><td>A stable name and IP in front of pods that come and go. Pods get new IPs constantly; the Service does not.</td><td>Without it nothing can reliably find the pods.</td></tr>
+<tr><td class="key">ConfigMap</td><td>Non-secret configuration, injected as environment variables. Here: region, table name, bucket name.</td><td>Note the <code>checksum/config</code> annotation on the Deployment &#8212; without it, changing the ConfigMap would change nothing, because env vars are read once at start.</td></tr>
+<tr><td class="key">ServiceAccount</td><td>The pod's identity inside the cluster &#8212; and, annotated with an IAM role ARN, its identity in AWS too.</td><td>This is the object that makes IRSA work. It is the whole reason the pod needs no AWS keys.</td></tr>
+<tr><td class="key">HorizontalPodAutoscaler</td><td>Watches CPU and changes the Deployment's replica count between 2 and 10 to hold 60% utilisation.</td><td>Needs resource <em>requests</em> set, because the percentage is of the request, not of the node.</td></tr>
+<tr><td class="key">PodDisruptionBudget</td><td>"Never let voluntary disruption take me below 1 pod." Node drains and cluster upgrades respect it.</td><td>Voluntary only. It will not save you from a node catching fire.</td></tr>
+<tr><td class="key">NetworkPolicy</td><td>A firewall for the pod. Here: all ingress allowed, egress restricted to DNS and port 443.</td><td>Enforced by the CNI plugin, not by Kubernetes. On <code>kind</code>'s default CNI it is accepted and ignored &#8212; which the chart's own comments admit.</td></tr>
+<tr><td class="key">Ingress</td><td>HTTP routing from outside the cluster to the Service, with TLS termination.</td><td>Disabled by default here, because it needs an ingress controller that may not exist.</td></tr>
+<tr><td class="key">ServiceMonitor</td><td>Tells the Prometheus Operator to scrape this Service.</td><td>There is no discovery by default. Without it a pod exposing perfect metrics is simply never asked for them &#8212; and the label the operator selects on must match, or the object is valid and silently ignored.</td></tr>
+<tr><td class="key">PrometheusRule</td><td>Four alerts: error rate, p99 latency, replicas not ready, restart rate.</td><td>Deliberately no CPU, memory or disk alerts. Those are causes, not symptoms &#8212; they belong on a dashboard. Every rule here alerts on something a user would notice and says what to do.</td></tr></tbody>
+</table></div>
+<p class="note">Helm sits on top of all of this and is simpler than it looks: it is templating plus
+  release tracking. <code>values.yaml</code> is the interface, the files in
+  <code>helm/templates/</code> are the implementation, and <code>helm template</code> renders them to
+  plain YAML you can read. Run that first, before ever installing &#8212; it is Helm's
+  <code>terraform plan</code>.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The part worth the whole page</p>
+<h2>Three wires join Terraform to Kubernetes</h2>
+</div>
+<p>Terraform creates cloud resources. Kubernetes runs containers. The interesting question is how a
+  container gets to use those resources, and the answer is three specific handoffs &#8212; all of them
+  visible in this repository.</p>
+<div class="join">
+<div class="joincard">
+<h3>1 &#183; Identity, with no key</h3>
+<p>The pod reads S3 and DynamoDB and holds no credentials. Terraform makes a role that trusts the
+  cluster's OIDC provider for one exact ServiceAccount; the annotation puts that role on the
+  ServiceAccount; the SDK exchanges a mounted token for credentials that expire hourly.</p>
+<p class="wire">main.tf &#8594; aws_iam_role.app_role<br/>
+outputs.tf &#8594; app_iam_role_arn<br/>
+values.yaml &#8594; serviceAccount.annotations<br/>
+&#8594; eks.amazonaws.com/role-arn</p>
+</div>
+<div class="joincard">
+<h3>2 &#183; The image</h3>
+<p>Terraform creates the registry and the CI role that may push to it. CI builds, scans and pushes,
+  then prints the digest. The chart runs that image &#8212; by digest when one is supplied, which no
+  tag can later redirect.</p>
+<p class="wire">ecr.tf &#8594; aws_ecr_repository.app<br/>
+outputs.tf &#8594; ecr_repository_url<br/>
+cicd.yml &#8594; push-to-ecr<br/>
+values.yaml &#8594; image.repository / image.digest</p>
+</div>
+<div class="joincard">
+<h3>3 &#183; The names</h3>
+<p>The app needs to know which bucket and which table. Terraform decides those names; they arrive as
+  environment variables through a ConfigMap. Changing the ConfigMap restarts the pods, because of the
+  checksum annotation.</p>
+<p class="wire">main.tf &#8594; bucket, table<br/>
+outputs.tf &#8594; names<br/>
+values.yaml &#8594; env:<br/>
+configmap.yaml &#8594; envFrom</p>
+</div>
+</div>
+<div class="call stop">
+<h3>The handoff is manual, and that is the honest state of the art</h3>
+<p>Nothing automatically carries <code>terraform output app_iam_role_arn</code> into
+  <code>--set serviceAccount.annotations</code>. A person reads one and types the other, or a pipeline
+  does. Terraform can provision Kubernetes objects and Helm can be driven by Terraform, and both
+  couplings bring their own problems.</p>
+<p>So when a job advert asks for &#8220;Terraform and Kubernetes&#8221;, this seam is what it means.
+  Being able to describe these three wires is most of what a mid-level interview is checking.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">End to end</p>
+<h2>One request, through every object</h2>
+</div>
+<p>A user uploads an avatar. Follow it, and each object earns its place.</p>
+<ol class="todo">
+<li><strong>Ingress</strong> terminates TLS and routes the path to a Service.</li>
+<li><strong>Service</strong> holds a stable virtual IP and picks one of the pods behind it &#8212; found
+  by label, not by address.</li>
+<li><strong>kube-proxy</strong> rewrites the destination to that pod's IP. The pod has been running
+  since the <strong>Deployment</strong> created it and the <strong>readiness probe</strong> said it
+  could take traffic.</li>
+<li>The app needs AWS. The SDK finds the token Kubernetes mounted because of the
+  <strong>ServiceAccount</strong>, calls <code>AssumeRoleWithWebIdentity</code>, and gets temporary
+  credentials.</li>
+<li>That call leaves the pod on port 443 &#8212; which the <strong>NetworkPolicy</strong> permits, and
+  almost nothing else.</li>
+<li>It writes the object to S3, which encrypts it with the <strong>KMS key</strong>. The role's policy
+  grants <code>kms:GenerateDataKey</code> for exactly this reason, and without that one statement the
+  upload fails with an error that mentions neither KMS nor the key.</li>
+<li>It writes the user record to <strong>DynamoDB</strong>, keyed by email.</li>
+<li>Load rises; the <strong>HPA</strong> sees CPU above 60% of requests and raises the replica count.
+  New pods land on other nodes because of the anti-affinity rule.</li>
+<li>A node is drained for an upgrade. The <strong>PodDisruptionBudget</strong> makes the drain wait
+  rather than take the last pod.</li>
+</ol>
+<p class="note">Step 6 is the one to remember. Permissions that look complete fail because of a second
+  policy on a different service, and the error names neither. You met this in the placement: there are
+  about nine independent causes of <code>AccessDenied</code> and the KMS key policy is the one nobody
+  guesses.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The part tutorials skip</p>
+<h2>Three environments, one configuration</h2>
+</div>
+<p>Every tutorial shows you one environment. Every real job has at least three, and the difference
+  between them is where most operational pain lives. Here each layer is applied once per Terraform
+  workspace, with its inputs in a file beside it:</p>
+<div class="code"><code>terraform workspace select prod<br/>terraform init -reconfigure -backend-config=env/backend-prod.hcl<br/>terraform plan -var-file=env/prod.tfvars</code></div>
+<p>The obvious alternative &#8212; copy the directory three times &#8212; is what most teams do first and
+  then regret, because three copies drift. A fix lands in production and never reaches staging, so
+  staging stops being a rehearsal for anything.</p>
+<div class="tw"><table>
+<thead><tr><th></th><th>dev</th><th>staging</th><th>prod</th></tr></thead>
+<tbody>
+<tr><td class="key">Availability zones</td><td>2</td><td>3</td><td>3</td></tr>
+<tr><td class="key">NAT gateways</td><td>1</td><td>3</td><td>3</td></tr>
+<tr><td class="key">API endpoint</td><td><code>0.0.0.0/0</code></td><td>narrowed</td><td>narrowed, enforced</td></tr>
+<tr><td class="key">Spot node group</td><td>no</td><td>yes</td><td>yes</td></tr>
+<tr><td class="key">Audit log retention</td><td>7 days</td><td>30 days</td><td>365 days</td></tr>
+<tr><td class="key">Backups</td><td>7 days</td><td>30 days</td><td>35 days + weekly for a year</td></tr>
+<tr><td class="key">Deletion protection</td><td>off</td><td>off</td><td>on</td></tr>
+</tbody>
+</table></div>
+<div class="call">
+<h3>Staging differs from production only in size</h3>
+<p>Look at which rows change and which do not. The AZ count, the NAT topology, the rollout strategy,
+  the probe timings and the PodDisruptionBudget are <strong>identical</strong> between staging and
+  production. Only size, retention and where the alerts go differ.</p>
+<p>That is the entire point of staging. A rehearsal on a different stage tells you nothing: a staging
+  environment with one replica and no disruption budget does not exercise a rolling update, so the
+  rollout behaviour is first tested in production, by users.</p>
+</div>
+<div class="call stop">
+<h3>The guard rails are in the code, not in a document</h3>
+<p>Two different severities, chosen deliberately. <code>check</code> blocks in <code>env.tf</code>
+  <em>warn</em> on every plan &#8212; a single NAT gateway in production, unpinned add-on versions,
+  running in the <code>default</code> workspace. A <code>precondition</code> in <code>eks.tf</code>
+  <em>fails</em> the plan outright if production would expose the Kubernetes API to
+  <code>0.0.0.0/0</code>.</p>
+<p>A warning is loud and still lets an emergency change through. A precondition is for the thing that
+  must never ship. Getting that distinction wrong in either direction is how guard rails end up
+  commented out.</p>
+<p>And note what is <em>not</em> guarded: <code>prevent_destroy</code> is on the state bucket and not
+  on the cluster. It takes a literal, so it cannot read &#8220;only in production&#8221; &#8212; setting
+  it on the cluster would block dev teardown too, somebody would comment it out to get work done, and a
+  guard rail people routinely disable teaches people to disable guard rails. Production deletion
+  protection belongs in an IAM policy or an Organizations SCP, outside Terraform entirely. Terraform
+  state describes intent; it is not an authorisation boundary.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">How a change reaches production</p>
+<h2>One artefact, three environments, one human</h2>
+</div>
+<div class="code"><code>push to main<br/>&nbsp; &#8595;<br/>cicd.yml&nbsp; test &#8594; build &#8594; scan &#8594; kind smoke test &#8594; sign &#8594; ECR<br/>&nbsp; &#8595;<br/>cd.yml&nbsp;&nbsp; resolve the digest, verify its signature<br/>&nbsp; &#8595;<br/>&nbsp; &#8627; dev&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;commit digest &#8594; values-dev.yaml&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(no gate)<br/>&nbsp;&nbsp;&nbsp;&nbsp;verify&nbsp;&nbsp;&nbsp;poll /health until 200, or fail<br/>&nbsp; &#8627; staging&nbsp;&nbsp;commit digest &#8594; values-staging.yaml&nbsp;&nbsp;&nbsp;(no gate)<br/>&nbsp;&nbsp;&nbsp;&nbsp;verify&nbsp;&nbsp;&nbsp;poll /health until 200, or fail<br/>&nbsp; &#8627; prod&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;commit digest &#8594; values-production.yaml&nbsp;&nbsp;<strong>HUMAN APPROVAL</strong></code></div>
+<p>One digest travels the whole way. <strong>Nothing is rebuilt between environments.</strong> This is
+  the same discipline as a Jenkins pipeline that builds a jar once and promotes it to test, UAT and
+  production rather than rebuilding per stage &#8212; and for the same reason: two builds of the same
+  commit genuinely can differ, because a base image tag moved, a transitive dependency resolved
+  differently, or a timestamp got baked in.</p>
+<div class="call">
+<h3>The commit <em>is</em> the deploy</h3>
+<p>No workflow in this repository runs <code>helm upgrade</code>, and none holds cluster credentials.
+  Each promotion writes one digest into <code>gitops/values-&lt;env&gt;.yaml</code> and pushes. Argo CD
+  notices and reconciles the cluster to match.</p>
+<p>Which means rolling back is <em>the same mechanism</em> as rolling forward: run the workflow with a
+  previous digest. There is no separate rollback path to get wrong at 3am, which is the only time
+  anyone uses it.</p>
+</div>
+<div class="call">
+<h3>Terraform now gets the same treatment the application always had</h3>
+<p>The gap this closed is worth naming: the application had test, build, scan, smoke test, sign and
+  push. The infrastructure was applied from somebody's laptop. The code deciding who can reach the
+  Kubernetes API got less review than the code formatting a timestamp.</p>
+<p>Now <code>terraform.yml</code> posts a <code>plan</code> as a pull-request comment per layer per
+  environment, and &#8212; the part that matters &#8212; <strong>the apply uses the saved plan file,
+  downloaded as an artifact, not a fresh plan.</strong> A fresh plan at apply time can differ from the
+  one that was reviewed, so &#8220;approved&#8221; would mean approved-something-else. Terraform refuses
+  a stale saved plan, and that refusal is the feature.</p>
+<p>Two IAM roles, not one: the plan role is read-only, so a pull request cannot change anything. And
+  <code>drift.yml</code> runs the same plan nightly, opening a GitHub issue when reality stops matching
+  the code &#8212; because otherwise drift surfaces during an unrelated apply, under pressure, which is
+  the worst possible moment to find it.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">What runs in the cluster</p>
+<h2>Six add-ons, and what breaks without each</h2>
+</div>
+<p>Terraform builds the AWS underneath and stops. Six upstream charts plus the cluster-scoped objects
+  they assume, all of it in <code>platform/</code> as Argo CD <code>Application</code>s, bootstrapped by a
+  single <code>kubectl apply</code> &#8212; the last one
+  anybody runs. After that, adding an add-on is a commit.</p>
+<div class="tw"><table>
+<thead><tr><th>Wave</th><th>Add-on</th><th>What breaks without it</th></tr></thead>
+<tbody>
+<tr><td class="key">&#8722;1</td><td>PriorityClasses, gp3 StorageClass, namespaces</td><td>A pod naming a missing PriorityClass is rejected by the API server outright.</td></tr>
+<tr><td class="key">0</td><td>metrics-server</td><td><code>kubectl get hpa</code> shows <code>&lt;unknown&gt;/60%</code>. The HPA is valid, the chart installed cleanly, and autoscaling simply never happens. EKS does not install this.</td></tr>
+<tr><td class="key">1</td><td>External Secrets Operator</td><td>No <code>ExternalSecret</code> CRD, so the chart fails on an unknown kind.</td></tr>
+<tr><td class="key">1</td><td>AWS Load Balancer Controller</td><td>An Ingress exists, is valid, and its ADDRESS column stays empty forever. Nothing reports an error, because nothing is responsible for it.</td></tr>
+<tr><td class="key">2</td><td>cluster-autoscaler</td><td>Pods stay <code>Pending</code> when the cluster is full. <strong>Nothing else alerts on this.</strong></td></tr>
+<tr><td class="key">2</td><td>external-dns</td><td>The hostname does not follow the load balancer, so a record keeps pointing at an ALB somebody deleted.</td></tr>
+<tr><td class="key">3</td><td>kube-prometheus-stack</td><td>No <code>ServiceMonitor</code> or <code>PrometheusRule</code> CRDs, and nowhere for an alert to go.</td></tr>
+</tbody>
+</table></div>
+<div class="call stop">
+<h3>Sync-wave order is not a preference</h3>
+<p>A chart that installs CRDs must be in an earlier wave than anything whose manifests use them. Get it
+  wrong and the error is <code>no matches for kind "ServiceMonitor"</code> &#8212; which reads exactly
+  like a typo in your YAML and is in fact an ordering bug three files away.</p>
+</div>
+<div class="call warn">
+<h3>The autoscaler failure worth memorising</h3>
+<p>Cluster Autoscaler finds the node groups it may manage by reading two tags <strong>on the Auto
+  Scaling group</strong>. Tags set on the EKS <em>node group</em> object are not the same thing and are
+  not reliably propagated down.</p>
+<p>So a node group that looks correctly tagged in the EKS console is invisible to the autoscaler, which
+  logs &#8220;no node groups configured&#8221; and does nothing. That is why
+  <code>eks-nodes.tf</code> uses a separate <code>aws_autoscaling_group_tag</code> resource to reach
+  the ASG that the managed node group created. It is the single most common reason a correctly-installed
+  autoscaler does nothing at all.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">When it breaks</p>
+<h2>An alert with no destination is a comment</h2>
+</div>
+<p>The chart creates five alerts. Before the Alertmanager configuration existed, each one transitioned
+  to <code>firing</code> on a dashboard nobody was looking at. That is the most common state of
+  monitoring in the wild: the rules are written, nothing routes them, and everybody believes they are
+  covered.</p>
+<div class="ladder">
+<div class="rung"><span class="s">A ROUTE TREE</span>
+<p><code>severity: critical</code> pages PagerDuty <em>and</em> posts to Slack, so the channel has a
+  record without the page depending on Slack being up. <code>warning</code> is Slack only. A catch-all
+  matches anything with a severity nobody defined &#8212; a catch-all that goes nowhere is how an alert
+  silently disappears.</p></div>
+<div class="rung"><span class="s">GROUPING</span>
+<p>By <code>alertname</code>, <code>namespace</code> and <code>severity</code>. Twenty failing pods
+  become one page listing twenty pods, rather than twenty pages. The shape of an incident is in the
+  grouping.</p></div>
+<div class="rung"><span class="s">INHIBITION</span>
+<p><code>KubeNodeNotReady</code> suppresses the warnings from everything on that node. This is the rule
+  that turns a node failure from twenty pages into one &#8212; the difference between alerting that
+  helps and alerting that people mute.</p></div>
+<div class="rung"><span class="s">A DEAD-MAN&#8217;S SWITCH</span>
+<p>The <code>Watchdog</code> alert always fires, on purpose, into an external service that pages if it
+  <em>stops</em> arriving. Without it, monitoring that has itself died looks exactly like a healthy
+  cluster: both are silent.</p></div>
+<div class="rung"><span class="s">A RUNBOOK LINK</span>
+<p>Every alert carries a <code>runbook_url</code> annotation that Alertmanager passes into the PagerDuty
+  payload and the Slack message. The point of a page at 3am is that it arrives with the first
+  diagnostic step attached.</p></div>
+</div>
+<div class="call">
+<h3>The fifth alert, and why four were not enough</h3>
+<p>The four original alerts covered error rate, latency, replicas not ready, and restart rate. There is
+  a failure none of them can see.</p>
+<p>When the HPA asks for a replica the cluster cannot place, the pod sits <code>Pending</code>
+  indefinitely. The pods that <em>are</em> running are perfectly healthy &#8212; so error rate is fine,
+  latency is fine, the ready count matches what the ReplicaSet managed to create. The service is
+  under-provisioned and every alert is green.</p>
+<p><code>UsersApiPodsPending</code> is the one that catches it. Five minutes, because a Pending pod
+  during a normal scale-up is expected: a node takes two to three minutes to boot and join.</p>
+</div>
+<div class="call">
+<h3>Two numbers, often confused</h3>
+<p><strong>RPO</strong> is how much data you can lose, in time. <strong>RTO</strong> is how long you can
+  be down. They are bought separately and by different mechanisms: point-in-time recovery buys RPO, a
+  rehearsed procedure buys RTO. A five-second RPO with a two-day RTO is perfectly coherent and
+  perfectly useless.</p>
+<p>And the sharp edge in <code>docs/DISASTER_RECOVERY.md</code> worth knowing before you need it:
+  DynamoDB point-in-time recovery restores to a <em>new table</em>. It does not roll the existing one
+  back. So the recovery involves a cutover, and therefore a decision, and therefore an outage &#8212;
+  which is the part people discover during the incident rather than before it.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Running it</p>
+<h2>Four routes, in increasing order of cost</h2>
+</div>
+<div class="ladder">
+<div class="rung"><span class="s">FREE &#183; READ</span>
+<p>No account, no cluster, no risk. <code>terraform init -backend=false</code> then
+  <code>terraform validate</code>; <code>helm template helm/</code> to render every manifest to plain
+  YAML. Start here, today.</p></div>
+<div class="rung"><span class="s">FREE &#183; KIND</span>
+<p>A real Kubernetes cluster in Docker. <code>kind create cluster</code>, then
+  <code>helm install</code>. Everything except AWS works, and the NetworkPolicy is accepted and
+  ignored, which is itself worth seeing.</p></div>
+<div class="rung"><span class="s">FREE &#183; LOCALSTACK</span>
+<p><code>terraform apply -var-file=localstack.tfvars</code> sends every AWS call to a fake on
+  <code>localhost:4566</code>. The <code>dynamic "endpoints"</code> block in
+  <code>providers.tf</code> is what makes this one variable rather than a second copy of the code.</p></div>
+<div class="rung"><span class="s">PENNIES &#183; THE DATA LAYER ONLY</span>
+<p><code>terraform/</code> on its own: an S3 bucket, an on-demand DynamoDB table, an ECR repository and
+  a few KMS keys. At this volume that is small change, and it is applied independently of the cluster
+  &#8212; which is one of the practical dividends of the three layers having separate state.</p></div>
+<div class="rung"><span class="s">~&#163;350/MONTH &#183; THE CLUSTER</span>
+<p><code>terraform/cluster/</code> is the expensive one and the reason not to apply it: $73 for the EKS
+  control plane with no free tier, ~$200 for three on-demand nodes, ~$96 for three NAT gateways, plus
+  the load balancer and the EBS volumes. Roughly <strong>$445/month standing still</strong> for
+  production; about $180 for dev with two AZs and one NAT gateway.</p></div>
+</div>
+<div class="call warn">
+<h3>Two things to know before the fourth route</h3>
+<p><code>terraform apply</code> against real credentials creates real, billable resources, and
+  <code>variables.tf</code> has a bucket name that must be globally unique. Read the plan. The plan
+  exists for this.</p>
+<p>The bucket is declared <code>force_destroy = true</code>, which means
+  <code>terraform destroy</code> deletes it <em>and everything in it</em> without asking. Convenient
+  for a throwaway stack, and exactly the setting you would never ship on something holding real user
+  data.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check</p>
+<h2>Six questions</h2>
+</div>
+<p>Answer each one before opening it. If the answer is the first time it makes sense, that is a zero,
+  and a zero is useful.</p>
+<details><summary>The S3 bucket in <code>main.tf</code> is one logical thing. How many Terraform resources describe it, and why is it not just one?</summary><div class="answer"><p><strong>Six.</strong> <code>aws_s3_bucket</code>, plus <code>aws_s3_bucket_server_side_encryption_configuration</code>, <code>aws_s3_bucket_ownership_controls</code>, <code>aws_s3_bucket_public_access_block</code>, <code>aws_s3_bucket_lifecycle_configuration</code>, and the KMS key it encrypts with.</p><p>Because the AWS API is shaped that way &#8212; each of those is a separate API call against an existing bucket, not a field you set when creating one. Terraform resources map to API calls, not to how a human thinks about the object.</p><p>The practical consequence: when you read Terraform, count <em>concepts</em>, not <code>resource</code> blocks. 175 lines here is roughly four things.</p></div></details>
+<details><summary>Nothing in <code>main.tf</code> says what order to create things in. The KMS key must exist before the bucket encryption that references it. How does Terraform know?</summary><div class="answer"><p>It reads the references. <code>kms_master_key_id = aws_kms_key.avatars.arn</code> is not just a value &#8212; it is an edge in a dependency graph. Terraform builds that graph from every expression that mentions another resource, then walks it, creating things in dependency order and in parallel wherever there is no edge.</p><p>This is why you almost never write ordering by hand. When you genuinely need an edge that no reference creates, <code>depends_on</code> exists &#8212; and needing it often means the configuration could be expressed better.</p></div></details>
+<details><summary>There are two Terraform projects here: <code>terraform/</code> and <code>terraform/state-backend/</code>. Why not one?</summary><div class="answer"><p>Chicken and egg. The main project stores its state in an S3 bucket with a DynamoDB lock table. Something has to create that bucket and table &#8212; and it cannot be the project that needs them to exist before it can run.</p><p>So <code>state-backend/</code> is applied first, with ordinary <strong>local state</strong>, and creates the bucket, the lock table and a KMS key. After that the main project runs <code>terraform init -backend-config=backend.hcl</code> and keeps its state there.</p><p>Every team doing this hits the same problem and most solve it the same way. The bucket is versioned, which is what lets you recover when state goes wrong.</p></div></details>
+<details><summary>The pod talks to S3 and DynamoDB. Find the AWS access key it uses.</summary><div class="answer"><p><strong>There isn't one.</strong> That is the point of the design, and tracing it is the single most useful thing in this repository.</p><p>Terraform creates an IAM role whose trust policy accepts tokens from the EKS cluster's OIDC provider, but only when <code>sub</code> is <code>system:serviceaccount:default:prima-app-sa</code> and <code>aud</code> is <code>sts.amazonaws.com</code>. The role ARN comes out as the <code>app_iam_role_arn</code> output. It goes onto the ServiceAccount as an annotation. Kubernetes mounts a signed token into the pod. The AWS SDK finds that token, calls <code>AssumeRoleWithWebIdentity</code>, and gets credentials that expire in about an hour.</p><p>No key is stored, committed, rotated or leaked, because none exists. The comment in <code>main.tf</code> about why <code>aud</code> must also be pinned is worth reading twice &#8212; without it, a token the same pod requested for a different audience would be accepted here.</p></div></details>
+<details><summary>The chart sets <code>readOnlyRootFilesystem: true</code>, and also mounts an <code>emptyDir</code> at <code>/tmp</code>. Why both?</summary><div class="answer"><p>Because the application genuinely needs to write somewhere, and the right answer is to allow exactly that one place rather than to give up on the control.</p><p>FastAPI spools large multipart uploads to disk once they pass a size threshold. With a read-only root and no writable mount the upload fails. With a writable root, anything that compromises the process can drop a binary anywhere in the image.</p><p>This is what defence in depth looks like in practice: not a switch you turn on, but a control plus the one deliberate exception that makes it survivable. <code>emptyDir</code> lives and dies with the pod, so nothing written there outlasts a restart.</p></div></details>
+<details><summary>The NetworkPolicy allows egress only to DNS and port 443. CI proves the chart installs cleanly on <code>kind</code>. Does that prove the policy works?</summary><div class="answer"><p><strong>No, and the chart says so itself.</strong> NetworkPolicy is enforced by the CNI plugin, not by Kubernetes. <code>kind</code>'s default CNI accepts the object and ignores it entirely.</p><p>So the test proves the manifest is <em>valid</em>. It proves nothing about whether a packet is actually blocked. On EKS you would need the VPC CNI with network policy support, or Calico or Cilium, before that policy does anything at all.</p><p>This is a good habit to copy: the chart's comments state what its tests do <em>not</em> prove. Most projects quietly let a green pipeline imply more than it checked.</p></div></details>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Interchange</p>
+<h2>What to take, and what not to</h2>
+</div>
+<p>This is a specimen to read, not a project to claim. When phases 4 and 5 build the real thing, these
+  are the patterns worth carrying over:</p>
+<ul class="todo">
+<li>The <strong>state-backend bootstrap</strong>, almost verbatim. Every project needs it and it is
+  always the same shape.</li>
+<li><strong>Outputs as a deliberate interface.</strong> Decide what the next tool needs, and output
+  exactly that.</li>
+<li><strong>IRSA</strong>, with both <code>sub</code> and <code>aud</code> pinned. Not optional, and
+  the reason is in the comment.</li>
+<li>The <strong>security context</strong> &#8212; non-root, read-only root filesystem, all capabilities
+  dropped &#8212; plus the one writable mount the app actually needs.</li>
+<li><strong>Comments that say what a test does not prove.</strong> The NetworkPolicy note is the best
+  thing in the repository.</li>
+</ul>
+<p>Also worth carrying over, from the second pass that finished the repository:</p>
+<ul class="todo">
+<li><strong>One configuration, many environments</strong>, with the differences in a reviewable file
+  rather than in three copies of a directory.</li>
+<li><strong>Plan on the pull request, apply the saved plan.</strong> The second half is the part most
+  teams miss, and it is what makes &#8220;approved&#8221; mean something.</li>
+<li>The <strong>Alertmanager route tree with inhibition</strong>. Rules are easy; routing and
+  suppression are what make alerting usable.</li>
+<li><strong>A runbook per alert</strong>, linked from the alert itself.</li>
+<li>The honest &#8220;what is still missing&#8221; section at the end of
+  <code>docs/PRODUCTION_READINESS.md</code>. A readiness document without one is marketing.</li>
+</ul>
+<p>What not to take: the belief that this is finished. Everything here validates, lints and renders, and
+  <strong>none of it has ever been applied</strong> &#8212; no cluster has ever existed, nothing has run
+  under load, nothing has an SLO with an error budget, and nobody has been paged by it. The chart and
+  add-on versions are pinned placeholders that have not been checked against upstream. The first real
+  apply will find something; it always does. That gap is what phase 6 and the eight deliberate failures
+  exist to close, and it is the gap the job adverts care most about.</p>
+</section>
+
+<footer>
+<p>Read from <code>aws-sre</code> after the pass that finished it: 27 Terraform files across three
+  layers, 13 Helm templates, 12 add-on manifests in <code>platform/</code>, four GitHub Actions
+  workflows and five documents under <code>docs/</code>. Every file path, line count and resource
+  figure above was taken from the repository rather than remembered.</p>
+<p>The course reaches this material properly in phase 4 (Terraform, through Ansible) and phase 5
+  (Kubernetes). This page is orientation so that the depth has somewhere to attach.</p>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Plan, Re-Cut</title>
+<link rel="icon" href="../../assets/img/favicon-reference.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/00-the-recut.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Curriculum v4 · re-cut against a placement result</p>
+<h1>The Plan, Re-Cut</h1>
+<p class="lede">Twenty-four weeks rebuilt around what one person actually knows, rather than what a
+  market survey says a role requires. The scope did not shrink. The order changed completely, and two
+  phases got shorter because the experience was already there under a different name.</p>
+<div class="facts">
+<span class="fact">216 hours</span>
+<span class="fact">24 weeks at 9 h</span>
+<span class="fact">7 phases</span>
+<span class="fact">project runs from week 3</span>
+</div>
+</header>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Why it changed</p>
+<h2>The assessment found the opposite of what I had assumed</h2>
+</div>
+<p>The previous plan assumed a developer who knew Linux, Docker and networking and needed AWS. A
+  twenty-question adaptive placement found the reverse on both counts, and the correction runs in two
+  directions at once.</p>
+<div class="split">
+<div class="card">
+<span class="tag">What was worse than assumed</span>
+<p>Linux fundamentals, AWS mechanisms, Terraform and Kubernetes all scored at or near zero. Not the
+  vocabulary — that was present throughout — but every mechanism underneath it. The
+  signature of learning from documentation rather than from operating things, which matters because
+  <strong>more reading is what produced it</strong>.</p>
+</div>
+<div class="card">
+<span class="tag">What was better than assumed</span>
+<p>Two years of production responsibility with deploy and rollback authority. Jenkins pipelines
+  maintained in anger. Ansible on real servers. Python running unattended in CI and depended on by other
+  engineers. Build-once-deploy-many understood so thoroughly it was the only full-marks answer in the
+  whole assessment.</p>
+</div>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Area</th><th>Score</th></tr></thead>
+<tbody><tr><td class="key">Delivery pipelines</td><td>3 / 8</td></tr>
+<tr><td class="key">AWS</td><td>2 / 8</td></tr>
+<tr><td class="key">Docker</td><td>~2 / 8</td></tr>
+<tr><td class="key">Linux and networking</td><td>1 / 8</td></tr>
+<tr><td class="key">Terraform</td><td>1 / 8</td></tr>
+<tr><td class="key">Scripting</td><td>1 / 8</td></tr>
+<tr><td class="key">State and data</td><td>1 / 8</td></tr>
+<tr><td class="key">Observability</td><td>0 / 8</td></tr>
+<tr><td class="key">Kubernetes</td><td>0 / 8</td></tr></tbody>
+</table></div>
+<p class="note">Roughly twenty adaptive probes rather than the full thirty-two questions: when an answer
+  came back blank the next question dropped a layer to find the floor, and when one landed it went up.
+  The number is indicative. The pattern was consistent enough by the end that more questions would have
+  confirmed rather than revealed.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The assets</p>
+<h2>Eight things not to teach, because they are already there</h2>
+</div>
+<p>The first assessment probed the destination and never the origin, which measured the gap precisely and
+  said nothing about the foundation. This is the half that changes the schedule.</p>
+<div class="tw"><table>
+<thead><tr><th>Asset</th><th>Evidence</th><th>Where the plan uses it</th></tr></thead>
+<tbody><tr><td class="key">Jenkins</td><td>Maintained build and deploy pipelines in production</td><td>Phase 0 translates it to GitHub Actions</td></tr>
+<tr><td class="key">Artifact promotion</td><td>Understood and lived — the only 2 scored in the whole assessment</td><td>Becomes the spine of phase 0</td></tr>
+<tr><td class="key">Ansible</td><td>Configuration management on real servers</td><td>Becomes the on-ramp to Terraform in phase 4</td></tr>
+<tr><td class="key">Python</td><td>Unattended, in CI, depended on by other engineers</td><td>Already the most-named skill in the market</td></tr>
+<tr><td class="key">Java, Maven, JFrog</td><td>The whole enterprise build chain</td><td>Phase 2 containerises exactly this stack</td></tr>
+<tr><td class="key">AWS, narrowly</td><td>CodeCommit and Parameter Store in a real delivery path</td><td>Phase 3 starts from what you have touched</td></tr>
+<tr><td class="key">Docker</td><td>Images, containers, volumes, state</td><td>Phase 2 starts above zero, which shortens the critical path</td></tr>
+<tr><td class="key">Production</td><td>Deploy and roll back on your own authority, 1–3 years</td><td>The thing that makes six months plausible</td></tr></tbody>
+</table></div>
+<div class="call">
+<h3>The one that buys the most time</h3>
+<p>Ansible is declarative, idempotent and safe to re-run — the same model as Terraform, applied to
+  a machine's configuration rather than to whether the machine exists. Two years of using that model
+  without anyone naming it means Terraform needs its mechanisms explained, not its philosophy.
+  <strong>Twelve hours becomes nine</strong>, and the phase starts at state rather than at syntax.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Four rules the re-cut follows</p>
+<h2>How the order was decided</h2>
+</div>
+<div class="split">
+<div class="card"><span class="tag">Rule 1</span><p><strong>Mechanism before vocabulary.</strong> Every
+  gap found was a named thing with nothing underneath it. No lesson stops at what something is called.</p></div>
+<div class="card"><span class="tag">Rule 2</span><p><strong>Build on the assets, do not re-teach them.</strong>
+  CI/CD becomes a translation exercise. Terraform arrives through Ansible. Containers use the Java and
+  Maven stack already known.</p></div>
+<div class="card"><span class="tag">Rule 3</span><p><strong>Containers are the critical path.</strong>
+  Zero in production, 44.6% of adverts alone, and the prerequisite for the 62% that want Kubernetes. They
+  move from phase 3 to phase 2, directly behind the Linux they depend on.</p></div>
+<div class="card"><span class="tag">Rule 4</span><p><strong>The project manufactures the experience the
+  job cannot.</strong> Never on-call, never more than one application and a database. Both are fixed by
+  building something and then deliberately breaking it.</p></div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The seven phases</p>
+<h2>Twenty-four weeks, in order</h2>
+</div>
+<div class="steps">
+<div class="step">
+<span class="n">0</span>
+<div>
+<h3>Name what you already do <span class="chip">weeks 1–2</span> <span class="chip ok">14 h</span></h3>
+<p>You have been doing CI/CD for two years without the vocabulary for it. This phase converts tacit experience into things you can say in an interview, and repairs the mechanisms under the tools you already run.</p>
+<ul><li>Artifact promotion: why build-once-deploy-many is the rule you already follow, and what breaks without it</li><li>Jenkins → GitHub Actions and GitLab CI: the same concepts, different syntax. You translate your own deploy pipeline as the exercise</li><li>Secrets in a pipeline: Jenkins credentials, Parameter Store, Secrets Manager — what each one actually guarantees, and OIDC federation so the pipeline holds no key at all</li><li>Ansible idempotency, named: <code>changed_when</code>, <code>creates</code>, and why <code>shell</code> and <code>command</code> break the model</li><li>Python that survives leaving your laptop: virtualenv, pinned requirements, why it failed on the server</li></ul>
+<p class="note">Two weeks, and your CV changes in week two.</p>
+</div>
+</div>
+<div class="step">
+<span class="n">1</span>
+<div>
+<h3>The machine underneath <span class="chip">weeks 3–6</span> <span class="chip ok">36 h</span></h3>
+<p>Your lowest score, and it sits beneath everything else in the plan. Not an introduction — this is the layer below the commands you already run every day.</p>
+<ul><li>Processes and file descriptors: why <code>df</code> and <code>du</code> disagree, <code>lsof +L1</code>, log rotation done wrong</li><li>Memory: RSS against page cache, why <code>free</code> looks alarming and is fine, the OOM killer and how cgroups kill differently</li><li>systemd: units, timers instead of cron, journald — and why your 2am cron job failed silently</li><li>Networking: interfaces, <code>0.0.0.0</code> against loopback, <code>ss</code>, DNS resolution and the five-second timeout, TLS handshakes</li><li>Users, groups and permissions from below — the things your Ansible playbooks have been setting for two years</li></ul>
+<p class="note">Every lesson ends by breaking it on purpose and fixing it.</p>
+</div>
+</div>
+<div class="step">
+<span class="n">2</span>
+<div>
+<h3>Containers, properly <span class="chip">weeks 7–10</span> <span class="chip ok">36 h</span></h3>
+<p>You have the object model — image, container, volume — and none of the build or network side. This is the critical path: it is 44.6% of adverts on its own and it is the prerequisite for the 62% that want Kubernetes.</p>
+<ul><li>Layers and copy-on-write: why ten containers from one image do not use ten images of disk</li><li>The build cache and instruction order, on your actual Java/Maven stack. Multi-stage builds, 700 MB down to 200 MB</li><li>Container networking: bridge, published ports, DNS between containers, and why your service bound to localhost is unreachable</li><li>Volumes: named, bind and anonymous — including the Postgres trap that strands your data in a volume with a hash for a name</li><li>Registries and image provenance, which is JFrog again at a different layer</li><li>Compose for several services locally — your first system with more than one moving part</li></ul>
+<p class="note">Exercise: containerise a Java service of your own, end to end.</p>
+</div>
+</div>
+<div class="step">
+<span class="n">3</span>
+<div>
+<h3>AWS, mechanism first <span class="chip">weeks 11–14</span> <span class="chip ok">36 h</span></h3>
+<p>You scored 2/8 while having shipped through CodeCommit and read secrets from Parameter Store. The exposure is real; the mechanisms are missing. This phase is the mechanisms.</p>
+<ul><li>IAM: principals, how a request is evaluated, explicit deny beating every allow, SCPs and permissions boundaries</li><li>Roles against users, instance profiles, and IMDS — where credentials actually come from, IMDSv2, and why SSRF cost Capital One 100 million records</li><li>VPC: route tables are the only thing that makes a subnet public, IGW against NAT, gateway endpoints, security groups being stateful against NACLs</li><li>S3 and storage mechanics; KMS and envelope encryption, under the Parameter Store you already use</li><li>Cost as an engineering concern: NAT gateway per-gigabyte, data transfer, the invoice that surprises people</li></ul>
+<p class="note">Runs on the free moto sandbox first, real AWS only where the sandbox lies.</p>
+</div>
+</div>
+<div class="step">
+<span class="n">4</span>
+<div>
+<h3>Terraform, through Ansible <span class="chip">weeks 15–17</span> <span class="chip ok">27 h</span></h3>
+<p>Nine hours shorter than the original plan, because you already own the hard half. Declarative, idempotent, converge-on-rerun — that is Ansible, and you have used it for two years. We skip the philosophy and start at state.</p>
+<ul><li>What is in state and why the cloud cannot be read instead of it</li><li>Remote backends and locking: what two simultaneous applies do to an unlocked state file</li><li>What a half-failed apply leaves behind — there is no rollback, and believing there is will hurt you in an incident</li><li>Drift, <code>import</code>, <code>moved</code> blocks, <code>lifecycle</code>, and bringing hand-built resources under management without downtime</li><li>Modules, variables, outputs, and where Terraform stops and Ansible starts</li></ul>
+<p class="note">Exercise: rebuild everything you clicked together in phase 3, as code.</p>
+</div>
+</div>
+<div class="step">
+<span class="n">5</span>
+<div>
+<h3>Kubernetes <span class="chip">weeks 18–21</span> <span class="chip ok">36 h</span></h3>
+<p>Zero, from a standing start, and named in 62.1% of UK adverts. The longest road on the list and the one with the largest market premium. It gets full weight and no trimming.</p>
+<ul><li>Pods, deployments, services, ingress — and what the control loop is actually doing</li><li>The debugging loop: <code>CrashLoopBackOff</code>, <code>describe</code> before <code>logs</code>, <code>--previous</code>, exit codes 0, 1 and 137</li><li>Requests and limits, QoS classes, OOMKilled against CPU throttled — the asymmetry that explains every argument about limits</li><li>Probes, rolling updates, and the thirty-second window where readiness passes and users get 502s</li><li>EKS specifics: IRSA and Pod Identity, the ALB controller, node groups against Fargate, EBS CSI and availability-zone affinity</li></ul>
+<p class="note">Your phase 2 containers, on kind first, then on EKS from phase 4's Terraform.</p>
+</div>
+</div>
+<div class="step">
+<span class="n">6</span>
+<div>
+<h3>Operating it, and the on-call you never had <span class="chip">weeks 22–24</span> <span class="chip ok">27 h</span></h3>
+<p>Zero score, 61% of direct-employer adverts, and the only honest substitute for a pager. Half teaching, half drills.</p>
+<ul><li>Metrics, logs and traces: which answers which question, and why going straight to logs costs you the night</li><li>Percentiles rather than averages — p50 flat and p99 tripled is a different problem from everything being slower</li><li>Prometheus and Grafana against your own running system</li><li>SLOs, SLIs and error budgets: 99.9% is 43 minutes a month, and the budget exists to end an argument</li><li>Alerting that is actionable, and the dead man's switch — alerting on the absence of success, which is what your 2am cron job needed</li><li><strong>Six incident drills.</strong> I break your system at a layer you have learned. You diagnose it and write the postmortem.</li></ul>
+<p class="note">You finish with six written incidents about a system you own.</p>
+</div>
+</div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The spine</p>
+<h2>One project, from week 3 to week 24</h2>
+</div>
+<p>Not a phase. It runs alongside every phase from week three and absorbs roughly a third of the total
+  hours, because the diagnosis was that reading produces vocabulary and only operating produces
+  mechanisms.</p>
+<div class="call stop">
+<h3>What it has to be, and why each constraint is there</h3>
+<p><strong>More than one service.</strong> Everything operated so far has been one application and its
+  database. Partial failure — one thing down while another is up, retries, timeouts, a queue
+  filling — only exists once services talk to each other, and it is most of what makes this job
+  hard.</p>
+<p><strong>Terraform provisions it, CI deploys to it, Prometheus watches it.</strong> That three-way join
+  is the job description. Being able to say it about something you built, and then answer questions
+  about the parts that went wrong, is the thing a certificate cannot provide.</p>
+<p><strong>It gets broken on purpose, six to eight times.</strong> Each break at a layer just learned:
+  a full disk held open by a deleted file, an OOMKilled pod, an unlocked state file applied twice, a
+  readiness probe that passes while users get 502s. You diagnose it and write the postmortem.</p>
+<p><strong>Why that last one matters more than it sounds:</strong> interviews ask you to walk through an
+  incident you handled, and “I have been in the room” is a visibly weaker answer than
+  “I was paged, here is what I checked first and what I got wrong.” Six written incidents
+  about your own system is the closest honest substitute for a pager you have never carried.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">What was cut</p>
+<h2>Five things left out, and the cost of each</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Cut</th><th>Market share</th><th>Why, and what it costs</th></tr></thead>
+<tbody><tr><td class="key">Azure</td><td>45.2% of UK adverts</td><td>Genuinely painful to drop. There is no room in 216 hours and it is the second cloud, not the first. Four hours of literacy post-course, or sooner if a specific job asks.</td></tr>
+<tr><td class="key">Go</td><td>54.3% at product companies</td><td>Your language is Python, which is 52.7% and the most-named skill after Kubernetes. Go is the product-company signal, and product companies are not the market your experience fits in six months.</td></tr>
+<tr><td class="key">A deep Jenkins module</td><td>29.5%, the most-named CI tool</td><td>You already have it. It becomes a CV line and a translation exercise in phase 0, not a module.</td></tr>
+<tr><td class="key">Service mesh, eBPF, Karpenter</td><td>2.7%, 0.2%, 0.6%</td><td>Measured, not guessed. They are not in the adverts and they are not in the plan.</td></tr>
+<tr><td class="key">DOP-C02 certification</td><td>—</td><td>Decided earlier: target the job, not the exam. Nothing here changes that, and the exam would cost six weeks.</td></tr></tbody>
+</table></div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The honest part</p>
+<h2>Whether twenty-four weeks is enough</h2>
+</div>
+<p><strong>For the market this experience fits, yes, and it was not going to be before the second half of
+  the assessment.</strong> Jenkins at 29.5% and Ansible at 31.9% of UK adverts are the enterprise and
+  agency half of the market — the larger half, where 77% of postings are agency-placed. That CV
+  already half-fits. What it is missing is AWS, Terraform and containers, which is exactly what the
+  twenty-four weeks adds.</p>
+<p><strong>For product companies, no.</strong> Go at 54%, GCP at 52%, Kubernetes-native operations and
+  SRE practice as a working vocabulary — that is a different population and a longer road. It is a
+  reasonable target for the year after this one, not for month six.</p>
+<div class="call warn">
+<h3>Where the plan breaks if it breaks</h3>
+<p>Phases 2 and 5 are 72 hours between them and they are one continuous dependency: containers, then
+  Kubernetes on top of containers. <strong>If the schedule slips, it will slip there</strong>, and the
+  temptation will be to compress Kubernetes to catch up.</p>
+<p>Do the opposite. Cut the depth of phase 6 and keep the drills, or extend to twenty-eight weeks. A
+  shallow pass at the 62% of the market that wants Kubernetes is worth very little; adverts ask what
+  broke and why, not what the objects are called.</p>
+</div>
+</section>
+<footer>
+<p>Built from a twenty-question adaptive placement on 9 October 2026, and from three job-market surveys
+  run the week before: 147 postings from key-free APIs, 662 UK adverts through the Adzuna API, and 162
+  written by direct employers through their own hiring systems. Every market percentage on this page
+  comes from one of those three and is reproducible from the scripts in this repository.</p>
+<p>The previous curriculum, derived from the market alone, is still in the course map. This one
+  supersedes it: same scope, different order, two phases shorter where the experience was already there.</p>
+</footer>
+</div>
+</body>
+</html>

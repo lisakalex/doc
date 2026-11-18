@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Key Says Who</title>
+<link rel="icon" href="../../assets/img/favicon-module-4.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/42-the-key-says-who.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Module 04 · Lesson 4.2 · AWS + DevOps course</p>
+<h1>The Key Says Who</h1>
+<p class="lede">Nearly every other resource in AWS can be governed by IAM alone. A KMS key cannot.
+      The key carries its own policy, that policy is mandatory, and it is the only reason your IAM
+      permissions on the key mean anything at all.</p>
+<div class="facts">
+<span class="fact">terraform/main.tf:29</span>
+<span class="fact">no explicit policy → default policy</span>
+<span class="fact">kms:ViaService</span>
+<span class="fact">aws:s3:arn</span>
+</div>
+</header>
+<section>
+<p class="eyebrow">Start with the failure</p>
+<h2>You granted <code>kms:Decrypt</code> in IAM and the call still fails</h2>
+<div class="code"><span class="c"># the IAM policy is unambiguous</span>
+{ <span class="g">"Effect"</span>: <span class="g">"Allow"</span>, <span class="g">"Action"</span>: [<span class="g">"kms:Decrypt"</span>], <span class="g">"Resource"</span>: <span class="g">"arn:aws:kms:us-east-1:1111:key/8b1f…"</span> }
+
+<span class="c"># and the call is still refused</span>
+<span class="r">An error occurred (AccessDeniedException) when calling the Decrypt operation:
+The ciphertext refers to a customer master key that does not exist, does not exist
+in this region, or you are not allowed to access.</span></div>
+<p>In Lesson 3.2 you met the shape of this: two locks, the bucket and the key. This lesson is about
+      the second lock's own policy — where it lives, why it is unlike every bucket policy you have
+      written, and how to write one that is tighter than the default your repo is using today.</p>
+<div class="call">
+<h3>The rule</h3>
+<p>IAM never grants access to a KMS key on its own. The key policy decides — and a key policy
+        that says nothing about IAM means IAM says nothing about the key.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The difference that catches everyone</p>
+<h2>Optional on a bucket, mandatory on a key</h2>
+</div>
+<div class="tw">
+<table>
+<thead><tr><th></th><th>S3 bucket policy</th><th>KMS key policy</th></tr></thead>
+<tbody>
+<tr><td class="key">Exists by default?</td><td>no</td><td><strong>always</strong> — every key has one</td></tr>
+<tr><td class="key">If it is absent or silent</td><td>IAM alone decides; access still works</td><td><strong>nobody</strong> has access, including account admins</td></tr>
+<tr><td class="key">Can IAM grant access alone?</td><td>yes, same account</td><td>no — only if the key policy delegates to IAM</td></tr>
+<tr><td class="key">Can you lock yourself out?</td><td>awkwardly, and the bucket owner can recover</td><td><strong>yes, permanently</strong> — it becomes a support case</td></tr>
+</tbody>
+</table>
+</div>
+<p>That last row is not a rhetorical flourish. A key whose policy grants nothing to anyone cannot be
+      edited, used or rescued by you, because editing the policy is itself an action the policy must
+      allow. This is why AWS puts a delegation statement in the default policy and why you should think
+      hard before removing it.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">What your repo actually has</p>
+<h2>The most misread line in AWS</h2>
+</div>
+<p><code>aws_kms_key.avatars</code> has no <code>policy</code> argument, so the key was created with
+      the AWS default key policy. It is one statement:</p>
+<div class="code">{
+  <span class="g">"Sid"</span>: <span class="g">"Enable IAM User Permissions"</span>,
+  <span class="g">"Effect"</span>: <span class="g">"Allow"</span>,
+  <span class="g">"Principal"</span>: { <span class="g">"AWS"</span>: <span class="w">"arn:aws:iam::111122223333:root"</span> },
+  <span class="g">"Action"</span>: <span class="g">"kms:*"</span>,
+  <span class="g">"Resource"</span>: <span class="g">"*"</span>
+}</div>
+<div class="call warn">
+<h3>Read the principal correctly</h3>
+<p><code>:root</code> here does <strong>not</strong> mean the root user. It names
+        <em>the account</em>, and it means: “IAM policies in this account are allowed to govern this
+        key.” It grants no access by itself. Every principal still needs an IAM policy saying
+        <code>kms:Decrypt</code> — which is exactly what your app role has.</p>
+</div>
+<p>So access to your avatars key is currently decided in two places, and both must say yes:</p>
+<div class="split">
+<div class="card"><span class="tag">On the key</span>
+<p>The default policy: this account's IAM may govern the key. Broad, and identical on every key
+          anyone creates without thinking about it.</p></div>
+<div class="card"><span class="tag">In IAM</span>
+<p>Your app role's inline policy: <code>kms:Decrypt</code> and
+          <code>kms:GenerateDataKey</code> on this key's ARN. Specific, and the only thing narrowing
+          access today.</p></div>
+</div>
+<p class="note">This is the standard, supported arrangement — not a bug. But it means anyone who
+      can attach an IAM policy in this account can grant themselves use of the key. On a key that mattered,
+      you would say more on the key itself.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Writing a real one</p>
+<h2>Four conditions that do most of the work</h2>
+</div>
+<div class="tw">
+<table>
+<thead><tr><th>Condition</th><th>What it pins down</th></tr></thead>
+<tbody>
+<tr><td class="key">kms:ViaService</td><td>the key may only be used <em>through</em> a named service in a named region, e.g. <code>s3.us-east-1.amazonaws.com</code> — a stolen credential cannot call <code>Decrypt</code> directly</td></tr>
+<tr><td class="key">kms:EncryptionContext:<em>k</em></td><td>the key may only be used for a particular payload — S3 sets <code>aws:s3:arn</code> on every call</td></tr>
+<tr><td class="key">kms:CallerAccount</td><td>which account the caller belongs to — the cross-account boundary</td></tr>
+<tr><td class="key">kms:GrantIsForAWSResource</td><td>allows <code>CreateGrant</code> only when an AWS service is doing it on your behalf</td></tr>
+</tbody>
+</table>
+</div>
+<h3>The hardening this repo could take today</h3>
+<div class="code"><span class="c"># terraform/main.tf — an explicit policy on aws_kms_key.avatars</span>
+{
+  <span class="g">"Sid"</span>: <span class="g">"App role may use the key, but only through S3, only for this bucket"</span>,
+  <span class="g">"Effect"</span>: <span class="g">"Allow"</span>,
+  <span class="g">"Principal"</span>: { <span class="g">"AWS"</span>: aws_iam_role.app_role.arn },
+  <span class="g">"Action"</span>: [<span class="g">"kms:Decrypt"</span>, <span class="g">"kms:GenerateDataKey"</span>],
+  <span class="g">"Resource"</span>: <span class="g">"*"</span>,
+  <span class="g">"Condition"</span>: {
+    <span class="g">"StringEquals"</span>: {
+      <span class="k">"kms:ViaService"</span>: <span class="w">"s3.us-east-1.amazonaws.com"</span>,
+      <span class="k">"kms:EncryptionContext:aws:s3:arn"</span>: <span class="w">"arn:aws:s3:::your-bucket"</span>
+    }
+  }
+}</div>
+<p>With both conditions in place, the app role's credentials are worth strictly less to an attacker:
+      they can decrypt avatars <em>by reading them from this bucket</em>, and they cannot use the key for
+      anything else — no direct <code>Decrypt</code> of a blob they brought with them, no other
+      bucket, no other region.</p>
+<div class="call stop">
+<h3>The trap in that second condition</h3>
+<p>S3 sets the encryption context to the <strong>bucket</strong> ARN when
+        <code>bucket_key_enabled = true</code>, and to the <strong>object</strong> ARN when it is false.
+        Your repo has bucket keys on, so the value above is right today — and the day someone turns
+        bucket keys off to debug something, every upload and download fails with an access-denied error
+        that mentions neither S3 nor the setting they changed.</p>
+</div>
+<p class="note">Which is the Module 3 pattern again: two things that look like one. “The
+      encryption context” is really two different values depending on a cost setting three lines
+      away in the same file.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The third way in</p>
+<h2>Grants, and why AWS services use them</h2>
+</div>
+<p>A grant is a small, revocable permission attached to a key, created programmatically rather than
+      written into the policy. AWS services create them constantly on your behalf: attach an encrypted EBS
+      volume and the service takes a grant on your key for the life of that volume.</p>
+<div class="tw">
+<table>
+<thead><tr><th></th><th>Key policy</th><th>Grant</th></tr></thead>
+<tbody>
+<tr><td class="key">Shape</td><td>one JSON document on the key</td><td>many small objects, one per delegation</td></tr>
+<tr><td class="key">Created by</td><td>a human, in Terraform</td><td>usually a service, via <code>CreateGrant</code></td></tr>
+<tr><td class="key">Scope</td><td>whatever you write</td><td>specific operations, optionally pinned to an encryption context</td></tr>
+<tr><td class="key">Removed by</td><td>editing the document</td><td><code>RevokeGrant</code> by an admin, or <code>RetireGrant</code> by the grantee</td></tr>
+<tr><td class="key">Consistency</td><td>immediate</td><td>eventually consistent — use the returned grant token to act immediately</td></tr>
+</tbody>
+</table>
+</div>
+<p>For your repo, no grants exist and none are needed: S3 works through the key policy and IAM. Know
+      them because <code>list-grants</code> on an unfamiliar key is where you discover who else can
+      really use it — a question the policy alone does not answer.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Where the bits came from</p>
+<h2>Origin: AWS's 32 bytes, or yours</h2>
+</div>
+<p>The runbook below turns on one attribute you have not met yet. Every key has an
+      <code>Origin</code>, fixed when the key is created and never changeable afterwards, recording where
+      its key material came from:</p>
+<div class="code"><span class="c"># the key in this repo</span>
+aws kms describe-key --key-id alias/avatars \
+  --query <span class="g">'KeyMetadata.[Origin,KeyState]'</span> --output text
+
+<span class="g">AWS_KMS  Enabled</span></div>
+<p>Four values exist: <code>AWS_KMS</code>, <code>EXTERNAL</code>, <code>AWS_CLOUDHSM</code> and
+      <code>EXTERNAL_KEY_STORE</code>. The last two are custom key stores, where the material lives in a
+      CloudHSM cluster of yours or in an external HSM reached through a proxy. They are rare, this course
+      does not use them, and everything below is about the other two.</p>
+<h3><code>AWS_KMS</code> — the default, and what you have</h3>
+<p>AWS generated the material inside its HSM fleet. No API returns it in plaintext: not to you, not to
+      AWS staff, not through a support case. That is the entire reason the first row of the table below
+      says <em>no</em> — there is no export path for the material to leak through, so a leak of it is not
+      a thing that can happen. When somebody says “our KMS key has leaked”, this is almost never what
+      occurred, and establishing that in the first five minutes saves you from cutting a new key for
+      nothing.</p>
+<h3><code>EXTERNAL</code> — bring your own key</h3>
+<p>You generate the 256 bits yourself and hand AWS a copy. Creating the key gives you a key with no
+      material at all, in state <code>PendingImport</code> and unusable, until you fill it:</p>
+<div class="code"><span class="c"># 1. a key with no material yet</span>
+aws kms create-key --origin <span class="w">EXTERNAL</span>
+<span class="c"># 2. AWS hands back a public wrapping key and a single-use import token</span>
+aws kms get-parameters-for-import --key-id <span class="g">"$KEY"</span> \
+  --wrapping-algorithm RSAES_OAEP_SHA_256 --wrapping-key-spec RSA_4096
+
+<span class="c"># 3. wrap your own 32 bytes with that public key, then hand them over</span>
+aws kms import-key-material --key-id <span class="g">"$KEY"</span> \
+  --encrypted-key-material fileb://wrapped.bin \
+  --import-token fileb://token.bin \
+  --expiration-model KEY_MATERIAL_DOES_NOT_EXPIRE</div>
+<p>People do this to prove the entropy came from a source they control, to carry an already-established
+      key into AWS, or to keep an escrow copy outside AWS for disaster recovery. All three reasons are the
+      same fact: <strong>you hold the original.</strong> That copy — on a laptop, in a vault, on paper in a
+      safe — can be stolen, and if it is, every data key it ever wrapped can be unwrapped offline, with no
+      account, no credentials and no KMS involved. Which is why row two of the table is the one row where
+      both answers are yes.</p>
+<div class="tw">
+<table>
+<thead><tr><th></th><th><code>AWS_KMS</code></th><th><code>EXTERNAL</code></th></tr></thead>
+<tbody>
+<tr><td class="key">Who made the bits</td><td>AWS, in an HSM</td><td>you, wherever you like</td></tr>
+<tr><td class="key">Automatic rotation</td><td>supported</td><td><strong>not supported</strong></td></tr>
+<tr><td class="key">On-demand rotation</td><td>supported</td><td>supported — you import the next material yourself</td></tr>
+<tr><td class="key">Old material</td><td>AWS keeps every version until the key is deleted</td><td>yours to keep; each version can expire or be deleted</td></tr>
+<tr><td class="key">Expiry</td><td>none</td><td>optional <code>ValidTo</code>, set at import</td></tr>
+<tr><td class="key">Fastest way to stop it</td><td>disable, or schedule deletion (7–30 days)</td><td><strong>delete the material — immediate</strong></td></tr>
+<tr><td class="key">Reversible?</td><td>cancel deletion inside the window; after that, never</td><td>re-import the same bytes, any time</td></tr>
+</tbody>
+</table>
+</div>
+<div class="call">
+<h3>The one thing imported material buys you</h3>
+<p>An instant, reversible off switch. Deleting the material drops the key to
+        <code>PendingImport</code> in seconds and every decrypt stops, yet importing the identical bytes
+        later brings all of it back. Nothing with <code>AWS_KMS</code> origin behaves like that: scheduled
+        deletion is neither instant nor undoable once the window closes. Lesson 4.1's warning about
+        <code>PendingDeletion</code> being an outage nobody can buy their way out of is about your keys,
+        not about these.</p>
+</div>
+<p>Rotation is not the same operation across the two either, which matters for the promise you make an
+      auditor. Automatic rotation exists only for symmetric encryption keys with <code>AWS_KMS</code>
+      origin. Imported material rotates on demand only, and “on demand” means you generate the next 32
+      bytes, import them as new material, and then call <code>RotateKeyOnDemand</code> to make them
+      current. Asymmetric keys, HMAC keys and anything in a custom key store get neither, and must be
+      rotated the manual way from Lesson 4.1 — a new key and a pointer change.</p>
+<p>In Terraform these are two different resources. <code>aws_kms_key</code> always means
+      <code>AWS_KMS</code> origin; there is no argument to change it. Imported material is
+      <code>aws_kms_external_key</code> with <code>key_material_base64</code>, and that argument lands your
+      key material in state, so it comes from a variable at apply time or it does not get committed at
+      all.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Runbook</p>
+<h2>“The key has been compromised”</h2>
+</div>
+<p>Someone says this to you in an incident channel. Before you create a new key, establish which of
+      four different things actually happened. Only two of them are cryptographic compromises, and only
+      those two mean any data has to be re-encrypted.</p>
+<div class="tw">
+<table>
+<thead><tr><th>What leaked</th><th>Possible?</th><th>Is stored ciphertext compromised?</th></tr></thead>
+<tbody>
+<tr><td>CMK material, <code>AWS_KMS</code> origin</td><td><span class="chip exp">no</span> no export path exists; it is generated in an HSM and never leaves in plaintext</td><td>no</td></tr>
+<tr><td>Imported material, <code>EXTERNAL</code> origin</td><td><span class="chip imp">yes</span> you hold the source copy</td><td>yes</td></tr>
+<tr><td>A data key — memory, logs, a heap dump</td><td><span class="chip imp">yes</span> the realistic case</td><td>yes, for what it wrapped</td></tr>
+<tr><td>Credentials of a principal with <code>kms:Decrypt</code></td><td><span class="chip imp">yes</span> the most common of all</td><td>no — but it can be used</td></tr>
+</tbody>
+</table>
+</div>
+<h3>What each one actually calls for</h3>
+<div class="steps">
+<div class="step"><div class="n">1</div><div>
+<h3>Credentials: it was never a key problem</h3>
+<p>Nothing about the key changed; someone can call <code>Decrypt</code> as you. Every one of those
+          calls is correctly authorised and appears in CloudTrail under that principal's identity, so
+          nothing looks wrong on the key side — which is why this one is usually found from the credential
+          end, not the KMS end. Revoke the session, remove the access, rotate the credential, and tighten
+          the key policy: <code>ViaService</code> above would have made those credentials far less useful,
+          since they would work only through S3. A new key achieves nothing, because the compromised
+          principal has to be granted the new one for your application to keep working, and the attacker
+          is that principal.</p></div></div>
+<div class="step"><div class="n">2</div><div>
+<h3>A data key: re-encrypt the objects, not the key</h3>
+<p>The wrapped copy beside the object is unchanged, so the leaked key opens that object forever.
+          Rotating or replacing the CMK does nothing for it. Copy the affected objects onto themselves so
+          they get fresh data keys, and remember the blast radius from Lesson 4.1: with bucket keys on,
+          one leaked key can cover everything written in a time window.</p></div></div>
+<div class="step"><div class="n">3</div><div>
+<h3>Imported material: one move nobody else has</h3>
+<p><code>DeleteImportedKeyMaterial</code> makes the key unusable immediately without deleting the
+          key, and you can re-import later. Do that first, then plan the migration.</p></div></div>
+<div class="step"><div class="n">4</div><div>
+<h3>Only then, the new key</h3>
+<p>Create it, point new writes at it — the ARN in the bucket config, not just the alias —
+          re-encrypt everything you intend to keep including old object versions, then watch CloudTrail for
+          <code>Decrypt</code> calls on the old key until it goes quiet. Disable it as a dress rehearsal.
+          Schedule deletion last, with the full 30-day window.</p></div></div>
+</div>
+<div class="call stop">
+<h3>The sentence that reframes the incident</h3>
+<p>Deleting the old key does not un-leak anything. If material really escaped, every copy of the
+        ciphertext the attacker already holds stays readable without your account, your permissions or KMS.
+        Deletion protects the copies <em>you</em> still hold. The exposure already happened — so the
+        real work is what was in those objects, who has it now, and what must be rotated downstream.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Hands-on · ~5 minutes · read-only</p>
+<h2>Read your own key's policy</h2>
+</div>
+<h3>1. The policy as it stands</h3>
+<div class="code">BUCKET=$(terraform -chdir=terraform output -raw s3_bucket_name)
+ALIAS=<span class="g">"alias/${BUCKET}-avatars"</span>
+
+aws kms get-key-policy --key-id <span class="w">$ALIAS</span> --policy-name default \
+  --query Policy --output text | python3 -m json.tool</div>
+<p class="note">One statement, principal <code>…:root</code>, action <code>kms:*</code>. You are
+      looking at the default policy, and now you can say precisely what it does and does not grant.</p>
+<h3>2. Who is actually allowed, then?</h3>
+<div class="code">aws iam get-role-policy --role-name prima-app-role --policy-name prima-app-policy \
+  --query <span class="g">'PolicyDocument.Statement[?contains(to_string(Action), `kms`)]'</span></div>
+<p class="note">The narrowing lives here, in IAM — not on the key. That asymmetry is the lesson.</p>
+<h3>3. Does anyone hold a grant?</h3>
+<div class="code">aws kms list-grants --key-id <span class="w">$ALIAS</span> --query <span class="g">'Grants[].{Grantee:GranteePrincipal,Ops:Operations}'</span></div>
+<p class="note">Expect an empty list. On a key you inherit from someone else, this is the first command
+      to run, because grants are invisible in the policy document.</p>
+<h3>4. Who has been using the key?</h3>
+<div class="code">aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=GenerateDataKey \
+  --max-results 5 \
+  --query <span class="g">'Events[].{Time:EventTime,Who:Username,Src:EventSource}'</span></div>
+<p class="note">This is the audit trail you bought by choosing a customer-managed key in Lesson 3.2,
+      and it is the evidence you would use before deleting a key in the runbook above.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check yourself</p>
+<h2>Four questions</h2>
+</div>
+<details>
+<summary>An engineer removes the “Enable IAM User Permissions” statement from a key policy, leaving only a statement for one deleted role. What is the state of that key?</summary>
+<div class="answer">
+<p>Unusable and unmanageable. No principal can encrypt, decrypt, or edit the policy — and
+          editing the policy is itself governed by the policy, so there is no way back from inside the
+          account. Account administrators cannot override it: unlike an S3 bucket, there is no owner
+          fallback.</p>
+<p>The data is not gone, but it is unreadable until AWS Support intervenes. This is the one AWS
+          mistake that turns into a support ticket rather than a fix.</p>
+</div>
+</details>
+<details>
+<summary>Your key policy grants <code>kms:*</code> to <code class="brk">arn:aws:iam::111122223333:root</code>. A colleague says “that means only the root user can use the key”. Correct them.</summary>
+<div class="answer">
+<p>It names the account, not the root user, and it grants no access to anyone by itself. It
+          delegates: IAM policies in that account are now allowed to decide who may use the key. Without
+          an IAM policy naming the key, a principal still gets nothing.</p>
+<p>The practical consequence is the opposite of what they fear: not “only root”, but
+          “anyone who can write IAM policy in this account”.</p>
+</div>
+</details>
+<details>
+<summary>You pin the key policy with <code class="brk">kms:EncryptionContext:aws:s3:arn</code> set to the bucket ARN. Months later someone sets <code>bucket_key_enabled = false</code>. What happens?</summary>
+<div class="answer">
+<p>Every upload and download starts failing with access denied from KMS. Without bucket keys, S3
+          sends the <em>object</em> ARN as the encryption context, so the condition no longer matches, and
+          the key refuses every call.</p>
+<p>Nothing in the error mentions bucket keys, and the change that caused it was made for cost or
+          debugging reasons in a different part of the file. If you use this condition, it belongs in a
+          comment next to <code>bucket_key_enabled</code>, tying the two lines together.</p>
+</div>
+</details>
+<details>
+<summary>An incident channel says “our KMS key leaked”. What do you ask, and what do you do first?</summary>
+<div class="answer">
+<p>Ask what leaked, because the phrase covers four different incidents. If it is a CMK with
+          <code>AWS_KMS</code> origin, the material cannot have leaked — there is no export path, so
+          the real event is something else. If it is credentials, the key is fine and the fix is revoking
+          access. If it is a data key, the affected objects need re-encrypting. Only imported material is
+          a genuine key-material leak, and it has its own instant containment in
+          <code>DeleteImportedKeyMaterial</code>.</p>
+<p>First action either way: contain access — revoke the credential, or disable the key if the
+          outage is acceptable. New key, re-encryption, then deletion, in that order, and deletion only
+          once CloudTrail shows the old key has gone quiet. And say the uncomfortable part out loud:
+          deleting the key does not un-leak data anyone already copied.</p>
+</div>
+</details>
+</section>
+<footer>
+<p>Module 4, Lesson 4.2 · AWS + DevOps course · 20 September 2026</p>
+<p>Repo material: <code>terraform/main.tf</code> — <code>aws_kms_key.avatars</code> (no
+      <code>policy</code> argument, so the AWS default key policy applies), the bucket's
+      <code>bucket_key_enabled = true</code>, and the app role's <code>kms:Decrypt</code> /
+      <code>kms:GenerateDataKey</code> statement.</p>
+<p>The encryption-context values are as documented in the S3 user guide, “Using server-side
+      encryption with AWS KMS keys”: the object ARN without bucket keys, the bucket ARN with them.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

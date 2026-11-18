@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Same Commit, Different Bytes</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/p0-1a-same-commit-different-bytes.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Phase 0 · Lesson 0.1, deep dive · AWS + DevOps course</p>
+<h1>Same Commit, Different Bytes</h1>
+<p class="lede">Lesson 0.1 named four ways a rebuild of an identical commit produces a different
+  artifact, in one sentence. This page takes that sentence apart: what each one looks like in a
+  Jenkins, Maven and JFrog shop, the mechanism underneath, and the fix.</p>
+<p class="note">Recorded from a question asked on 11 October 2026. Companion to
+  <a href="p0-1-build-once-deploy-many.html">Lesson 0.1, Build Once, Deploy Many</a>.</p>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Two kinds of difference</p>
+<h2>Behaviour, or only bytes</h2>
+</div>
+<p>The first three causes can change <strong>what the code does</strong>. The fourth changes the
+  bytes but not the behaviour. The fourth still matters: when two checksums disagree, the checksum
+  cannot tell you which kind of difference you are looking at.</p>
+<div class="tw"><table>
+<thead><tr><th>Cause</th><th>Kind</th><th>Closed by</th></tr></thead>
+<tbody>
+<tr><td class="key">Dependency resolved differently</td><td><span class="kind beh">behaviour</span></td><td><code>requireReleaseDeps</code>, <code>banDynamicVersions</code>, BOMs, <code>dependencyConvergence</code></td></tr>
+<tr><td class="key">Different JDK patch on the agent</td><td><span class="kind beh">behaviour</span></td><td>toolchains, <code>requireJavaVersion</code>, a build image pinned by digest</td></tr>
+<tr><td class="key">Plugin pulled a newer version</td><td><span class="kind beh">behaviour</span></td><td><code>pluginManagement</code>, <code>requirePluginVersions</code>, <code>./mvnw</code></td></tr>
+<tr><td class="key">Generated file, different timestamp</td><td><span class="kind byt">bytes only</span></td><td><code>project.build.outputTimestamp</code></td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The four causes</p>
+<h2>Each one: what happens, why, the fix</h2>
+</div>
+
+<div class="cause">
+<div class="hd"><span class="n">1</span><h3>A dependency resolved differently</h3><span class="kind beh">behaviour</span></div>
+<p>The commit contains your <code>pom.xml</code>, not the jars it names. Maven fetches those at
+  build time, so the answer can change between builds:</p>
+<ul>
+<li><strong>SNAPSHOT versions.</strong> <code>acme-common:1.4-SNAPSHOT</code> is a moving target.
+  JFrog stores each snapshot deploy as a timestamped jar
+  (<code>acme-common-1.4-20261009.143012-7.jar</code>) and Maven reads
+  <code>maven-metadata.xml</code> to pick the newest. Monday's build gets build 7. Someone deploys on
+  Tuesday, so Tuesday's build gets build 8. Same commit, different code inside.</li>
+<li><strong>Version ranges.</strong> <code>[2.0,3.0)</code> means "the highest version in that
+  range that exists today". When 2.7 is published, your next build quietly takes it.</li>
+<li><strong>Transitive mediation.</strong> You depend on A and B, and each pulls in Jackson at a
+  different version. Maven does not pick the highest. It picks the <em>nearest</em> in the tree and,
+  on a tie, whichever is declared first. Reorder two dependencies, or let A drop its Jackson
+  declaration in a patch release, and a different Jackson ships in your fat jar. Your own code did
+  not change at all.</li>
+<li><strong>The repository itself.</strong> A JFrog virtual repository searches its members in
+  order. Reorder them, or purge and refetch a remote proxy cache, and the same coordinates can
+  resolve to a different file.</li>
+</ul>
+<div class="mech"><p><span class="lbl">Because</span>Maven has no lockfile, unlike npm's
+  <code>package-lock.json</code>. The POM records what you asked for, not what you got, and
+  resolution runs again on every build against a repository whose contents change.</p></div>
+<div class="fix"><p><span class="lbl">Fix</span>Ban SNAPSHOTs and ranges in release builds:
+  Interchange's <code>release</code> profile already runs <code>requireReleaseDeps</code>, and
+  <code>banDynamicVersions</code> is the matching enforcer rule for ranges. Pin transitive versions
+  with <code>dependencyManagement</code> or a BOM (the Spring Boot and Camel BOMs do most of it). Add
+  <code>dependencyConvergence</code> so a conflict fails the build instead of being settled
+  silently.</p></div>
+</div>
+
+<div class="cause">
+<div class="hd"><span class="n">2</span><h3>A build agent with a different JDK patch</h3><span class="kind beh">behaviour</span></div>
+<p>Jenkins agent 1 has Temurin 21.0.4. Agent 2 was patched to 21.0.6. Whichever agent picks up
+  the job is the one that compiles your code.</p>
+<ul>
+<li><strong><code>maven.compiler.release=21</code> does not protect you.</strong> It limits which
+  <em>APIs</em> you may call. The compiler doing the work is still whatever JDK runs Maven.</li>
+<li><strong>javac changes between patches.</strong> Bug fixes can produce different bytecode:
+  how lambdas and string concatenation are compiled, constant-folding fixes. Some plugins also write
+  the JDK version into the manifest (<code>Build-Jdk: 21.0.4</code>), so the bytes differ even when
+  the bytecode does not.</li>
+<li><strong>The patch case is the harmless end.</strong> The dangerous end is an agent still on
+  JDK 17, or one whose default <code>java</code> was changed by an Ansible run nobody connected to
+  the builds.</li>
+</ul>
+<div class="mech"><p><span class="lbl">Because</span>the toolchain is not part of the commit. It
+  is part of the agent, and agents drift. Same lesson as Ansible: two servers configured "the same
+  way" six months apart are not the same.</p></div>
+<div class="fix"><p><span class="lbl">Fix</span>Pin the JDK with Maven toolchains. Add the
+  enforcer rule <code>requireJavaVersion</code> so a build on the wrong JDK fails loudly. Better
+  still, build inside a container image pinned by digest
+  (<code>eclipse-temurin:21.0.5_11-jdk@sha256:…</code>), so every agent compiles with exactly the
+  same JDK. That is where Phase 2 takes you.</p></div>
+</div>
+
+<div class="cause">
+<div class="hd"><span class="n">3</span><h3>A plugin that pulled a newer version</h3><span class="kind beh">behaviour</span></div>
+<p>Every Maven build runs plugins: compiler, resources, jar, surefire, shade. If the POM names no
+  version for one, Maven fills it in from its own defaults, and those defaults depend on which Maven
+  is installed.</p>
+<ul>
+<li>An agent on Maven 3.8 and an agent on 3.9 can package the same jar with different
+  <code>maven-jar-plugin</code> versions, or run different surefire versions.</li>
+<li>A new plugin version can change entry ordering, manifest contents, shading rules, or which
+  tests get picked up. Nobody touched the POM.</li>
+<li>Maven itself is the same problem: <code>mvn</code> on an agent is whatever someone installed
+  there.</li>
+</ul>
+<div class="mech"><p><span class="lbl">Because</span>an unpinned plugin is a dependency like any
+  other, resolved at build time. Most people never think of it that way.</p></div>
+<div class="fix"><p><span class="lbl">Fix</span>Pin every plugin in <code>pluginManagement</code>
+  (the Spring Boot parent pins most of them). Add the enforcer rule
+  <code>requirePluginVersions</code> to catch the rest. Use the Maven wrapper: Interchange has
+  <code>./mvnw</code>, which pins the Maven version inside the repo, so the agent's installed Maven
+  does not matter.</p></div>
+</div>
+
+<div class="cause">
+<div class="hd"><span class="n">4</span><h3>A generated file with a different timestamp</h3><span class="kind byt">bytes only</span></div>
+<p>The harmless kind, and the most common. Build the same code twice, one minute apart, on the
+  same machine, and the jars still hash differently:</p>
+<ul>
+<li><strong>A jar is a zip, and every zip entry stores a modification time.</strong> Same
+  <code>.class</code> contents with different mtimes gives different bytes and a different
+  SHA-256.</li>
+<li><strong>Generated files carry build-time facts.</strong> Spring Boot's
+  <code>build-info.properties</code> contains <code>build.time</code>. Older builds wrote
+  <code>pom.properties</code> with a date comment. The manifest may say
+  <code>Built-By: jenkins</code> on one agent and <code>Built-By: al</code> on your laptop.
+  <code>git.properties</code> records the build host.</li>
+<li><strong>Entry order</strong> can follow the filesystem listing, which can differ between
+  machines.</li>
+</ul>
+<div class="mech"><p><span class="lbl">Because</span>the build records <em>when</em> and
+  <em>where</em> it ran, not just <em>what</em> it built. Those facts change every time, so the
+  output changes every time.</p></div>
+<div class="fix"><p><span class="lbl">Fix</span><code>project.build.outputTimestamp</code>,
+  already pinned in Interchange. Modern Maven plugins read it, set every zip entry to that fixed time
+  and sort the entries; Spring Boot's build-info uses it too. To check: build twice and compare with
+  <code>sha256sum</code>, or run <code>mvn verify artifact:compare</code>. When they still differ,
+  <code>diffoscope</code> shows exactly which file inside differs and how.</p></div>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Why it matters</p>
+<h2>Promotion ships what you tested. Reproducibility proves it</h2>
+</div>
+<p>Staging tested artifact X. If production rebuilds from the same tag it gets artifact Y, and any
+  of the four causes can make Y differ from X. Nobody tested Y.</p>
+<div class="split">
+<div class="card"><span class="tag">Behaviour cannot drift</span><p>Pinning closes causes 1 to 3.
+  The code that runs is the code that was resolved and compiled once.</p></div>
+<div class="card"><span class="tag">You can verify</span><p>With cause 4 gone, matching hashes
+  really do mean an identical artifact, and a mismatch means something real changed.</p></div>
+</div>
+<p>You still promote the built artifact rather than rebuilding. Reproducibility is what lets you
+  <strong>prove</strong> the artifact you promoted is the one that came from that commit.</p>
+<div class="call">
+<h3>The same four, again, in Phase 2</h3>
+<p><code>FROM eclipse-temurin:21</code> is a moving tag. <code>apt-get install curl</code>
+  installs whatever version is current that day. Each layer records timestamps. It is the same
+  problem in a new tool.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check</p>
+<h2>Two questions</h2>
+</div>
+<p>Answer out loud and end with "because…" before opening.</p>
+<details><summary>Which two of the four causes will the Maven enforcer catch, and which two need something else?</summary><div class="answer"><p><strong>Enforcer catches 1 and 3</strong>, and partly 2. <code>requireReleaseDeps</code>, <code>banDynamicVersions</code> and <code>dependencyConvergence</code> fail the build on moving or conflicting dependencies. <code>requirePluginVersions</code> fails on unpinned plugins. <code>requireJavaVersion</code> can reject the wrong JDK, though only within the range you set, so a patch difference inside it passes.</p><p><strong>Cause 4 is not an enforcer rule at all.</strong> It is fixed by a property, <code>project.build.outputTimestamp</code>, which the packaging plugins read. <strong>Cause 2 is fully closed</strong> only by pinning the environment itself: toolchains, or a build image pinned by digest. Because the enforcer checks what the POM declares, and neither timestamps nor the agent's exact JDK are declared there.</p></div></details>
+<details><summary>Two builds of one commit have different SHA-256s. What do you run to find out whether it matters?</summary><div class="answer"><p><code>diffoscope</code> on the two jars, or <code>mvn verify artifact:compare</code> against the reference build. If the only differences are entry times or <code>build.time</code>, it is cause 4: bytes, not behaviour, and <code>outputTimestamp</code> is missing or not honoured by some plugin. If a <code>.class</code> file or a dependency jar inside <code>BOOT-INF/lib/</code> differs, it is one of causes 1 to 3, and something that runs has changed. Because a hash only says "different", never "how different".</p></div></details>
+</section>
+
+<footer>
+<p>Sources: the Maven documentation on snapshot resolution, dependency mediation and reproducible
+  builds (<code>project.build.outputTimestamp</code>); the Maven Enforcer built-in rules
+  (<code>requireReleaseDeps</code>, <code>banDynamicVersions</code>, <code>dependencyConvergence</code>,
+  <code>requirePluginVersions</code>, <code>requireJavaVersion</code>); Maven toolchains; the
+  maven-artifact-plugin's <code>artifact:compare</code>; diffoscope; reproducible-builds.org.</p>
+<p>Back to <a href="p0-1-build-once-deploy-many.html">Lesson 0.1</a>. Next: Lesson 0.2, Jenkins
+  to GitHub Actions.</p>
+</footer>
+</div>
+</body>
+</html>

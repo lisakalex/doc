@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Queries Before Tables</title>
+<link rel="icon" href="../../assets/img/favicon-module-5.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/51-queries-before-tables.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Module 05 · Lesson 5.1 · AWS + DevOps course</p>
+<h1>Queries Before Tables</h1>
+<p class="lede">In a relational database you model the data, then ask it anything. In DynamoDB you
+      enumerate the questions first and derive the keys from them — because the keys decide which
+      questions are cheap, every other question is a full table read, and you cannot change the keys
+      afterwards.</p>
+<div class="facts">
+<span class="fact">terraform/main.tf:112</span>
+<span class="fact">hash_key = email</span>
+<span class="fact">no sort key, no index</span>
+<span class="fact">dynamodb:Scan</span>
+</div>
+</header>
+<section>
+<p class="eyebrow">Start with the failure</p>
+<h2>Your <code>GET /users</code> reads the whole table, every time</h2>
+<div class="code"><span class="c"># app/services/dynamodb.py</span>
+def list_users(self) -&gt; list[dict]:
+    items: list[dict] = []
+    response = self._table.<span class="w">scan()</span>
+    items.extend(response.get(<span class="g">"Items"</span>, []))
+    <span class="k">while</span> <span class="g">"LastEvaluatedKey"</span> <span class="k">in</span> response:
+        response = self._table.<span class="w">scan</span>(ExclusiveStartKey=response[<span class="g">"LastEvaluatedKey"</span>])
+        items.extend(response.get(<span class="g">"Items"</span>, []))
+    <span class="k">return</span> items</div>
+<p>That <code>while</code> loop is the tell. It exists because a single read returns at most 1 MB,
+      so the code walks the table a megabyte at a time and glues the pages together. With twelve users
+      it is instant and free. With a hundred thousand it reads roughly 13 MB and makes thirteen
+      round trips — on every request, for every visitor, to render one page.</p>
+<p>And the permission was already granted, back in Module 2:</p>
+<div class="code"><span class="c"># terraform/main.tf — the app role</span>
+Action = [<span class="g">"dynamodb:PutItem"</span>, <span class="w">"dynamodb:Scan"</span>, <span class="g">"dynamodb:GetItem"</span>]</div>
+<p>That <code>Scan</code> in an IAM policy is a fossil. Somebody needed a question the key schema
+      could not answer, and the cheapest fix in the moment was a permission rather than a redesign.</p>
+<div class="call">
+<h3>The rule</h3>
+<p>A DynamoDB table answers the questions its keys were designed for. Every other question is a
+        full table read — and no amount of filtering makes it cheaper.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">What you actually declared</p>
+<h2>The key schema is a physical layout, not a constraint</h2>
+</div>
+<p>Eight lines of Terraform, and most of them are types:</p>
+<div class="code">resource <span class="g">"aws_dynamodb_table"</span> <span class="g">"users"</span> {
+  name         = local.dynamodb_table
+  billing_mode = <span class="g">"PAY_PER_REQUEST"</span>
+  hash_key     = <span class="w">"email"</span>
+
+  attribute {
+    name = <span class="g">"email"</span>
+    type = <span class="g">"S"</span>
+  }
+}</div>
+<p><code>hash_key</code> is Terraform's name for the <strong>partition key</strong>, and it does
+      something a relational primary key does not: DynamoDB hashes the value and the result decides
+      <em>which physical partition the item is stored on</em>. It is a placement decision, made per
+      item, at write time.</p>
+<p>A key can have a second part. The <strong>sort key</strong> does not affect placement — items
+      sharing a partition key live together, ordered by sort key. That ordering is the entire reason
+      ranges are cheap: “everything for this customer between March and June” is a contiguous read of
+      one partition.</p>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="Left: a table keyed only by email, where hashing scatters nine users across three partitions in no order. Right: a global secondary index keyed by signup month and creation date, where the same nine users sit in three month partitions, sorted by date inside each." role="img" viewbox="0 0 760 290">
+<text fill="var(--ink)" font-family="Archivo, sans-serif" font-size="13" font-weight="600" x="14" y="20">Table — partition key: email</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="11" x="14" y="38">hash(email) chooses the partition</text>
+<rect fill="var(--surface-2)" height="150" rx="6" stroke="var(--rule-strong)" width="100" x="14" y="52"></rect>
+<rect fill="var(--surface-2)" height="150" rx="6" stroke="var(--rule-strong)" width="100" x="128" y="52"></rect>
+<rect fill="var(--surface-2)" height="150" rx="6" stroke="var(--rule-strong)" width="100" x="242" y="52"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="64" y="70">partition 1</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="178" y="70">partition 2</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="292" y="70">partition 3</text>
+<rect fill="var(--stop-soft)" height="18" rx="3" stroke="var(--stop-rule)" width="80" x="24" y="82"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="64" y="95">jul · u041</text>
+<rect fill="var(--accent-soft)" height="18" rx="3" stroke="var(--rule-strong)" width="80" x="24" y="106"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="64" y="119">sep · u903</text>
+<rect fill="var(--warn-soft)" height="18" rx="3" stroke="var(--warn-rule)" width="80" x="24" y="130"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="64" y="143">aug · u277</text>
+<rect fill="var(--accent-soft)" height="18" rx="3" stroke="var(--rule-strong)" width="80" x="138" y="82"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="178" y="95">sep · u118</text>
+<rect fill="var(--stop-soft)" height="18" rx="3" stroke="var(--stop-rule)" width="80" x="138" y="106"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="178" y="119">jul · u650</text>
+<rect fill="var(--warn-soft)" height="18" rx="3" stroke="var(--warn-rule)" width="80" x="138" y="130"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="178" y="143">aug · u002</text>
+<rect fill="var(--warn-soft)" height="18" rx="3" stroke="var(--warn-rule)" width="80" x="252" y="82"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="292" y="95">aug · u534</text>
+<rect fill="var(--accent-soft)" height="18" rx="3" stroke="var(--rule-strong)" width="80" x="252" y="106"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="292" y="119">sep · u389</text>
+<rect fill="var(--stop-soft)" height="18" rx="3" stroke="var(--stop-rule)" width="80" x="252" y="130"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="292" y="143">jul · u771</text>
+<text fill="var(--stop)" font-family="IBM Plex Sans, sans-serif" font-size="11.5" text-anchor="middle" x="178" y="226">“users who signed up in September”</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="11.5" text-anchor="middle" x="178" y="244">reads all nine, returns three</text>
+<line stroke="var(--rule)" stroke-dasharray="4 4" x1="371" x2="371" y1="20" y2="260"></line>
+<text fill="var(--ink)" font-family="Archivo, sans-serif" font-size="13" font-weight="600" x="400" y="20">GSI — signup_month / created_at</text>
+<text fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="11" x="400" y="38">same items, grouped and ordered</text>
+<rect fill="var(--surface-2)" height="150" rx="6" stroke="var(--rule-strong)" width="100" x="400" y="52"></rect>
+<rect fill="var(--surface-2)" height="150" rx="6" stroke="var(--rule-strong)" width="100" x="514" y="52"></rect>
+<rect fill="var(--accent-soft)" height="150" rx="6" stroke="var(--accent)" stroke-width="2" width="100" x="628" y="52"></rect>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="450" y="70">2026-07</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="564" y="70">2026-08</text>
+<text fill="var(--accent-ink)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="678" y="70">2026-09</text>
+<rect fill="var(--stop-soft)" height="18" rx="3" stroke="var(--stop-rule)" width="80" x="410" y="82"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="450" y="95">07-02 u650</text>
+<rect fill="var(--stop-soft)" height="18" rx="3" stroke="var(--stop-rule)" width="80" x="410" y="106"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="450" y="119">07-14 u041</text>
+<rect fill="var(--stop-soft)" height="18" rx="3" stroke="var(--stop-rule)" width="80" x="410" y="130"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="450" y="143">07-28 u771</text>
+<rect fill="var(--warn-soft)" height="18" rx="3" stroke="var(--warn-rule)" width="80" x="524" y="82"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="564" y="95">08-03 u002</text>
+<rect fill="var(--warn-soft)" height="18" rx="3" stroke="var(--warn-rule)" width="80" x="524" y="106"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="564" y="119">08-11 u277</text>
+<rect fill="var(--warn-soft)" height="18" rx="3" stroke="var(--warn-rule)" width="80" x="524" y="130"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="564" y="143">08-22 u534</text>
+<rect fill="var(--surface)" height="18" rx="3" stroke="var(--accent)" width="80" x="638" y="82"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="678" y="95">09-05 u118</text>
+<rect fill="var(--surface)" height="18" rx="3" stroke="var(--accent)" width="80" x="638" y="106"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="678" y="119">09-19 u389</text>
+<rect fill="var(--surface)" height="18" rx="3" stroke="var(--accent)" width="80" x="638" y="130"></rect>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" x="678" y="143">09-27 u903</text>
+<text fill="var(--good)" font-family="IBM Plex Sans, sans-serif" font-size="11.5" text-anchor="middle" x="564" y="226">“users who signed up in September”</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Sans, sans-serif" font-size="11.5" text-anchor="middle" x="564" y="244">reads three, returns three</text>
+</svg>
+</div>
+<figcaption>The same nine users, laid out two ways. On the left the hash of the email decides
+      placement, so September's users are scattered and unordered — the only way to collect them is to
+      read everything. On the right the month is the partition key, so they are already together and
+      already sorted by date.</figcaption>
+</figure>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Three verbs, and only three</p>
+<h2>What you may ask, and what it costs</h2>
+</div>
+<div class="tw">
+<table>
+<thead><tr><th>Operation</th><th>Requires</th><th>Reads</th><th>Use it for</th></tr></thead>
+<tbody>
+<tr><td class="key">GetItem</td><td>the exact partition key (and sort key, if there is one)</td><td>one item</td><td>“this user, by email”</td></tr>
+<tr><td class="key">Query</td><td>an <strong>exact</strong> partition key, plus an optional condition on the sort key</td><td>only the matching items in one partition</td><td>“this customer's orders since March”</td></tr>
+<tr><td class="key">Scan</td><td>nothing</td><td><strong>every item</strong>, 1 MB at a time</td><td>migrations, exports, and admin jobs nobody waits on</td></tr>
+</tbody>
+</table>
+</div>
+<p>The shape of the constraint is in the second row: <strong>Query cannot search for a partition
+      key, only match one.</strong> There is no “find the partitions where…”. You must already know the
+      value. Designing the key is therefore the same act as designing the question.</p>
+<div class="call stop">
+<h3>The fact that surprises everyone</h3>
+<p>A <code>FilterExpression</code> does not save you a single read unit. DynamoDB reads the items
+        first and applies the filter <em>afterwards</em>, discarding what does not match. A filtered scan
+        that returns three items out of a million costs exactly the same as reading the million. The
+        response even tells you: <code>ScannedCount</code> is what you paid for, <code>Count</code> is
+        what you got.</p>
+</div>
+<p>The same is true of <code>ProjectionExpression</code> — asking for two attributes instead of
+      twenty reduces the bytes on the wire, not the bytes read. Capacity is computed from what was read
+      from disk, never from what was returned to you.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Run it yourself · ~30 seconds · no AWS account</p>
+<h2>What the gap looks like with numbers on it</h2>
+</div>
+<p><code>assets/scripts/access_patterns.py</code> builds your own users table in memory, fills it with
+      5,000 users signed up across a year, and answers one product question twice.</p>
+<div class="code">uv run assets/scripts/access_patterns.py
+
+<span class="c">question: which of 5,000 users signed up since 2026-09-23?</span>
+
+  Scan + FilterExpression
+    items read     <span class="r">5,000</span> <span class="c">&lt;- every item in the table</span>
+    items returned 108
+    read units     <span class="r">80</span>
+
+  Query on a GSI keyed (signup_month, created_at)
+    items read     <span class="g">108</span>
+    items returned 108
+    read units     <span class="g">2.0</span>
+<span class="w">same answer, 40x the reads</span></div>
+<p>Forty times, on a table small enough to fit in one page. The ratio is not the point though — the
+      <em>slope</em> is. The scan grows with the table; the query grows with the answer. At 5,000 users
+      it is 40×; at 100,000 users, with the same 108 results, it is 800×, and the scan has also become
+      thirteen sequential round trips because of the 1 MB page limit.</p>
+<p class="note">Read units here are calculated the way DynamoDB calculates them: total bytes read,
+      rounded up to 4 KB, halved because scans and queries are eventually consistent unless you ask
+      otherwise. The script prints its working.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Your table, honestly</p>
+<h2>The questions you can and cannot afford</h2>
+</div>
+<div class="tw">
+<table>
+<thead><tr><th>Product asks for…</th><th>On your table today</th></tr></thead>
+<tbody>
+<tr><td>a user by email address</td><td><span class="chip ok">GetItem</span> one read, single-digit milliseconds</td></tr>
+<tr><td>every user, for the admin list</td><td><span class="chip exp">Scan</span> the whole table, paged</td></tr>
+<tr><td>users who signed up this week</td><td><span class="chip exp">Scan</span> + filter — same cost as the whole table</td></tr>
+<tr><td>the 20 most recent sign-ups</td><td><span class="chip exp">Scan</span> everything, then sort in Python — there is no order to exploit</td></tr>
+<tr><td>a user by their internal id</td><td><span class="chip exp">Scan</span> + filter, because the id is not a key</td></tr>
+<tr><td>a count of users</td><td><span class="chip exp">Scan</span> — DynamoDB has no cheap <code>COUNT(*)</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>One row out of six is what the table was designed for. That is not a bug in the table — it is an
+      accurate reflection of one decision made on one line, months ago: <code>hash_key = "email"</code>.
+      Everything else was never asked for, so it was never paid for.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The part with no undo</p>
+<h2>You cannot change a key schema</h2>
+</div>
+<p>There is no <code>ALTER TABLE</code>. The partition key and sort key are fixed at creation, for
+      the life of the table. Changing them means creating a new table, migrating every item, repointing
+      the application, and deleting the old one — with the writes still arriving throughout.</p>
+<div class="tw">
+<table>
+<thead><tr><th></th><th>Add later?</th><th>Limit</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td class="key">Partition / sort key</td><td><span class="chip exp">never</span></td><td>—</td><td>new table and a migration</td></tr>
+<tr><td class="key">Global secondary index</td><td><span class="chip ok">yes</span></td><td>20 per table</td><td>own partition and sort key, own capacity, eventually consistent</td></tr>
+<tr><td class="key">Local secondary index</td><td><span class="chip exp">creation only</span></td><td>5 per table</td><td>same partition key, different sort key</td></tr>
+<tr><td class="key">Non-key attributes</td><td><span class="chip ok">anytime</span></td><td>—</td><td>the table is schemaless below the key</td></tr>
+</tbody>
+</table>
+</div>
+<p>So the GSI is the escape hatch, and it is the reason a wrong key is survivable. It is not free:
+      a GSI is a <strong>second copy</strong> of the projected attributes, written on every write to the
+      base table, billed for its own storage and its own write units. Twenty indexes on a hot table is
+      twenty multiples of your write bill.</p>
+<div class="call warn">
+<h3>Terraform will do this silently</h3>
+<p>Change <code>hash_key</code> in <code>main.tf</code> and <code>terraform plan</code> will show
+        you <code>forces replacement</code> — which means <strong>destroy and create</strong>. On a
+        DynamoDB table that is every item you have. This is the one place in your repo where reading the
+        plan output carefully is not a nicety.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The method</p>
+<h2>Write the questions down first</h2>
+</div>
+<p>The discipline is mechanical, and it happens before any Terraform. List every question the
+      application will ask, with how often and how selective it is. Then, and only then, derive keys.</p>
+<div class="steps">
+<div class="step"><div class="n">1</div><div>
+<h3>Enumerate the access patterns</h3>
+<p>“Get a user by email”, “list users newest first, 20 at a time”, “find a user by id”. Write
+          them as sentences, not as tables. If you cannot name the question, you cannot design for
+          it.</p></div></div>
+<div class="step"><div class="n">2</div><div>
+<h3>For each, name the one value you will always have</h3>
+<p>That value is a candidate partition key. For “get a user by email” it is the email. For
+          “newest first” there is no such value — which is the signal that you need a bucket.</p></div></div>
+<div class="step"><div class="n">3</div><div>
+<h3>Give ranges a sort key</h3>
+<p>“Between these dates”, “the most recent N”, “starting with” — all of these are sort key
+          conditions, and all of them require the partition key to be pinned first.</p></div></div>
+<div class="step"><div class="n">4</div><div>
+<h3>Check the spread before you commit</h3>
+<p>A partition key with few distinct values concentrates traffic on few partitions. The fix is
+          usually a finer bucket — month rather than year — or a suffix that spreads writes across
+          several partitions at the cost of querying each.</p></div></div>
+</div>
+<h3>What that produces for this repo</h3>
+<div class="code"><span class="c"># terraform/main.tf — same table, one index added</span>
+resource <span class="g">"aws_dynamodb_table"</span> <span class="g">"users"</span> {
+  name         = local.dynamodb_table
+  billing_mode = <span class="g">"PAY_PER_REQUEST"</span>
+  hash_key     = <span class="g">"email"</span> <span class="c"># unchanged — do not touch this line</span>
+
+  attribute { name = <span class="g">"email"</span>        type = <span class="g">"S"</span> }
+  attribute { name = <span class="g">"signup_month"</span> type = <span class="g">"S"</span> }
+  attribute { name = <span class="g">"created_at"</span>   type = <span class="g">"S"</span> }
+
+  global_secondary_index {
+    name            = <span class="g">"by-signup-month"</span>
+    hash_key        = <span class="w">"signup_month"</span> <span class="c"># "2026-09"</span>
+    range_key       = <span class="w">"created_at"</span> <span class="c"># ISO 8601, so lexical order is chronological</span>
+    projection_type = <span class="g">"ALL"</span>
+  }
+}</div>
+<p>Two points hide in that block. <code>signup_month</code> is a <strong>derived</strong> attribute
+      — the application writes it, computed from the timestamp, purely so that something exists to
+      partition on. That is normal and it is the trick: in DynamoDB you invent attributes whose only job
+      is to be a key.</p>
+<p>And <code>created_at</code> must be ISO 8601, because sort keys are compared as strings.
+      <code>2026-09-30</code> sorts correctly; <code>30/09/2026</code> does not. Choosing the format
+      <em>is</em> choosing whether ranges work.</p>
+<p>The application side is then a three-line change — the pagination the API is missing comes along
+      for free, because <code>LastEvaluatedKey</code> becomes the cursor:</p>
+<div class="code"><span class="c"># app/services/dynamodb.py</span>
+def recent_users(self, month: str, limit: int = 20, start=None) -&gt; dict:
+    kwargs = {
+        <span class="g">"IndexName"</span>: <span class="g">"by-signup-month"</span>,
+        <span class="g">"KeyConditionExpression"</span>: Key(<span class="g">"signup_month"</span>).eq(month),
+        <span class="g">"ScanIndexForward"</span>: <span class="k">False</span>,   <span class="c"># newest first: descending sort key</span>
+<span class="g">"Limit"</span>: limit,
+    }
+    <span class="k">if</span> start:
+        kwargs[<span class="g">"ExclusiveStartKey"</span>] = start
+    <span class="k">return</span> self._table.query(**kwargs)</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Module 2, returning</p>
+<h2>Delete the permission and the mistake becomes impossible</h2>
+</div>
+<p>Once the query exists, the last step is the one people skip:</p>
+<div class="code"><span class="c"># terraform/main.tf — the app role</span>
+Action = [<span class="g">"dynamodb:PutItem"</span>, <span class="g">"dynamodb:GetItem"</span>, <span class="g">"dynamodb:Query"</span>]
+<span class="c">#                                    dynamodb:Scan removed</span>
+Resource = [
+  aws_dynamodb_table.users.arn,
+  <span class="g">"${aws_dynamodb_table.users.arn}/index/*"</span>,   <span class="c"># a GSI is a separate resource</span>
+]</div>
+<p>With <code>Scan</code> gone, the expensive mistake stops being a judgement call and becomes an
+      <code>AccessDeniedException</code> in a pull request. This is the Module 2 idea used
+      constructively: permissions are not only about attackers, they are about making the wrong thing
+      fail loudly and early.</p>
+<p class="note">Note the second ARN. Queries against an index are authorised against
+      <code class="brk">table/users/index/by-signup-month</code>, not against the table — a policy that
+      names only the table denies every index read, with an error that mentions neither.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Hands-on · ~10 minutes · nothing costs money</p>
+<h2>Watch the counters yourself</h2>
+</div>
+<p class="note">Your AWS stack is torn down, so this runs against LocalStack, which the repo already
+      has wired up.</p>
+<h3>1. Start it</h3>
+<div class="code">docker compose --profile localstack up -d
+export AWS_ENDPOINT_URL=http://localhost:4566 AWS_DEFAULT_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test</div>
+<h3>2. Create the table you already have</h3>
+<div class="code">aws dynamodb create-table --table-name users \
+  --attribute-definitions AttributeName=email,AttributeType=S \
+  --key-schema AttributeName=email,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST</div>
+<h3>3. Put a few users in, then ask for one</h3>
+<div class="code">aws dynamodb put-item --table-name users --item \
+  <span class="g">'{"email":{"S":"a@example.com"},"created_at":{"S":"2026-09-30"}}'</span>
+
+aws dynamodb get-item --table-name users \
+  --key <span class="g">'{"email":{"S":"a@example.com"}}'</span> \
+  --return-consumed-capacity TOTAL</div>
+<p class="note"><code>ConsumedCapacity</code> of 0.5 — one eventually consistent read of an item
+      under 4 KB. This is the only shape of request your table is designed for.</p>
+<h3>4. Now ask a question it was not designed for</h3>
+<div class="code">aws dynamodb scan --table-name users \
+  --filter-expression <span class="g">"created_at &gt;= :d"</span> \
+  --expression-attribute-values <span class="g">'{":d":{"S":"2026-09-01"}}'</span> \
+  --return-consumed-capacity TOTAL \
+  --query <span class="g">'{Scanned:ScannedCount,Returned:Count,Paid:ConsumedCapacity.CapacityUnits}'</span></div>
+<p class="note">Compare <code>Scanned</code> with <code>Returned</code>. On three items the
+      difference is academic; the point is that <code>Paid</code> tracks the first number and not the
+      second, and it will keep doing that for the next four years of sign-ups.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check yourself</p>
+<h2>Four questions</h2>
+</div>
+<details>
+<summary>A colleague says “the scan is fine, I added a filter expression so it only returns the ten rows we need.” What do you tell them, and what evidence do you show?</summary>
+<div class="answer">
+<p>The filter runs <em>after</em> the read, not during it. DynamoDB reads every item, then discards
+          the ones that do not match, and bills for everything it read. Ten returned rows out of a
+          million cost the same as reading the million.</p>
+<p>The evidence is in the response they already have: run it with
+          <code>--return-consumed-capacity TOTAL</code> and compare <code>ScannedCount</code>,
+          <code>Count</code> and <code>CapacityUnits</code>. The capacity tracks
+          <code>ScannedCount</code>. A high scanned count with a low count is the definition of an
+          inefficient scan.</p>
+<p>Which means the filter improved the payload and changed nothing about the cost or the latency,
+          both of which grow with the table for as long as the code survives.</p>
+</div>
+</details>
+<details>
+<summary>You need “the 20 most recent sign-ups”. Someone proposes a GSI with partition key <code>"USER"</code> — a literal constant on every item — and sort key <code>created_at</code>. It works perfectly in staging. What happens in production, and what would you do instead?</summary>
+<div class="answer">
+<p>Every item in the table lands in one partition, because the partition key has exactly one
+          value. That single partition now absorbs every write to the index and every read of it, and a
+          partition has a hard throughput ceiling regardless of what the table is provisioned for. In
+          staging, with three writes a minute, nothing shows. In production it throttles — and the
+          throttling is invisible in the table's own metrics, because it is the index that is hot.</p>
+<p>Instead, bucket the partition key so it has many values but few enough to query: the month
+          (<code>2026-09</code>) for a “recent” view, which is one query for this month and a second for
+          last month when the window straddles a boundary. If a month is still too much traffic, go
+          finer — day — or add a shard suffix and query the shards in parallel.</p>
+<p>Which means the design question is never only “what do I need to look up”, it is “how many
+          distinct values will this key have, and how evenly will traffic land on them”.</p>
+</div>
+</details>
+<details>
+<summary>The product owner asks for user search by name, with partial matching. What do you say?</summary>
+<div class="answer">
+<p>That DynamoDB cannot do it, at any price. Sort keys support <code>begins_with</code>, so
+          prefix matching on a known partition is possible, but “contains”, fuzzy matching and
+          relevance ranking are not operations the engine has. A scan with
+          <code>contains()</code> would work at demo scale and is a full table read per keystroke.</p>
+<p>The honest answers are: put the searchable copy somewhere built for it — OpenSearch, or a
+          relational database — fed from DynamoDB Streams; or accept prefix-only search on a key you
+          design for it. What you do not do is add the scan and revisit it later, because “later” is
+          after the table has grown.</p>
+<p>Which means this is the moment to say the quiet part: DynamoDB is the wrong database for
+          search, and choosing it for the user table does not oblige you to use it for everything.</p>
+</div>
+</details>
+<details>
+<summary>Terraform plan on the users table shows <code>forces replacement</code>. Walk through what you do, in order.</summary>
+<div class="answer">
+<p><strong>Stop.</strong> Do not apply. On a DynamoDB table, replacement means destroy and create:
+          every item is gone, and Terraform will report success.</p>
+<p>Then, in order: read the plan to find which attribute forced it — changing
+          <code>hash_key</code> or <code>range_key</code> does, adding a <code>global_secondary_index</code>
+          does not. Decide whether you actually need a new key schema or whether a GSI answers the
+          question. If you genuinely need it, treat it as a migration, not an apply: create the new table
+          alongside, backfill it, dual-write, cut the application over, then remove the old one. And add
+          <code class="brk">lifecycle { prevent_destroy = true }</code> to the table so the next person
+          gets an error instead of an outage.</p>
+<p>Which means the safeguard belongs in the code before you need it, not in the care of whoever
+          happens to read the plan that day.</p>
+</div>
+</details>
+</section>
+<footer>
+<p>Module 5, Lesson 5.1 · AWS + DevOps course · 30 September 2026</p>
+<p>Repo material: <code>terraform/main.tf</code> — <code>aws_dynamodb_table.users</code>
+      (<code>hash_key = "email"</code>, <code>PAY_PER_REQUEST</code>, no sort key and no index), the app
+      role's <code>dynamodb:Scan</code> grant, and <code>app/services/dynamodb.py</code>, whose
+      <code>list_users()</code> pages through the whole table.</p>
+<p>Sources: the DynamoDB developer guide on core components (partition key hashing, composite keys,
+      GSI versus LSI), on scanning (the 1 MB page limit, filter expressions being applied after the read,
+      <code>ScannedCount</code> versus <code>Count</code>, and capacity computed from items read rather
+      than returned), and the service quotas page (20 GSIs, 5 LSIs per table).</p>
+<p>Runnable: <code>uv run assets/scripts/access_patterns.py</code> — 5,000 users in memory, one
+      question, two key schemas, no AWS account.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>

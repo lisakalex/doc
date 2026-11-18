@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nothing Breaks Until It Restarts</title>
+<link rel="icon" href="../../assets/img/favicon-module-4.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/43-nothing-breaks-until-it-restarts.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Module 04 · Lesson 4.3 · AWS + DevOps course</p>
+<h1>Nothing Breaks Until It Restarts</h1>
+<p class="lede">In S3, the key is on the request path: make it unusable and the next download
+      fails. Everywhere else in AWS it is on the <em>lifecycle</em> path — the volume keeps writing,
+      the database keeps serving, and the failure waits for the next attach, restart or scale-out.
+      That delay is the most dangerous property KMS has.</p>
+<div class="facts">
+<span class="fact">one key, many services</span>
+<span class="fact">grants</span>
+<span class="fact">request quotas</span>
+<span class="fact">multi-Region keys</span>
+</div>
+</header>
+<section>
+<p class="eyebrow">Start with the failure</p>
+<h2>03:12, and the Auto Scaling group cannot launch anything</h2>
+<div class="code"><span class="c"># capacity has been draining for an hour; every launch attempt fails</span>
+aws autoscaling describe-scaling-activities --max-items 1
+
+<span class="r">StatusCode:    Failed
+Description:   Launching a new EC2 instance. Status Reason: Client.InternalError
+StatusMessage: Client.InternalError: Client error on launch</span></div>
+<p><code>Client.InternalError</code> is the least helpful error message in AWS, and this is its most
+      common cause: the instances have encrypted EBS volumes, and somebody disabled the KMS key at
+      four o'clock the previous afternoon while tidying up unused resources. Nothing broke at four.
+      Nothing broke at midnight. It broke when the group tried to launch an instance.</p>
+<div class="call">
+<h3>The rule</h3>
+<p>Outside S3, making a key unusable does not break anything that is already running. It breaks
+        the <strong>next lifecycle event</strong> — and you do not choose when that happens.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Two places the key can sit</p>
+<h2>The request path and the lifecycle path</h2>
+</div>
+<p>Everything in Module 4 so far has been S3, where the pattern is simple: every upload calls
+      <code>GenerateDataKey</code> and every download calls <code>Decrypt</code>, so the key is being
+      exercised constantly and any problem with it surfaces within seconds. That is the exception, not
+      the rule.</p>
+<div class="tw">
+<table>
+<thead><tr><th>Service</th><th>When it calls KMS</th><th>When you find out the key is gone</th></tr></thead>
+<tbody>
+<tr><td class="key">S3</td><td>every upload and download (or per bucket key window)</td><td><span class="chip exp">seconds</span> the next request</td></tr>
+<tr><td class="key">Secrets Manager</td><td>every <code>GetSecretValue</code></td><td><span class="chip exp">seconds</span> the next read</td></tr>
+<tr><td class="key">DynamoDB</td><td>refreshes the table key every 5 minutes per caller</td><td><span class="chip imp">~5 minutes</span> then the table goes Inaccessible</td></tr>
+<tr><td class="key">RDS</td><td>at create, start, restore and host replacement</td><td><span class="chip imp">~2 hours</span> after detection, instance stopped</td></tr>
+<tr><td class="key">EBS / EC2</td><td>once, at attach — the key lives in Nitro afterwards</td><td><span class="chip exp">next restart</span> which could be tonight or in March</td></tr>
+</tbody>
+</table>
+</div>
+<p>Read the last column as a list of how long you get to make a mistake before it is visible. For an
+      EBS volume the answer is <em>indefinitely</em>, and that is why the Friday-afternoon tidy-up
+      becomes a Tuesday-morning incident with no obvious cause.</p>
+<figure>
+<div class="svg-scroll">
+<svg aria-label="Time between disabling a KMS key and each service failing: S3 and Secrets Manager immediately, DynamoDB after about five minutes then archived at seven days, RDS after about two hours then terminal at seven days, EBS only at the next restart" role="img" viewbox="0 0 760 260">
+<text fill="var(--ink)" font-family="Archivo, sans-serif" font-size="14" font-weight="600" x="8" y="20">Time from “key disabled” to “you notice”</text>
+<line stroke="var(--rule-strong)" stroke-width="1" x1="170" x2="730" y1="46" y2="46"></line>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" x="215" y="38">immediately</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" x="330" y="38">~5 min</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" x="440" y="38">~2 hours</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" x="560" y="38">7 days</text>
+<text fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" x="672" y="38">next restart</text>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="12" x="8" y="86">S3</text>
+<line stroke="var(--rule)" stroke-width="1" x1="170" x2="730" y1="82" y2="82"></line>
+<circle cx="215" cy="82" fill="var(--stop)" r="7"></circle>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="12" x="8" y="126">Secrets Manager</text>
+<line stroke="var(--rule)" stroke-width="1" x1="170" x2="730" y1="122" y2="122"></line>
+<circle cx="215" cy="122" fill="var(--stop)" r="7"></circle>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="12" x="8" y="166">DynamoDB table</text>
+<line stroke="var(--rule)" stroke-width="1" x1="170" x2="730" y1="162" y2="162"></line>
+<line stroke="var(--warn)" stroke-linecap="round" stroke-width="5" x1="330" x2="560" y1="162" y2="162"></line>
+<circle cx="330" cy="162" fill="var(--warn)" r="7"></circle>
+<circle cx="560" cy="162" fill="var(--stop)" r="7"></circle>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="12" x="8" y="206">RDS instance</text>
+<line stroke="var(--rule)" stroke-width="1" x1="170" x2="730" y1="202" y2="202"></line>
+<line stroke="var(--warn)" stroke-linecap="round" stroke-width="5" x1="440" x2="560" y1="202" y2="202"></line>
+<circle cx="440" cy="202" fill="var(--warn)" r="7"></circle>
+<circle cx="560" cy="202" fill="var(--stop)" r="7"></circle>
+<text fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="12" x="8" y="246">EBS volume</text>
+<line stroke="var(--rule)" stroke-width="1" x1="170" x2="730" y1="242" y2="242"></line>
+<circle cx="672" cy="242" fill="var(--stop)" r="7"></circle>
+</svg>
+</div>
+<figcaption>Amber is the recoverable window: re-enable the key and the resource comes back. Red is
+      a hard stop — for DynamoDB the table is archived to a backup you are billed for, for RDS the
+      instance reaches a terminal state and can only be restored from a snapshot, and for EBS the
+      volume simply will not attach until the key works again.</figcaption>
+</figure>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Why the delay exists</p>
+<h2>The data key is in the hardware, not in KMS</h2>
+</div>
+<p>Envelope encryption from Lesson 4.1, one layer down. When you create an encrypted EBS volume, EBS
+      asks KMS for a data key and stores the wrapped copy in the volume's metadata. When you attach that
+      volume to an instance, EC2 unwraps the data key <em>once</em> and hands the plaintext to the Nitro
+      card, which encrypts and decrypts every block of disk I/O from then on.</p>
+<div class="steps">
+<div class="step"><div class="n">1</div><div>
+<h3>The volume is attached and running</h3>
+<p>The plaintext data key is resident in Nitro hardware. Every read and write uses it. <strong>KMS
+          is not involved at all</strong> — not once per I/O, not once per hour, not at all.</p></div></div>
+<div class="step"><div class="n">2</div><div>
+<h3>Somebody disables the key</h3>
+<p>Nothing happens. The instance does not notice, the volume does not notice, CloudWatch does not
+          notice. There is no alarm to fire because no call failed.</p></div></div>
+<div class="step"><div class="n">3</div><div>
+<h3>The volume is detached</h3>
+<p>Nitro discards the data key. This is the moment the incident is created, and it still looks
+          like nothing has gone wrong. Detaching happens on stop, on terminate, on host replacement,
+          and on any instance refresh.</p></div></div>
+<div class="step"><div class="n">4</div><div>
+<h3>Something tries to attach it again</h3>
+<p>EBS asks KMS to unwrap the data key, KMS refuses because the key is unusable, and the attach
+          fails. In an Auto Scaling group this reads as <code>Client.InternalError</code> and capacity
+          quietly stops replacing itself.</p></div></div>
+</div>
+<div class="call warn">
+<h3>What this means for your monitoring</h3>
+<p>You cannot alarm on “the key is broken” by watching for KMS errors, because there are none
+        until the lifecycle event. The alarm you actually need is on the <strong>configuration</strong>:
+        an EventBridge rule on <code>DisableKey</code> and <code>ScheduleKeyDeletion</code>, or an AWS
+        Config rule. Detect the change, not the consequence — the consequence is late by design.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Clocks you do not control</p>
+<h2>Seven days, twice, with different endings</h2>
+</div>
+<p>Two services put a countdown on the incident. Both give you seven days, and both do something
+      irreversible at the end of it — but the endings differ and so does the recovery.</p>
+<div class="tw">
+<table>
+<thead><tr><th></th><th>RDS</th><th>DynamoDB</th></tr></thead>
+<tbody>
+<tr><td class="key">First state</td><td><code class="brk">inaccessible-encryption-credentials-recoverable</code>, about 2 hours after detection; the instance is stopped</td><td>table status <strong>Inaccessible</strong>, within about 5 minutes; you also get an email</td></tr>
+<tr><td class="key">Recovery</td><td>enable the key, then <code>start-db-instance</code></td><td>enable the key; the table returns by itself</td></tr>
+<tr><td class="key">After 7 days</td><td>terminal <code class="brk">inaccessible-encryption-credentials</code> — restore from a snapshot only</td><td>the table is <strong>archived</strong>; DynamoDB takes an on-demand backup and bills you for it</td></tr>
+<tr><td class="key">What you get back</td><td>a final snapshot named <code class="brk">rds-final:&lt;instance&gt;-&lt;resource-id&gt;</code>, which you restore into a new instance</td><td>a restore into a <em>new</em> table — and the last key on the table must be enabled first</td></tr>
+<tr><td class="key">The exception</td><td>instances that cannot stop — read replicas, and instances that have read replicas — skip the recoverable state and go straight to terminal</td><td>a global table replica is removed from the replication group after 20 hours</td></tr>
+</tbody>
+</table>
+</div>
+<p>Two things worth carrying out of that table. First, the identifier changes on recovery in both
+      cases — you restore into a new instance or a new table, so anything holding the old endpoint needs
+      updating, which is the same lesson as the Secrets Manager ARN suffix in 2.6. Second, the
+      <strong>read replica exception is the one that catches people</strong>: the architecture you built
+      for availability is the one with no recoverable state.</p>
+<div class="call stop">
+<h3>The asymmetry to remember</h3>
+<p>Re-enabling a key is instant and free. Every deadline above exists because AWS is waiting for
+        you to do exactly that. If you are in this incident, the first action is always
+        <code>enable-key</code> — arguing about who disabled it, and why, costs you hours off a
+        seven-day clock.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Where grants stop being trivia</p>
+<h2>The permission that outlives the person who had it</h2>
+</div>
+<p>In Lesson 4.2 grants were something to know about. Here they are load-bearing, because this is
+      how the services above actually hold their access.</p>
+<p>When you create an encrypted RDS instance, RDS checks that <em>you</em> can use the key and then
+      creates a grant on the key that it holds <strong>for the entire life of that instance</strong>. The
+      consequence is one of the most counter-intuitive facts in KMS:</p>
+<div class="call">
+<h3>Revoking someone's key access does not stop the database they created</h3>
+<p>Take away that engineer's IAM permissions, delete their role, offboard them entirely — the
+        RDS instance keeps running, because it is not using their access. It is using its own grant.
+        Disabling the <em>key</em> stops it. Removing the <em>person</em> does not.</p>
+</div>
+<p>That is a feature, not a hole: you do not want a database to fail because someone left the
+      company. But it means an access review that only reads IAM policies will tell you nobody can use
+      the key, while five services quietly use it all day.</p>
+<div class="code"><span class="c"># the inventory question IAM cannot answer</span>
+aws kms list-grants --key-id <span class="w">$KEY</span> \
+  --query <span class="g">'Grants[].{Name:Name,Who:GranteePrincipal,Ops:Operations}'</span>
+<span class="c"># service grants look like this — the name tells you who is holding on</span>
+<span class="g">[{ "Name": "rds-abc123...", "Who": "rds.us-east-1.amazonaws.com", ...}]</span></div>
+<p>Two practical rules follow. <strong>Never revoke a grant you did not create</strong> without
+      finding out which resource depends on it — <code>RevokeGrant</code> on a live volume or instance is
+      the same outage as disabling the key, scoped to one resource, and there is no undo. And when you
+      write a key policy that must support AWS services, allow <code>kms:CreateGrant</code> with the
+      <code>kms:GrantIsForAWSResource</code> condition set to true, so a service can take a grant on your
+      behalf but a human cannot hand one out.</p>
+<div class="call warn">
+<h3>The condition that breaks integrations</h3>
+<p>The <code>kms:ViaService</code> hardening from Lesson 4.2 is excellent on a single-service key
+        and dangerous on a shared one. Pin the avatars key to
+        <code class="brk">s3.us-east-1.amazonaws.com</code> and the day someone encrypts an RDS instance
+        or a secret with the same key, it fails — correctly, and confusingly. One key per service is
+        not a purity argument; it is what makes tight conditions possible.</p>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">The shared resource nobody drew</p>
+<h2>One account, one region, one quota</h2>
+</div>
+<p>KMS request quotas are per account, per region, across every key and every service — including
+      calls AWS services make on your behalf. Your S3 uploads, DynamoDB's five-minute refresh, every
+      Lambda reading a secret and someone else's batch job all draw on the same number.</p>
+<div class="tw">
+<table>
+<thead><tr><th>Quota</th><th>Default, per second</th></tr></thead>
+<tbody>
+<tr><td class="key">Symmetric cryptographic operations<br/><span class="mono">Encrypt, Decrypt, GenerateDataKey, ReEncrypt…</span></td><td><strong>100,000</strong> in us-east-1, us-west-2, eu-west-1 · 20,000 in several others · <strong>10,000</strong> everywhere else — all shared</td></tr>
+<tr><td class="key">CreateGrant</td><td>50</td></tr>
+<tr><td class="key">ListGrants</td><td>100</td></tr>
+<tr><td class="key">DescribeKey</td><td>2,000</td></tr>
+<tr><td class="key">ScheduleKeyDeletion / PutKeyPolicy</td><td>15</td></tr>
+<tr><td class="key">EnableKey / DisableKey / CreateKey</td><td>5</td></tr>
+</tbody>
+</table>
+</div>
+<p>The gap between the first row and the second is the operational point. A hundred thousand
+      decrypts per second and <strong>fifty</strong> grants per second — so a large scale-out event,
+      where every new instance with an encrypted volume needs a grant, hits a wall that has nothing to
+      do with how much cryptography you are doing. When a launch storm fails and the key is enabled and
+      the policy is fine, <code>CreateGrant</code> throttling is the thing to check.</p>
+<p>Management operations are cheap to forget too: <code>DisableKey</code> at 5 per second means a
+      script that loops over a thousand keys to disable them will throttle, and half-finished is the
+      worst possible state to leave that in.</p>
+<div class="code"><span class="c"># what your region actually allows, rather than what a blog said</span>
+aws service-quotas list-service-quotas --service-code kms \
+  --query <span class="g">"Quotas[?contains(QuotaName,'symmetric')].[QuotaName,Value]"</span> \
+  --output table</div>
+<p class="note">Every quota here is adjustable except the custom key store one. Ask before you need
+      it — a quota increase during an incident is a support case, not a command.</p>
+<p>Three ways to use fewer requests, in the order you should reach for them: <strong>S3 bucket
+      keys</strong> (Lesson 4.1 — up to 99% fewer calls, and you already have them on), <strong>data key
+      caching</strong> in the AWS Encryption SDK for client-side encryption, and <strong>separate keys
+      per workload</strong>, which does not reduce the total but does stop one workload's throttling from
+      taking out the others.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Crossing a region boundary</p>
+<h2>Multi-Region keys, and why they are not the default</h2>
+</div>
+<p>A KMS key is regional. Ciphertext produced in us-east-1 cannot be decrypted in eu-west-1, because
+      the key does not exist there — which is why copying an encrypted snapshot across regions makes you
+      name a key in the <em>destination</em> region, and why S3 cross-region replication decrypts and
+      re-encrypts every data key on the way.</p>
+<p>Multi-Region keys are the escape hatch: a set of keys in different regions with the same key ID
+      and the same key material, so any of them can decrypt what another encrypted.</p>
+<div class="tw">
+<table>
+<thead><tr><th>Shared, synchronised by AWS</th><th>Independent, yours to keep in step</th></tr></thead>
+<tbody>
+<tr><td>key material and key ID (the region differs in the ARN)</td><td><strong>key policy</strong></td></tr>
+<tr><td>key spec, key usage, origin</td><td><strong>grants</strong></td></tr>
+<tr><td>rotation — enabled and performed on the primary only</td><td><strong>enabled / disabled state</strong></td></tr>
+<tr><td></td><td>aliases, tags, description</td></tr>
+</tbody>
+</table>
+</div>
+<p>That right-hand column is the whole risk. A replica key is a fully independent key that happens
+      to share material: its policy is not synchronised, so tightening the policy in one region protects
+      nothing in the other, and drift between the two is invisible until someone tries to decrypt
+      somewhere unexpected.</p>
+<div class="call stop">
+<h3>What you give up</h3>
+<p>Regional isolation is a blast-radius boundary you get for free. A multi-Region key deletes it
+        on purpose: the same material now protects data in several regions, so one leaked copy or one
+        bad policy reaches all of them. AWS's own guidance is that single-Region keys are the best fit
+        for most needs — use multi-Region keys when you have a concrete reason (client-side encryption
+        across regions, a DR plan that must decrypt in the backup region, active-active), not as a
+        default.</p>
+</div>
+<p>Three facts that decide real designs. You <strong>cannot convert</strong> an existing key to
+      multi-Region or back — moving an existing workload means re-encrypting everything under a new key.
+      Most AWS services treat a multi-Region key as though it were single-Region anyway, so S3
+      replication still re-encrypts even when both regions hold related keys. And a primary key cannot
+      finish being deleted until every replica is deleted, which is a safety net and an obstacle in equal
+      measure.</p>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Runbook</p>
+<h2>“Can we disable this key?”</h2>
+</div>
+<p>The question arrives as cost tidying, or as a leaver's access review, or as an auditor asking why
+      an unused key exists. Answer it in this order, and never from the console's “last used” column
+      alone.</p>
+<div class="steps">
+<div class="step"><div class="n">1</div><div>
+<h3>Find every grant</h3>
+<p><code>list-grants</code> first, because it names services that IAM will never mention. An RDS
+          grant here means a database depends on this key whether or not anyone has touched it in
+          months.</p></div></div>
+<div class="step"><div class="n">2</div><div>
+<h3>Find every caller in CloudTrail</h3>
+<p>Ninety days of <code>Decrypt</code> and <code>GenerateDataKey</code> events, grouped by
+          <code>invokedBy</code> and by the encryption context. The context tells you <em>which</em>
+          bucket, secret or table, not merely which service.</p></div></div>
+<div class="step"><div class="n">3</div><div>
+<h3>Search the estate for the key ARN</h3>
+<p>Encrypted resources reference the key in their own configuration — bucket encryption, RDS
+          <code>KmsKeyId</code>, EBS volumes, secrets, snapshots. AWS Config or a scripted sweep finds
+          the ones that are attached but idle, which is exactly the set CloudTrail cannot show you.</p></div></div>
+<div class="step"><div class="n">4</div><div>
+<h3>Classify what you found by path</h3>
+<p>Request-path users fail immediately and loudly; lifecycle-path users fail at some unknown
+          future restart. If the list contains a single EBS volume or RDS instance, the honest answer to
+          “can we disable it” is no.</p></div></div>
+<div class="step"><div class="n">5</div><div>
+<h3>Disable, do not delete — and watch</h3>
+<p>Disabling is the dress rehearsal: reversible in one command, with none of the seven-day
+          clocks running. Leave it disabled through at least one full deployment and one scale-out
+          before anyone says the word deletion.</p></div></div>
+<div class="step"><div class="n">6</div><div>
+<h3>Only then schedule deletion, with the long window</h3>
+<p>Thirty days, not seven. The cost of the extra days is a few cents of key storage; the cost of
+          being wrong is a restore from backup, or nothing at all.</p></div></div>
+</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Hands-on · ~5 minutes · read-only</p>
+<h2>Take an inventory of a key you did not create</h2>
+</div>
+<p class="note">These run against any account. On a key you inherit, they are the first five minutes
+      of work — and on your own torn-down stack, read them as the shape of the answer.</p>
+<h3>1. Who holds a grant?</h3>
+<div class="code">aws kms list-grants --key-id <span class="w">$KEY</span> \
+  --query <span class="g">'Grants[].{Name:Name,Who:GranteePrincipal,Ops:Operations}'</span> --output table</div>
+<h3>2. Who has actually called it, and on behalf of what?</h3>
+<div class="code">aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventSource,AttributeValue=kms.amazonaws.com \
+  --max-results 50 --query <span class="g">'Events[].CloudTrailEvent'</span> --output text \
+  | jq -r <span class="g">'[.eventName, (.userIdentity.invokedBy // .userIdentity.arn)] | @tsv'</span> \
+  | sort | uniq -c | sort -rn</div>
+<p class="note"><code>invokedBy</code> is the field that matters: <code>rds.amazonaws.com</code> in
+      that column means a database is using this key, no matter what IAM says.</p>
+<h3>3. What is the key's own state and origin?</h3>
+<div class="code">aws kms describe-key --key-id <span class="w">$KEY</span> \
+  --query <span class="g">'KeyMetadata.{State:KeyState,Origin:Origin,MR:MultiRegion,Mgr:KeyManager}'</span></div>
+<p class="note"><code>MultiRegion: true</code> changes every conclusion in this lesson, and
+      <code>KeyManager: AWS</code> means it is an AWS managed key you cannot set a policy on at all.</p>
+<h3>4. How much of the region's quota are you using?</h3>
+<div class="code">aws service-quotas list-service-quotas --service-code kms \
+  --query <span class="g">"Quotas[?contains(QuotaName,'symmetric')].[QuotaName,Value]"</span> --output table</div>
+</section>
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check yourself</p>
+<h2>Four questions</h2>
+</div>
+<details>
+<summary>At 16:00 on Friday someone disables a CMK used by an S3 bucket, a DynamoDB table, an RDS instance with a read replica, and forty EBS volumes. Nothing alerts. Walk the next seven days: what fails, when, and what is unrecoverable?</summary>
+<div class="answer">
+<p><strong>16:00, seconds:</strong> S3 uploads and downloads fail. If anything reads a secret with
+          that key, it fails too. This is the only part that pages anyone.</p>
+<p><strong>16:05:</strong> the DynamoDB table goes Inaccessible and AWS emails the account. A
+          seven-day clock starts.</p>
+<p><strong>~18:00:</strong> RDS — but the instance has a read replica, so it cannot be stopped and
+          skips the recoverable state entirely, going straight to terminal
+          <code>inaccessible-encryption-credentials</code>. RDS takes a final snapshot. Restoring into
+          a new instance is now the only path, and the endpoint changes.</p>
+<p><strong>Whenever an instance next stops or is replaced:</strong> that EBS volume will not
+          re-attach. Forty volumes means forty independent time bombs with no common trigger; an Auto
+          Scaling group finds it within hours, a long-lived instance might not for months.</p>
+<p><strong>Day 7:</strong> the DynamoDB table is archived to a backup you are billed for, and must
+          be restored into a new table.</p>
+<p>Which means the true answer to “what is unrecoverable” is: nothing, if you enable the key in
+          the first two hours. After that, the RDS instance and the table survive only as new
+          resources with new identifiers, and everything that referenced the old ones has to be
+          changed.</p>
+</div>
+</details>
+<details>
+<summary>An access review says “this engineer left; revoke their KMS permissions.” You do. The next morning someone asks why the encrypted RDS instance they built is still running. Answer them.</summary>
+<div class="answer">
+<p>Because the instance is not using their access. When RDS created it, RDS verified that the
+          calling principal could use the key and then created its own grant on the key, which it holds
+          for the lifetime of the instance. The grant belongs to the service, not the person.</p>
+<p>Which means an access review that reads only IAM is incomplete: <code>list-grants</code> is the
+          other half, and it is where you discover that offboarding somebody has not reduced anything's
+          access to the key. It also means the reverse — do not “clean up” that grant to finish the
+          review, because revoking it stops the database.</p>
+</div>
+</details>
+<details>
+<summary>A deployment scales an Auto Scaling group from 10 to 400 instances, all with encrypted EBS volumes. Launches start failing, but the key is enabled, the policy allows the role, and your KMS decrypt rate is nowhere near the quota. What do you check, and why?</summary>
+<div class="answer">
+<p><code>CreateGrant</code> throttling. Every new encrypted volume needs a grant on the key, and
+          the <code>CreateGrant</code> quota is <strong>50 per second</strong> — while the symmetric
+          cryptographic operations quota next to it is 10,000 to 100,000. The two numbers are three
+          orders of magnitude apart, and the small one is the one a launch storm consumes.</p>
+<p>Confirm it in CloudTrail by looking for <code>ThrottlingException</code> on
+          <code>CreateGrant</code>, then either slow the scale-out or request a quota increase — in
+          advance, because an increase during an incident is a support case.</p>
+<p>Which means capacity planning for KMS is not about how much data you encrypt; it is about how
+          many resources you create per second.</p>
+</div>
+</details>
+<details>
+<summary>The DR plan says “replicate the avatars bucket to eu-west-1 and we are covered.” What does KMS do to that plan, and what are your two options?</summary>
+<div class="answer">
+<p>The key is regional and does not exist in eu-west-1, so replication cannot simply copy the
+          ciphertext. S3 replication decrypts each object's data key with the source key and
+          re-encrypts it with a key in the destination region — which you must create and name, and
+          which the replication role must be allowed to use. Miss that and replication silently fails
+          for every encrypted object.</p>
+<p><strong>Option one, two independent keys:</strong> the default, and it keeps the region as a
+          blast-radius boundary. Two key policies to maintain, and the destination has its own key with
+          its own rotation.</p>
+<p><strong>Option two, a multi-Region key:</strong> same material in both regions, so ciphertext is
+          interoperable — but you cannot convert the existing key, so you would re-encrypt everything
+          under a new one; the key policy, grants and enabled state do <em>not</em> synchronise; and S3
+          replication re-encrypts anyway, so for this particular workload you gain very little.</p>
+<p>Which means option one for this bucket, and multi-Region keys reserved for client-side
+          encryption or a DR plan that has to decrypt the same ciphertext in the backup region.</p>
+</div>
+</details>
+</section>
+<footer>
+<p>Module 4, Lesson 4.3 · AWS + DevOps course · 26 September 2026</p>
+<p>Sources: the KMS developer guide on unusable keys, request quotas and multi-Region keys; the RDS
+      user guide on encrypting resources (the <code class="brk">inaccessible-encryption-credentials</code>
+      states, the two-hour and seven-day clocks, and the service grant taken at instance creation); the
+      DynamoDB developer guide on encryption at rest (the five-minute key refresh, Inaccessible status,
+      seven-day archive and twenty-hour global-table replica removal); and the Secrets Manager user guide
+      on secret encryption.</p>
+<p>Repo material: <code>aws_kms_key.avatars</code> is a single-Region, <code>AWS_KMS</code>-origin key
+      used by exactly one service — which is why none of the delayed-failure modes in this lesson apply to
+      it yet, and why they will the moment a second service is pointed at it.</p>
+</footer>
+</div>
+<script src="../../assets/js/copy-code.js"></script>
+</body>
+</html>
