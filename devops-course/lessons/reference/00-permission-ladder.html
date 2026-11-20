@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Permission Ladder</title>
+<link rel="icon" href="../../assets/img/favicon-reference.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/00-permission-ladder.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+<p class="eyebrow">Reference sheet · lesson 1.5</p>
+<h1>The Permission Ladder</h1>
+<p class="lede">Every time a process opens a file, the kernel climbs four rungs and stops at the
+  first one that matches. Only that rung's three bits count.</p>
+<div class="facts">
+<span class="fact">first match decides</span>
+<span class="fact">no fall-through</span>
+<span class="fact">updated 2026-11-20</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The rungs</p>
+<h2>Who gets which row</h2>
+</div>
+<div class="tw"><table class="rungs">
+<thead><tr><th>Rung</th><th>The kernel asks</th><th>If yes</th><th>Library</th><th>From your lab</th></tr></thead>
+<tbody>
+<tr><td class="num">1</td><td><strong>Is the process root</strong> (effective UID 0)?</td>
+  <td>Read and write allowed, whatever the bits say. Execute still needs one <code>x</code> somewhere.</td>
+  <td>The librarian, who can go anywhere</td>
+  <td><code>passwd</code> runs as root (setuid), so it can write <code>/etc/shadow</code></td></tr>
+<tr><td class="num">2</td><td><strong>Is the process the file's owner?</strong></td>
+  <td>Use the <strong>owner</strong> bits, and stop</td>
+  <td>The book's owner</td>
+  <td><code>chmod 077 mine</code>: owner row <code>---</code>, so you can't read your own file</td></tr>
+<tr><td class="num">3</td><td><strong>Is the file's group one of the process's groups?</strong></td>
+  <td>Use the <strong>group</strong> bits, and stop</td>
+  <td>A member of the book's club</td>
+  <td><code>unix_chkpwd</code> runs in group <code>shadow</code>, so it can read <code>/etc/shadow</code> (<code>r--</code>)</td></tr>
+<tr><td class="num">4</td><td><strong>Everyone else</strong></td>
+  <td>Use the <strong>other</strong> bits</td>
+  <td>Everyone else</td>
+  <td>You (<code>al</code>) on <code>/etc/shadow</code>: other <code>---</code>, so "Permission denied"</td></tr>
+</tbody></table></div>
+<div class="call">
+<h3>Say it as a chain</h3>
+<p>Not root, so rung 1 is skipped. Not the owner, so rung 2 is skipped. Not in the file's group, so
+  rung 3 is skipped. That leaves <em>other</em>, and its row says <code>---</code>, so no read.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Reading a mode</p>
+<h2>One string, four fields</h2>
+</div>
+<div class="bits">
+<span>-<small>type</small></span>
+<span class="o">rw-<small>owner</small></span>
+<span class="g">r--<small>group</small></span>
+<span class="x">---<small>other</small></span>
+</div>
+<p class="note"><code>-rw-r----- 640 root:shadow /etc/shadow</code>. Check <strong>who you are</strong>
+  (<code>id</code>) against the <strong>owner and group</strong> (<code>stat</code>) first. The rwx
+  letters only matter once you know which row is yours.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">What the bits mean</p>
+<h2>Same letter, different job</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Bit</th><th>On a file</th><th>On a directory</th><th>From your lab</th></tr></thead>
+<tbody>
+<tr><td class="key">r</td><td>Read the contents</td><td><strong>List</strong> the names</td>
+  <td><code>ronly</code> (r, no x): <code>ls</code> shows <code>-????????? f</code></td></tr>
+<tr><td class="key">w</td><td>Change the contents</td><td><strong>Create, delete, rename</strong> entries</td>
+  <td><code>locked</code> is 444, so you can't append, but <code>rm</code> works because <code>d</code> has w</td></tr>
+<tr><td class="key">x</td><td>Run it</td><td><strong>Go through</strong> it to a name inside</td>
+  <td><code>xonly</code> (x, no r): <code>ls</code> denied, <code>cat xonly/known</code> works</td></tr>
+</tbody></table></div>
+<div class="call warn">
+<h3>Deleting is a directory question</h3>
+<p>Removing a file changes the <em>directory's</em> list of names, so it needs <code>w</code> and
+  <code>x</code> on the directory. The file's own bits don't matter. A sealed book can still be taken
+  off an open shelf.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The fourth digit</p>
+<h2>Special bits</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Bit</th><th>Shows as</th><th>Does</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td class="key">setuid 4000</td><td><code>s</code> in the owner's x place</td>
+  <td>The program runs as its file's <strong>owner</strong>, whoever starts it</td>
+  <td><code>/usr/bin/passwd</code> <code>rwsr-xr-x 4755</code>: RUSER <code>al</code>, EUSER <code>root</code></td></tr>
+<tr><td class="key">setgid 2000</td><td><code>s</code> in the group's x place</td>
+  <td>On a directory: new files inside take the directory's <strong>group</strong></td>
+  <td><code>/var/log/journal</code> <code>drwxr-sr-x 2755</code></td></tr>
+<tr><td class="key">sticky 1000</td><td><code>t</code> in other's x place</td>
+  <td>On a directory: you can delete only <strong>your own</strong> files</td>
+  <td><code>/tmp</code> <code>drwxrwxrwt 1777</code></td></tr>
+</tbody></table></div>
+<p class="note">A capital <code>S</code> or <code>T</code> means the special bit is set but the
+  <code>x</code> under it isn't, which is usually a mistake (see Ansible <code>mode: 644</code> unquoted).</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">When it says no</p>
+<h2>Two different errors</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Message</th><th>Errno</th><th>Usually means</th></tr></thead>
+<tbody>
+<tr><td>Permission denied</td><td class="key">EACCES</td><td>The rwx bits on your rung said no, on the file or on a directory along the path (<code>namei -l</code>)</td></tr>
+<tr><td>Operation not permitted</td><td class="key">EPERM</td><td>Not the rwx bits: the sticky bit, <code>chown</code> by a non-owner, or a security layer such as AppArmor</td></tr>
+</tbody></table></div>
+<div class="call stop">
+<h3>The docker group is root</h3>
+<p>The Docker daemon runs as root, and a container's root is the host's root for any file you mount.
+  <code>docker run --rm -v /etc/shadow:/s:ro alpine wc -l /s</code> read a root-only file with no
+  <code>sudo</code>. Treat docker group membership like sudo access.</p>
+</div>
+</section>
+
+<footer>
+<p>From lesson 1.5, <a href="../devops/p1-5-the-file-root-left-behind.html">The File Root Left Behind</a>.
+  <a href="../index.html">All lessons</a>.</p>
+</footer>
+
+</div>
+</body>
+</html>

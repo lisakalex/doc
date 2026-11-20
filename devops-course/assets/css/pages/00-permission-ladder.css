@@ -1,0 +1,13 @@
+/* reference: the permission ladder */
+.facts{display:flex;flex-wrap:wrap;gap:.5rem;}
+.fact{font-family:"IBM Plex Mono",monospace;font-size:.72rem;font-weight:500;padding:.22rem .55rem;border:1px solid var(--rule-strong);border-radius:4px;color:var(--ink-2);background:var(--surface);}
+td.num{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap;}
+table.rungs{min-width:44rem;}
+.bits{display:grid;grid-template-columns:3.2rem repeat(3,minmax(0,1fr));max-width:30rem;border:1px solid var(--rule-strong);border-radius:6px;overflow:hidden;background:var(--surface);}
+.bits span{display:flex;flex-direction:column;align-items:center;gap:.2rem;padding:.6rem .3rem;font-family:"IBM Plex Mono",monospace;font-size:1.15rem;font-weight:600;color:var(--ink);}
+.bits span+span{border-left:1px solid var(--rule-strong);}
+.bits small{font-size:.62rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+.bits .o{background:var(--accent-soft);color:var(--accent-ink);}
+.bits .g{background:var(--good-soft);color:var(--good);}
+.bits .x{background:var(--warn-soft);color:var(--warn);}
+.note{font-size:.9rem;color:var(--muted);max-width:68ch;}
