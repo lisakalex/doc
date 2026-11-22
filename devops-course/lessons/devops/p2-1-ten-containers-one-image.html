@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ten Containers, One Image</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/p2-1-ten-containers-one-image.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Phase 2 · Lesson 2.1 · AWS + DevOps course</p>
+<h1>Ten Containers, One Image</h1>
+<p class="lede">The build agent's disk is full again. <code>docker images</code> lists forty
+  images at about 600 MB each, which adds up to 24 GB. <code>du</code> on
+  <code>/var/lib/docker</code> says 9 GB. Both are right. A Docker image isn't one file: it's
+  a stack of read-only layers, and an image that shares a layer with another one stores that
+  layer once. A running container adds one thin writable layer on top, and the first time it
+  changes a file, the whole file is copied up into that layer. This lesson is that mechanism,
+  from below, on the <code>reference</code> service you built in Phase 1.</p>
+<div class="facts">
+<span class="fact">~3 hours</span>
+<span class="fact">week 7</span>
+<span class="fact">laptop; Docker, no sudo</span>
+<span class="fact">Docker 29.9 · overlay2 · Temurin 21</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Review · lesson 1.4, still open</p>
+<h2>The retake and two questions</h2>
+</div>
+<p>Lesson 1.5 is finished. Lesson 1.4 still has three items open, and they come first.</p>
+<ol class="todo">
+<li><strong>The interview retake, cold.</strong> "A service is running, but users can't reach
+  it. Walk me through how you'd debug it." Start from the error message; four rows, each with
+  its "because" and its tool; end with the work example. On 22 Nov it scored ¾ in practice,
+  straight after reading the model answer. Cold, it counts.</li>
+<li><strong>The two review questions below,</strong> out loud, without notes. Each is done at
+  ¾ or better.</li>
+</ol>
+<details><summary>"Connection refused" against "connection timed out": what does each tell you, and where do you look for each?</summary><div class="answer"><p><strong>Refused means the machine answered and nobody was listening. Timed out means nothing answered at all.</strong> Refused comes back in a millisecond, as a reset (RST) from the target's kernel, so the network path is fine. Look at the server: is the program running, and is it listening on that port and that address (<code>ss -ltnp</code>)? Timed out takes the full timeout, because the packets were dropped on the way. Look at firewalls, security groups, routing, and whether the IP is right at all.</p></div></details>
+<details><summary><code>dig api.internal</code> returns the new IP, but the app keeps connecting to the old one. Give two reasons.</summary><div class="answer"><p><strong>The app doesn't ask DNS the way dig does.</strong> First, <code>/etc/hosts</code>. The app's lookups go through <code>nsswitch.conf</code>, which checks <code>files</code> first, so an old entry there wins. dig skips it. <code>getent hosts api.internal</code> shows what the app really gets. Second, caching. The JVM keeps lookups for 30 seconds by default, and longer if <code>networkaddress.cache.ttl</code> is set, so a long-running app may not look again until it restarts.</p></div></details>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The mechanism</p>
+<h2>Read-only layers, one writable layer, and a filesystem that merges them</h2>
+</div>
+<p>An <strong>image</strong> is an ordered list of <strong>layers</strong>. Each layer is a
+  tar archive of the files that one build step added, changed or deleted, and it never
+  changes after it's built. A <strong>container</strong> is those same layers, read-only,
+  plus one new, empty, <strong>writable layer</strong> on top that belongs to that container
+  alone.</p>
+<p>The kernel joins them with <strong>overlayfs</strong>, the <code>overlay2</code> storage
+  driver. It shows the process one merged directory tree. Reading a file finds it in the
+  topmost layer that has it. Writing always goes to the writable layer:</p>
+<div class="tw"><table>
+<thead><tr><th>The container…</th><th>What overlayfs does</th><th>What it costs</th></tr></thead>
+<tbody>
+<tr><td>reads a file from the image</td><td>Reads it straight from the read-only layer</td><td>Nothing; every container shares the same copy</td></tr>
+<tr><td>creates a new file</td><td>Writes it in the writable layer</td><td>The file's size</td></tr>
+<tr><td>changes a file from the image, even by one byte</td><td><strong>Copy-up:</strong> copies the <em>whole</em> file into the writable layer first, then changes the copy</td><td>The whole file's size</td></tr>
+<tr><td>deletes a file from the image</td><td>Writes a <strong>whiteout</strong> in the writable layer that hides it</td><td>Nothing freed: the file is still in the layer below</td></tr>
+</tbody></table></div>
+<div class="stack" role="img" aria-label="Three containers, each with a thin writable layer of about 34 kilobytes, sitting on one shared set of read-only image layers totalling 359 megabytes">
+<p class="label">Three containers from one image</p>
+<div class="tops">
+<div class="layer rw"><b>writable</b><span>34 kB</span></div>
+<div class="layer rw"><b>writable</b><span>34 kB</span></div>
+<div class="layer rw"><b>writable</b><span>34 kB</span></div>
+</div>
+<p class="label">One image, read-only, shared by all three</p>
+<div class="layer ro"><b>COPY app.jar</b><span>23.6 MB</span></div>
+<div class="layer ro"><b>the Temurin 21 JRE</b><span>166 MB</span></div>
+<div class="layer ro"><b>apt packages: certificates, locales</b><span>68.6 MB</span></div>
+<div class="layer ro"><b>Ubuntu 26.04 base</b><span>102 MB</span></div>
+</div>
+<p>In the library: the image is a <strong>reference book</strong> on the shelf, one copy,
+  that nobody may write in. Every reader who sits down with it gets their own sheet of
+  <strong>tracing paper</strong> laid over the page, and that's the writable layer. Ten
+  readers means ten sheets and still one book. To change a paragraph, you first trace the
+  <em>whole page</em> onto your sheet, then change it there: copy-up. To "remove" a page, you
+  put a "removed" sticker on your sheet. The page is still in the book for anyone who lifts
+  the sheet.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Where layers come from</p>
+<h2>One layer per build step that changes files</h2>
+</div>
+<p>Every <code>RUN</code>, <code>COPY</code> and <code>ADD</code> in a Dockerfile makes a
+  layer holding exactly what that step changed. <code>ENV</code>, <code>WORKDIR</code>,
+  <code>CMD</code>, <code>USER</code> and <code>EXPOSE</code> only change the image's config,
+  so they show as <code>0B</code>. Here is <code>reference</code> on the Temurin JRE, newest
+  layer first:</p>
+<div class="code"><code>$ docker history ref:multi --format '{{.Size}}\t{{.CreatedBy}}'
+0B      CMD ["java" "-jar" "app.jar"]
+23.6MB  COPY /src/services/reference/target/referenc…   <span class="c"># our one layer</span>
+0B      WORKDIR /app
+0B      ENTRYPOINT ["/__cacert_entrypoint.sh"]
+5.98kB  COPY --chmod=755 entrypoint.sh /__cacert_ent…
+0B      RUN /bin/sh -c set -eux;     echo "Verifying…
+166MB   RUN /bin/sh -c set -eux;     ARCH="$(dpkg --…    <span class="c"># unpacks the JRE</span>
+0B      ENV JAVA_VERSION=jdk-21.0.13.1+2
+68.6MB  RUN /bin/sh -c set -eux;     apt-get update;…
+…
+102MB   umoci raw add-layer --image /home/buildd/roc…   <span class="c"># Ubuntu 26.04</span></code></div>
+<p>Three lines from our own Dockerfile, and only one of them adds anything. Everything below
+  <code>WORKDIR /app</code> came with <code>FROM eclipse-temurin:21-jre</code>. Each layer is
+  named by the SHA-256 of its contents, so two images built on the same base point at the
+  same layers, and Docker stores them once.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Ten containers</p>
+<h2>Why ten containers don't use ten images of disk</h2>
+</div>
+<p>Ten copies of <code>reference</code>, all started from one image:</p>
+<div class="code"><code>$ for i in $(seq 1 10); do docker run -d --name ten$i ref:multi; done
+$ docker ps -s --format '{{.Names}}\t{{.Size}}'
+ten1    34.4kB (virtual 359MB)
+ten2    34.4kB (virtual 359MB)
+…
+ten10   34.4kB (virtual 359MB)</code></div>
+<p><code>docker ps -s</code> gives two numbers. The first is the container's
+  <strong>own writable layer</strong>: what it has written since it started (Tomcat's work
+  directory and the JVM's perf data in <code>/tmp</code>). "Virtual" is that plus the image it
+  stands on. Ten containers cost ten times 34 kB, plus one image: about 359 MB in total, not
+  3.6 GB.</p>
+<p>The same sharing works between images. <code>docker system df -v</code> splits each image
+  into what it shares and what is its own:</p>
+<div class="code"><code>$ docker system df -v
+REPOSITORY        TAG                     SIZE    SHARED SIZE  UNIQUE SIZE  CONTAINERS
+ref               multi                   359MB   335.8MB      23.61MB      10
+ref               alpine                  238MB   214.1MB      23.61MB      0
+eclipse-temurin   21-jre                  336MB   335.8MB      0B           0
+eclipse-temurin   21-jre-alpine           214MB   214.1MB      0B           0
+maven             3.9-eclipse-temurin-21  539MB   539MB        0B           0</code></div>
+<p>The SIZE column is what <code>docker images</code> prints, and adding it up counts every
+  shared layer again for each image that uses it. That's the build agent in the opening: forty
+  images on the same few bases look like 24 GB and take 9 GB. The real figure is the
+  "Images" line of <code>docker system df</code>, or the UNIQUE SIZE column added up, plus the
+  shared layers once.</p>
+<p>Memory works the same way. When ten containers read the same <code>app.jar</code>, they
+  read one file in one lower layer, so the kernel keeps one copy of it in the page cache
+  (lesson 1.2), not ten.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Copy-on-write</p>
+<h2>One byte changed, the whole file copied</h2>
+</div>
+<p>A running container appends <em>one byte</em> to the 23.6 MB jar that came from the
+  image:</p>
+<div class="code"><code>$ docker ps -s --filter name=cow1 --format '{{.Size}}'
+35kB (virtual 359MB)
+$ docker exec cow1 sh -c 'echo x &gt;&gt; /app/app.jar'
+$ docker ps -s --filter name=cow1 --format '{{.Size}}'
+23.6MB (virtual 383MB)                <span class="c"># the whole jar, copied up</span></code></div>
+<p>overlayfs can't change a file inside a read-only layer, so on the first write it copies
+  the entire file into the writable layer and changes the copy. From then on, the container
+  sees only its copy. A 2 GB file with one line appended costs 2 GB per container.</p>
+<p><code>docker diff</code> lists what the writable layer holds, as A (added), C (changed)
+  and D (deleted):</p>
+<div class="code"><code>$ docker diff cow1
+C /app
+C /app/app.jar                        <span class="c"># copied up, then changed</span>
+A /app/logs
+A /app/logs/reference.log             <span class="c"># the app's own log file</span>
+A /tmp/note
+C /tmp
+A /tmp/hsperfdata_root/1
+…</code></div>
+<p>Look at <code>/app/logs/reference.log</code>. The app wrote its log into the writable
+  layer, because <code>application.properties</code> still says
+  <code>logging.file.name=logs/reference.log</code>, relative to the working directory. The
+  writable layer is deleted with the container. After <code>docker rm</code>, that log is
+  gone. In a container the log goes to <strong>stdout</strong>, where
+  <code>docker logs</code> collects it, and data that must outlive the container goes on a
+  <strong>volume</strong> (lesson 2.4).</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Deleting</p>
+<h2>A file deleted in a later layer is still in the image</h2>
+</div>
+<p>Two Dockerfiles that both end with no <code>/big</code> file:</p>
+<div class="split">
+<div class="code"><code><span class="c"># two steps</span>
+FROM alpine:latest
+RUN dd if=/dev/zero of=/big bs=1M count=100
+RUN rm /big</code></div>
+<div class="code"><code><span class="c"># one step</span>
+FROM alpine:latest
+RUN dd if=/dev/zero of=/big bs=1M count=100 &amp;&amp; rm /big</code></div>
+</div>
+<div class="code"><code>$ docker images --format '{{.Repository}}:{{.Tag}}\t{{.Size}}'
+cow:two-steps   113MB
+cow:one-step    8.43MB
+alpine:latest   8.43MB
+$ docker history cow:two-steps --format '{{.Size}}\t{{.CreatedBy}}'
+0B      RUN /bin/sh -c rm /big # buildkit                <span class="c"># only a whiteout</span>
+105MB   RUN /bin/sh -c dd if=/dev/zero of=/big bs=1M…   <span class="c"># still here</span></code></div>
+<p>A layer never changes once it's built. The <code>rm</code> step can only add a whiteout
+  on top, so the 100 MB stays in the layer below. In one <code>RUN</code>, the file is created
+  and removed before the layer is saved, so it never reaches any layer. That's why Dockerfiles
+  write <code>apt-get update &amp;&amp; apt-get install … &amp;&amp; rm -rf
+  /var/lib/apt/lists/*</code> as one line.</p>
+<div class="call stop">
+<h3>A deleted secret is still in the image</h3>
+<p>The same rule applies to a password file. This image copies one in and deletes it in the
+  next step. The container can't see it, but anyone who can pull the image can read it:</p>
+<div class="code"><code>$ docker run --rm cow:secret ls /tmp/db.password
+ls: /tmp/db.password: No such file or directory
+$ docker save cow:secret -o s.tar &amp;&amp; tar -xf s.tar -C x
+$ for l in x/blobs/sha256/*; do tar -tf $l | grep password; done
+tmp/.wh.db.password                   <span class="c"># the whiteout, in the top layer</span>
+tmp/db.password                       <span class="c"># the file, in the layer below</span>
+$ for l in x/blobs/sha256/*; do tar -xOf $l tmp/db.password; done
+not-a-real-password-123</code></div>
+<p>Pass build-time secrets with <code>RUN --mount=type=secret</code>, which never writes them
+  into a layer, and runtime secrets as environment or mounted files when the container
+  starts.</p>
+</div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">On disk</p>
+<h2>Where the layers live</h2>
+</div>
+<p>Inside a container, the root filesystem is one overlay mount. Its options name every
+  layer:</p>
+<div class="code"><code>$ docker exec ten1 grep ' / ' /proc/mounts
+overlay / overlay rw,relatime,lowerdir=…,upperdir=/var/lib/docker/overlay2/b718…/diff,workdir=…
+$ docker exec ten1 sh -c 'grep -o "lowerdir=[^,]*" /proc/mounts | tr ":" "\n" | wc -l'
+9</code></div>
+<ul class="todo">
+<li><strong><code>lowerdir</code></strong>: the read-only layers, joined with colons. Here
+  that's the image's eight layers plus one small <code>-init</code> layer that Docker adds for
+  each container, with the empty <code>/etc/hosts</code>, <code>/etc/hostname</code> and
+  <code>/etc/resolv.conf</code> it mounts over. Every container from this image shares the
+  same eight.</li>
+<li><strong><code>upperdir</code></strong>: this container's writable layer. It's a plain
+  directory under <code>/var/lib/docker/overlay2/</code>, and <code>sudo ls</code> on it shows
+  exactly what <code>docker diff</code> lists.</li>
+<li><strong><code>workdir</code></strong>: overlayfs's scratch space for copy-up.</li>
+</ul>
+<p>All of it is under <code>/var/lib/docker</code>, on the host's root filesystem unless
+  someone moved it. That's how containers fill the disk of the host they run on, which takes
+  you back to lesson 1.1.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Who runs it</p>
+<h2>Every image here runs as root, unless the Dockerfile says otherwise</h2>
+</div>
+<div class="code"><code>$ docker run --rm eclipse-temurin:21-jre id
+uid=0(root) gid=0(root) groups=0(root)</code></div>
+<p>Lesson 1.5 again: a process in a container is an ordinary process on the host, with the
+  same UID numbers. Root in the container is UID 0 on the host's files that it can reach,
+  through a bind mount, for example. A <code>USER</code> line in the Dockerfile picks the
+  user; the user must exist in the image (<code>useradd</code> in a <code>RUN</code>). Its UID
+  is the image's own count, not the host's: <code>useradd --system</code> gave
+  <code>interchange</code> UID 999 in the Temurin image and UID 997 on your laptop.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The method</p>
+<h2>"The disk is full of Docker": the order to check in</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Question</th><th>Command</th><th>What it tells you</th></tr></thead>
+<tbody>
+<tr><td>How much is Docker really using?</td><td><code>docker system df</code></td><td>Images, containers, volumes and build cache, with shared layers counted once</td></tr>
+<tr><td>Which images share what?</td><td><code>docker system df -v</code></td><td>SHARED SIZE against UNIQUE SIZE for every image</td></tr>
+<tr><td>Which containers are growing?</td><td><code>docker ps -as</code></td><td>Each container's writable layer, stopped ones too</td></tr>
+<tr><td>What is a container writing?</td><td><code>docker diff &lt;name&gt;</code></td><td>Added, changed and deleted paths: logs, copied-up files</td></tr>
+<tr><td>Which step made the image big?</td><td><code>docker history &lt;image&gt;</code></td><td>Size per layer, with the instruction that made it</td></tr>
+<tr><td>What can I safely remove?</td><td><code>docker image prune</code>, <code>docker container prune</code></td><td>Dangling images and stopped containers; <code>-a</code> also removes images no container uses</td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Lab</p>
+<h2>Six parts, five of them on your laptop</h2>
+</div>
+<p>Write your prediction down before each run. Work in <code>labs/p2-1/</code>. You're in
+  the <code>docker</code> group, so nothing here needs <code>sudo</code>. Clean up as you go:
+  ten JVMs use real memory.</p>
+
+<h3>Part 1: what an image is made of <span class="muted">· layers</span></h3>
+<div class="code"><code>docker pull eclipse-temurin:21-jre
+docker history eclipse-temurin:21-jre
+docker image inspect eclipse-temurin:21-jre --format '{{len .RootFS.Layers}} layers'
+docker image inspect eclipse-temurin:21-jre --format '{{json .RootFS.Layers}}'</code></div>
+<p>Predict first: how many layers? Which instructions in the history will show
+  <code>0B</code>, and why? The history has more lines than the image has layers. Why?</p>
+
+<h3>Part 2: ten containers <span class="muted">· sharing</span></h3>
+<div class="code"><code>for i in $(seq 1 10); do docker run -d --name ten$i eclipse-temurin:21-jre sleep 600; done
+docker ps -s --filter name=ten
+docker system df
+docker system df -v | grep -E 'REPOSITORY|temurin'
+docker rm -f $(docker ps -aq --filter name=ten)</code></div>
+<p>Predict: each container's own size, and its "virtual" size. How much disk do the ten use
+  together? What does <code>docker system df</code> show for Images and for Containers?</p>
+
+<h3>Part 3: copy-up <span class="muted">· copy-on-write</span></h3>
+<div class="code"><code>docker run -d --name cu eclipse-temurin:21-jre sleep 600
+docker exec cu ls -l /opt/java/openjdk/lib/modules
+docker ps -s --filter name=cu
+docker exec cu sh -c 'echo x &gt;&gt; /opt/java/openjdk/lib/modules'
+docker ps -s --filter name=cu
+docker exec cu rm /opt/java/openjdk/release
+docker diff cu
+docker ps -s --filter name=cu
+docker rm -f cu</code></div>
+<p>Predict: the container's size before the append, after appending one line to the 101 MB
+  <code>modules</code> file, and after deleting <code>release</code>. Which letter will
+  <code>docker diff</code> show for each path?</p>
+
+<h3>Part 4: deleting in a later layer <span class="muted">· whiteouts, secrets</span></h3>
+<div class="code"><code>mkdir -p two one secret
+printf 'FROM alpine:latest\nRUN dd if=/dev/zero of=/big bs=1M count=100\nRUN rm /big\n' &gt; two/Dockerfile
+printf 'FROM alpine:latest\nRUN dd if=/dev/zero of=/big bs=1M count=100 &amp;&amp; rm /big\n' &gt; one/Dockerfile
+docker build -q -t cow:two-steps two; docker build -q -t cow:one-step one
+docker images | grep -E '^(cow|alpine)'
+docker history cow:two-steps
+echo "not-a-real-password-123" &gt; secret/db.password
+printf 'FROM alpine:latest\nCOPY db.password /tmp/db.password\nRUN rm /tmp/db.password\n' &gt; secret/Dockerfile
+docker build -q -t cow:secret secret
+docker run --rm cow:secret ls /tmp/db.password
+docker save cow:secret -o secret/s.tar; mkdir -p secret/x; tar -xf secret/s.tar -C secret/x
+for l in secret/x/blobs/sha256/*; do tar -tf "$l" 2&gt;/dev/null | grep password; done
+for l in secret/x/blobs/sha256/*; do tar -xOf "$l" tmp/db.password 2&gt;/dev/null; done</code></div>
+<p>Predict: the two image sizes. Can the container see <code>db.password</code>? Can you get
+  it back from the saved image? What is the file whose name starts with
+  <code>.wh.</code>?</p>
+
+<h3>Part 5: where it lives <span class="muted">· overlayfs</span></h3>
+<div class="code"><code>docker run -d --name ov eclipse-temurin:21-jre sleep 600
+docker exec ov grep ' / ' /proc/mounts
+docker exec ov sh -c 'grep -o "lowerdir=[^,]*" /proc/mounts | tr ":" "\n" | wc -l'
+docker inspect ov --format '{{.GraphDriver.Data.UpperDir}}'
+findmnt -t overlay
+docker exec ov sh -c 'echo hello &gt; /tmp/mine'
+sudo ls -l "$(docker inspect ov --format '{{.GraphDriver.Data.UpperDir}}')/tmp"   <span class="c"># optional</span>
+docker rm -f ov</code></div>
+<p>Predict: how many lower directories, compared with Part 1's layer count? Where on the host
+  will <code>/tmp/mine</code> be? The <code>sudo ls</code> line is optional; it's the only one
+  in this lab, and you run it yourself.</p>
+
+<h3>Part 6: your servers <span class="muted">· at work, look only</span></h3>
+<p>On a Jenkins agent or a build server that has Docker, and only looking:
+  <code>docker system df</code>, then <code>docker system df -v | head -20</code>, and
+  <code>df -h /var/lib/docker</code>. How does the SIZE column added up compare with the
+  real figure? Are there many stopped containers or dangling images? In your repositories,
+  <code>git ls-files | grep -i dockerfile</code>: is there a Dockerfile anywhere, and does it
+  have a <code>USER</code> line? Run nothing that removes or prunes. Leave out hostnames,
+  image names that name the customer, and anything that looks like a password.</p>
+<p><strong>Done when:</strong> you can say, without notes, what an image is made of, what
+  happens on the first write to a file from the image, why ten containers from one image cost
+  almost nothing extra, and why <code>RUN rm</code> doesn't make an image smaller.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check</p>
+<h2>Five questions</h2>
+</div>
+<p>Out loud first, and end each one with "because…" and the consequence.</p>
+<details><summary>A build agent's <code>docker images</code> adds up to 24 GB, but <code>/var/lib/docker</code> uses 9 GB. Which number is right, and how do you see the real one?</summary><div class="answer"><p><strong>9 GB is right; the 24 GB counts shared layers many times.</strong> Each image's SIZE includes every layer it stands on, and most images on one agent share their base layers, which are stored once, named by their SHA-256. <code>docker system df</code> counts each layer once; <code>docker system df -v</code> splits every image into SHARED SIZE and UNIQUE SIZE.</p></div></details>
+<details><summary>A Dockerfile downloads a 300 MB tarball in one <code>RUN</code>, unpacks it, and deletes it in the next <code>RUN</code>. The image is still 300 MB bigger. Why, and what's the fix?</summary><div class="answer"><p><strong>Layers never change once they're built, so the second <code>RUN</code> can only hide the file with a whiteout.</strong> The tarball is still in the layer below, and it's pulled and stored with the image. Download, unpack and delete in the same <code>RUN</code>, joined with <code>&amp;&amp;</code>, so the tarball never reaches a saved layer. Or unpack it in a build stage and copy only the result into the final image (lesson 2.2).</p></div></details>
+<details><summary>A Dockerfile copies <code>settings.xml</code> with a repository password in, runs <code>mvn package</code>, and deletes it in the next step. Is the password safe?</summary><div class="answer"><p><strong>No. It's in the layer the <code>COPY</code> made, and anyone who can pull the image can read it.</strong> The delete only adds a whiteout. <code>docker save</code> and <code>tar</code> get it back in two commands, and so does anything that reads the registry. Use <code>RUN --mount=type=secret</code>, which makes the file available to that one step without writing it into any layer. Then rotate the password, because it's already in every copy of the old image.</p></div></details>
+<details><summary>A container appends one line to a 2 GB data file that came with its image. How much does its writable layer grow, and why? What happens with ten such containers?</summary><div class="answer"><p><strong>About 2 GB each, so 20 GB for ten.</strong> overlayfs can't change a file in a read-only layer, so the first write copies the whole file up into the container's writable layer and changes the copy. Every container makes its own copy. Data that a container changes belongs on a volume, not in the image.</p></div></details>
+<details><summary>You run <code>reference</code> in a container, and its log goes to <code>/app/logs/reference.log</code>. You <code>docker rm</code> the container and start a new one. Where is yesterday's log?</summary><div class="answer"><p><strong>Gone. The file was in the container's writable layer, which is deleted with the container.</strong> A new container starts with a new, empty writable layer on the same read-only image. In a container, log to stdout so <code>docker logs</code> (and later the platform) collects it; put anything that must outlive the container on a volume.</p></div></details>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Build 6 · Interchange</p>
+<h2><code>reference</code> in a container, as its own user</h2>
+</div>
+<p>Build 5 ran <code>reference</code> under systemd as its own user. Build 6 puts the same jar
+  in an image, still as its own user. No <code>sudo</code>: your systemd service stays on port
+  8081, and the container is published on <code>18081</code>. Lesson 2.2 will move the Maven
+  build inside the Dockerfile; here you copy in the jar you build on the laptop. Predict before
+  each step.</p>
+<ol class="todo">
+<li><strong>Predict:</strong> with no <code>USER</code> line, which UID does the app run as?
+  With <code>USER interchange</code>, what happens when the app tries to write
+  <code>logs/reference.log</code> under <code>/app</code>, a directory that
+  <code>WORKDIR</code> created as root?</li>
+<li><strong>Branch and build the jar:</strong> <code>git switch -c phase2-build6</code>, then
+  <code>./mvnw -pl services/reference -am package</code>.</li>
+<li><strong>The Dockerfile.</strong> Write <code>services/reference/Dockerfile</code>:
+  <code>FROM eclipse-temurin:21-jre</code>; a <code>RUN useradd</code> with the same options
+  as Build 5's user; <code>WORKDIR /app</code>; <code>COPY</code> the jar from
+  <code>target/</code> to <code>app.jar</code>; <code>USER interchange</code>;
+  <code>EXPOSE 8081</code>; <code>CMD</code> as an exec-form list running
+  <code>java -XX:MaxRAMPercentage=75 -jar app.jar</code>. Comment each line with its
+  "because".</li>
+<li><strong>Build and read it:</strong>
+  <code>docker build -t interchange/reference:dev services/reference</code>, then
+  <code>docker history interchange/reference:dev</code>. Predict which of your lines make a
+  layer, and how big each is.</li>
+<li><strong>Run it:</strong>
+  <code>docker run -d --name ref -p 18081:8081 interchange/reference:dev</code>, then
+  <code>curl localhost:18081/customers/C001</code>, <code>docker exec ref id</code> and
+  <code>docker logs ref</code>. Find the error and name the lesson it came from.</li>
+<li><strong>Fix it the container way:</strong> logs go to stdout. Spring stops writing the
+  file when <code>LOGGING_FILE_NAME</code> is set to an empty value. Put that in the
+  Dockerfile as an <code>ENV</code> line, rebuild, run, and prove there's no error and that a
+  lookup line appears in <code>docker logs</code>.</li>
+<li><strong>Copy-on-write, on your own image:</strong> <code>docker ps -s</code>, then
+  <code>docker diff ref</code>. Then <code>docker exec ref sh -c 'echo x &gt;&gt; /app/app.jar'</code>:
+  predict the result first, and explain it with lesson 1.5.</li>
+<li><strong>Three at once:</strong> start two more on ports 18082 and 18083, then
+  <code>docker ps -s</code> and <code>docker system df -v</code>. Write down what the three
+  cost together, then remove them.</li>
+<li><strong>Commit</strong> the Dockerfile on the branch, with its comments.</li>
+</ol>
+<p><strong>Done when:</strong> <code>curl</code> on 18081 returns C001, <code>id</code> in the
+  container isn't root, <code>docker logs</code> shows the lookup with no file error, and you
+  can explain the size of each layer and each container.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Interview answer · 60 seconds, spoken</p>
+<h2>"What's actually in a Docker image, and what happens on disk when you start ten containers from it?"</h2>
+</div>
+<p>Mechanism first: read-only layers, one per build step, shared between images by their
+  hash; one thin writable layer per container; overlayfs merges them; copy-up on the first
+  write. Then the consequences: ten containers cost ten small writable layers and one image;
+  <code>RUN rm</code> doesn't shrink an image and doesn't hide a secret; a container's own
+  files, logs included, are deleted with it. End with Build 6, the jar in an image as its own
+  user, in one sentence. Say it with a timer, then type what you said.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Review</p>
+<h2>At the start of the next lesson</h2>
+</div>
+<p>The two lowest-scored questions above are asked again, without notes, before the next
+  lesson starts. They count as done at ¾ or better.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Interchange</p>
+<h2>Where this comes back</h2>
+</div>
+<p>In lesson 2.2 the build cache turns out to be these same layers: a step is reused while
+  everything above it is unchanged, so the order of your Dockerfile decides whether a one-line
+  Java change rebuilds in 3 seconds or 23. In 2.4 volumes are the answer to the writable layer
+  dying with its container. In 2.5 a registry stores and sends layers by their hash, so a push
+  uploads only the layers the registry doesn't already have. In Phase 5, Kubernetes counts a
+  container's writable layer against its ephemeral storage, and a node whose image layers fill
+  the disk starts evicting pods: lesson 1.1, one level up.</p>
+</section>
+
+<footer>
+<p>Sources: Docker documentation, "Storage drivers" and "OverlayFS storage driver"
+  (<code>overlay2</code>, copy-up, whiteouts); the Linux kernel's
+  <code>Documentation/filesystems/overlayfs.rst</code>; the Dockerfile reference
+  (<code>RUN</code>, <code>COPY</code>, <code>USER</code>,
+  <code>RUN --mount=type=secret</code>); <code>docker history</code>,
+  <code>docker diff</code>, <code>docker ps --size</code>, <code>docker system df</code>,
+  <code>docker save</code>. Every output on this page comes from a real run on 22 November
+  2026 with Docker 29.9.2 (buildx 0.38.1, overlay2 on ext4) and
+  <code>eclipse-temurin:21-jre</code> (Java 21.0.13.1 on Ubuntu 26.04.1). The 24 GB and 9 GB
+  in the opening are an illustration, not a measurement.</p>
+</footer>
+
+</div>
+</body>
+</html>

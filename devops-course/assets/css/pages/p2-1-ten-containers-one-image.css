@@ -1,0 +1,21 @@
+/* lesson 2.1: ten containers, one image */
+.facts{display:flex;flex-wrap:wrap;gap:.5rem;}
+.fact{font-family:"IBM Plex Mono",monospace;font-size:.72rem;font-weight:500;padding:.22rem .55rem;border:1px solid var(--rule-strong);border-radius:4px;color:var(--ink-2);background:var(--surface);}
+ol.todo,ul.todo{margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.55rem;max-width:68ch;}
+ol.todo li,ul.todo li{font-size:.94rem;color:var(--ink-2);}
+h3 .muted{font-weight:400;color:var(--muted);font-size:.82em;}
+td.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap;}
+
+/* the stack: three thin writable layers on top of one shared set of image layers */
+.stack{display:flex;flex-direction:column;gap:.45rem;max-width:40rem;}
+.stack .tops{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.45rem;}
+.stack .layer{border:1px solid var(--rule-strong);border-radius:5px;padding:.5rem .7rem;background:var(--surface);
+  display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;flex-wrap:wrap;}
+.stack .layer b{font-size:.86rem;font-weight:600;color:var(--ink);}
+.stack .layer span{font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--ink-2);font-variant-numeric:tabular-nums;}
+.stack .rw{background:var(--warn-soft);border-color:var(--warn-rule);border-style:dashed;}
+.stack .ro{background:var(--accent-soft);border-color:var(--rule-strong);}
+.stack .label{font-family:"IBM Plex Mono",monospace;font-size:.66rem;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);}
+.stack .merged{background:var(--good-soft);border-color:var(--good-rule);}
+@media (max-width:30rem){ .stack .tops{grid-template-columns:1fr;} }

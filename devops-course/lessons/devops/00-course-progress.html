@@ -13,7 +13,7 @@
 <div class="wrap">
 
 <header class="masthead">
-<p class="eyebrow">Updated 22 Nov 2026 · Week 6 of 24 · Phase 1, the machine underneath</p>
+<p class="eyebrow">Updated 22 Nov 2026 · Week 7 of 24 from 23 Nov · Phase 2, containers, properly</p>
 <h1>Course progress</h1>
 <p class="lede">Every lesson has seven stages, and one lesson is finished before the next starts.
   This page shows where each lesson stands, and where the Interchange build stands.</p>
@@ -23,13 +23,13 @@
 <div class="now">
   <div class="now-card">
     <span class="k">Now</span>
-    <span class="v">Lesson 1.4 retake</span>
-    <span class="d">Lesson 1.5 done: all seven stages, review Q2 and Q4 at ¾ (22 Nov). Next: lesson 1.4's open items, the interview retake (four rows plus the work example, cold) and review Q2, Q4.</span>
+    <span class="v">Lesson 2.1, and the 1.4 retake</span>
+    <span class="d">Lesson 2.1 is written: read it at work. First, lesson 1.4's open items: the interview retake cold (¾ in practice, 22 Nov) and review Q2, Q4.</span>
   </div>
   <div class="now-card">
     <span class="k">Current lesson</span>
-    <span class="v">1.5 The File Root Left Behind</span>
-    <span class="d">Users, groups and permissions. All seven stages done. Build 5: <code>reference</code> runs as its own system user.</span>
+    <span class="v">2.1 Ten Containers, One Image</span>
+    <span class="d">Layers, the writable layer and copy-on-write. Build 6: <code>reference</code> in a container as its own user. Lesson 1.5 is done; Build 5: <code>reference</code> runs as its own system user.</span>
   </div>
   <div class="now-card">
     <span class="k">After that</span>
@@ -38,7 +38,7 @@
   </div>
 </div>
 <div class="counts">
-  <span class="count"><b>1 / 9</b> interview answers</span>
+  <span class="count"><b>1 / 10</b> interview answers</span>
   <span class="count"><b>7</b> reviews open</span>
   <span class="count"><b>2</b> at-work checks open</span>
   <span class="count"><b>6 of 6</b> Phase 1 builds done</span>
@@ -98,11 +98,17 @@
 <tr><th scope="row"><span class="n">1.4</span>Networking</th>
   <td><span class="s done"></span></td><td><span class="s done"></span></td><td><span class="s done"><small>Part 6</small></span></td>
   <td><span class="s done"><small>ss, LAN, timing.sh</small></span></td><td><span class="s done"><small>2½/5</small></span></td>
-  <td><span class="s part"><small>½, retake</small></span></td><td><span class="s part"><small>Q4 ½; Q2, Q4 on 20 Nov</small></span></td></tr>
-<tr class="current"><th scope="row"><span class="n">1.5</span>Permissions</th>
+  <td><span class="s part"><small>½; ¾ practice 22 Nov</small></span></td><td><span class="s part"><small>Q4 ½; Q2, Q4 on 20 Nov</small></span></td></tr>
+<tr><th scope="row"><span class="n">1.5</span>Permissions</th>
   <td><span class="s done"><small>read 19 Nov</small></span></td><td><span class="s done"><small>Parts 1–5, 20 Nov</small></span></td><td><span class="s done"><small>Part 6, 21 Nov</small></span></td>
   <td><span class="s done"><small>own user, drill</small></span></td><td><span class="s done"><small>2/5</small></span></td>
   <td><span class="s done"><small>¾, 22 Nov</small></span></td><td><span class="s done"><small>Q2, Q4 ¾, 22 Nov</small></span></td></tr>
+<tr class="phase"><td colspan="8">Phase 2 · containers, properly</td></tr>
+<tr class="cols"><th scope="col">Lesson</th><th scope="col">Lesson</th><th scope="col">Lab</th><th scope="col">At work</th><th scope="col">Build</th><th scope="col">Questions</th><th scope="col">Interview</th><th scope="col">Review</th></tr>
+<tr class="current"><th scope="row"><span class="n">2.1</span>Layers</th>
+  <td><span class="s todo"><small>written 22 Nov</small></span></td><td><span class="s todo"></span></td><td><span class="s todo"></span></td>
+  <td><span class="s todo"><small>Build 6</small></span></td><td><span class="s todo"></span></td>
+  <td><span class="s todo"></span></td><td><span class="s todo"></span></td></tr>
 </tbody>
 </table>
 </div>
@@ -113,7 +119,7 @@
 <section>
 <div class="sec-head">
   <p class="eyebrow">Interchange · builds 0 to 4 merged to main in PR #5, 17 Nov</p>
-  <h2>Phase 1 builds</h2>
+  <h2>Interchange builds</h2>
 </div>
 <ol class="builds">
   <li><span class="b">0</span>
@@ -140,6 +146,10 @@
     <span class="what"><span class="s done"><strong>Its own user</strong></span>
       <span>A system user <code>interchange</code>, the jar in <code>/opt</code> owned by root, logs in <code>/var/log/interchange</code>, <code>UMask=0027</code>. Drill: a root-owned log, found and fixed.</span></span>
     <span class="c">fe02e3c</span></li>
+  <li><span class="b">6</span>
+    <span class="what"><span class="s todo"><strong>In a container</strong></span>
+      <span>The same jar in an image on <code>eclipse-temurin:21-jre</code>, as its own user, logging to stdout. Layers and copy-up measured on it.</span></span>
+    <span class="c">lesson 2.1</span></li>
 </ol>
 </section>
 

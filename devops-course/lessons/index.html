@@ -182,10 +182,19 @@
 <span class="f">devops/p1-5-the-file-root-left-behind.html</span>
 </span>
 </a>
+<a class="lrow" href="devops/p2-1-ten-containers-one-image.html">
+<span class="no">2.1</span>
+<span class="body">
+<span class="t">Ten Containers, One Image</span>
+<span class="d">What a Docker image is on disk: read-only layers, one per RUN, COPY or ADD, named by their hash and shared between images; the container's writable layer; overlayfs, lowerdir and upperdir; copy-up of the whole file on the first write; whiteouts, why RUN rm doesn't shrink an image, and a deleted secret read back with docker save; docker ps -s, docker diff, docker history, docker system df -v; images run as root unless USER says otherwise.</span>
+<span class="k">Ten containers from one image cost ten thin writable layers and one image. A layer never changes once built, so deleting a file later hides it and frees nothing.</span>
+<span class="f">devops/p2-1-ten-containers-one-image.html</span>
+</span>
+</a>
 </div>
 <div class="call">
 <h3>Next</h3>
-<p>Lesson 1.5 — the file root left behind: users, groups and permissions, then Build 5, <code>reference</code> as its own user. Lesson 1.4's interview answer and review are still open.</p>
+<p>Lesson 2.1 — ten containers, one image: layers, the writable layer and copy-on-write, then Build 6, <code>reference</code> in a container as its own user. Phase 2 starts on 23 Nov. Lesson 1.4's interview retake and review are still open.</p>
 <p><a href="#road-ahead">See every lesson in the plan, all 37 →</a></p>
 </div>
 </section>
@@ -472,10 +481,10 @@
 <a class="prow done" href="devops/p1-2-where-the-memory-went.html"><span class="no">1.2</span><span class="pt">Memory<span class="pd">RSS against page cache, why <code>free</code> looks alarming and is fine, the OOM killer and cgroups</span></span><span class="st">done</span></a>
 <a class="prow done" href="devops/p1-3-the-job-nobody-saw-fail.html"><span class="no">1.3</span><span class="pt">systemd<span class="pd">Units, timers instead of cron, journald, and why your 2am cron job failed silently</span></span><span class="st">done</span></a>
 <a class="prow done" href="devops/p1-4-running-but-unreachable.html"><span class="no">1.4</span><span class="pt">Networking<span class="pd">Interfaces, <code>0.0.0.0</code> against loopback, <code>ss</code>, DNS and the five-second timeout, TLS handshakes</span></span><span class="st">done</span></a>
-<a class="prow now" href="devops/p1-5-the-file-root-left-behind.html"><span class="no">1.5</span><span class="pt">Users, groups and permissions<span class="pd">From below: the owner, group and mode your Ansible playbooks have been setting for years</span></span><span class="st">now</span></a>
+<a class="prow done" href="devops/p1-5-the-file-root-left-behind.html"><span class="no">1.5</span><span class="pt">Users, groups and permissions<span class="pd">From below: the owner, group and mode your Ansible playbooks have been setting for years</span></span><span class="st">done</span></a>
 </div>
 <div class="pphase"><p class="ph"><span class="pn">P2</span> Containers, properly <span class="muted">· wks 7–10 · 23 Nov – 20 Dec · 36 h</span></p>
-<div class="prow plan"><span class="no">2.1</span><span class="pt">Layers and copy-on-write<span class="pd">Why ten containers from one image do not use ten images of disk</span></span><span class="st">planned</span></div>
+<a class="prow now" href="devops/p2-1-ten-containers-one-image.html"><span class="no">2.1</span><span class="pt">Layers and copy-on-write<span class="pd">Why ten containers from one image do not use ten images of disk</span></span><span class="st">now</span></a>
 <div class="prow plan"><span class="no">2.2</span><span class="pt">The build cache and multi-stage builds<span class="pd">Instruction order on your Java/Maven stack; 700 MB down to 200 MB</span></span><span class="st">planned</span></div>
 <div class="prow plan"><span class="no">2.3</span><span class="pt">Container networking<span class="pd">Bridge, published ports, DNS between containers, and the service bound to localhost</span></span><span class="st">planned</span></div>
 <div class="prow plan"><span class="no">2.4</span><span class="pt">Volumes<span class="pd">Named, bind and anonymous, and the Postgres trap that strands your data</span></span><span class="st">planned</span></div>
