@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S&amp;P 500</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<style>
+  :root {
+    --bg: #fbfaf8; --panel: #ffffff; --fg: #1f1e1c; --muted: #6b675f; --line: #e4e1da;
+    --grid: #ecebe7; --axis: #c9c5bc; --ref: #b5b0a6; --ok: #2f8a55; --bad: #c0392b; --pop: #ffffff; --nav: #9a958b;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --serif: Georgia, "Times New Roman", serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1b1a18; --panel: #232220; --fg: #ece9e3; --muted: #a39e94; --line: #3a3833;
+      --grid: #2e2c29; --axis: #4a4741; --ref: #6a665e; --ok: #5cc48a; --bad: #e8735f; --pop: #2a2926; --nav: #7d786f; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); }
+  .sp { max-width: 1040px; margin: 0 auto; padding: 32px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 20px; }
+  .sp-name { margin: 0; font-size: 1.15rem; font-weight: 600; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .sp-ticker { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; font-weight: 400; }
+  .sp-priceline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 14px; }
+  .sp-price { font-family: var(--serif); font-size: 2.8rem; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .sp-chg { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .up { color: var(--ok); } .down { color: var(--bad); }
+  .sp-asof { font-size: 13px; color: var(--muted); }
+  .sp-ranges { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 2px; gap: 2px; justify-self: start; }
+  .sp-ranges button { font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--muted); padding: 4px 12px; border-radius: 6px; cursor: pointer; }
+  .sp-ranges button[aria-pressed="true"] { background: var(--bg); color: var(--fg); box-shadow: 0 0 0 1px var(--line); }
+  .sp-ranges button:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
+  .sp-chart { position: relative; min-height: 320px; }
+  .sp-chart svg, .sp-nav svg { display: block; overflow: visible; }
+  .sp-chart svg { touch-action: pan-y; }
+  .tick text { fill: var(--muted); font-size: 12px; font-family: var(--sans); }
+  .sp-grid line { stroke: var(--grid); }
+  .sp-axis line, .sp-axis path { stroke: var(--axis); }
+  .sp-cross { stroke: var(--ref); stroke-dasharray: 3 3; }
+  .sp-start { stroke: var(--ref); stroke-dasharray: 2 4; }
+  .sp-tip { position: absolute; pointer-events: none; z-index: 2; background: var(--pop); border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0,0,0,.12); border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .sp-tip-v { color: var(--fg); font-weight: 600; font-size: 15px; }
+  .sp-nav { position: relative; min-height: 84px; margin-top: -8px; }
+  .sp-nav svg { touch-action: none; }
+  .sp-nav .overlay { cursor: crosshair; }
+  .sp-nav .selection { fill: var(--fg); fill-opacity: 0.08; stroke: var(--muted); stroke-width: 1; shape-rendering: crispEdges; }
+  .sp-nav .handle { fill: var(--bg); stroke: var(--muted); stroke-width: 1.5; rx: 4; ry: 4; }
+  .sp-grip { stroke: var(--muted); stroke-width: 1.5; pointer-events: none; }
+  .sp-note { margin: 0; font-size: 13px; color: var(--muted); }
+  .sp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .sp-stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; display: grid; gap: 2px; }
+  .sp-stat-l { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .sp-stat-v { font-variant-numeric: tabular-nums; font-size: 1.15rem; }
+  .sp-stat-d { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="sp">
+  <header>
+    <h1 class="sp-name">S&amp;P 500 <span class="sp-ticker">SPX · INDEX POINTS (USD)</span></h1>
+    <div class="sp-priceline">
+      <span class="sp-price" id="price">—</span>
+      <span class="sp-chg" id="chg">—</span>
+    </div>
+    <span class="sp-asof">Close on <span id="asof">—</span> · change over <span id="rangename">—</span></span>
+  </header>
+
+  <div class="sp-ranges" role="group" aria-label="Time range">
+    <button type="button" data-range="1M" aria-pressed="false">1M</button>
+    <button type="button" data-range="3M" aria-pressed="false">3M</button>
+    <button type="button" data-range="6M" aria-pressed="false">6M</button>
+    <button type="button" data-range="1Y" aria-pressed="false">1Y</button>
+    <button type="button" data-range="All" aria-pressed="true">All</button>
+  </div>
+
+  <div class="sp-chart" id="chart"></div>
+  <div class="sp-nav" id="nav"></div>
+  <p class="sp-note">Drag the handles under the chart to pick any dates, or drag the shaded window to move it.</p>
+
+  <div class="sp-stats">
+    <div class="sp-stat"><span class="sp-stat-l">Range high</span><span class="sp-stat-v" id="high">—</span><span class="sp-stat-d" id="highd">—</span></div>
+    <div class="sp-stat"><span class="sp-stat-l">Range low</span><span class="sp-stat-v" id="low">—</span><span class="sp-stat-d" id="lowd">—</span></div>
+    <div class="sp-stat"><span class="sp-stat-l">Start of range</span><span class="sp-stat-v" id="first">—</span><span class="sp-stat-d" id="firstd">—</span></div>
+    <div class="sp-stat"><span class="sp-stat-l">Change</span><span class="sp-stat-v" id="change">—</span><span class="sp-stat-d">index points</span></div>
+  </div>
+
+  <p class="sp-note">Daily closing values from FRED (series SP500). Weekends and US market holidays have no close. Data: <a href="sp500.csv">sp500.csv</a>.</p>
+</div>
+
+<script>
+const SP = {
+  pts: [], range: 'All', win: null,
+  num: d3.format(',.2f'), signed: d3.format('+,.2f'),
+  label: d3.utcFormat('%-d %b %Y'),
+  names: { '1M': '1 month', '3M': '3 months', '6M': '6 months', '1Y': '1 year', All: 'all time shown', Custom: 'the dates you picked' }
+};
+const day = (s) => new Date(s + 'T00:00:00Z');
+
+function presetWindow(range) {
+  const pts = SP.pts, last = pts[pts.length - 1].t;
+  const start = { '1M': d3.utcMonth.offset(last, -1), '3M': d3.utcMonth.offset(last, -3), '6M': d3.utcMonth.offset(last, -6), '1Y': d3.utcYear.offset(last, -1), All: pts[0].t }[range];
+  const first = pts.find((p) => p.t >= start);
+  return { from: first.date, to: pts[pts.length - 1].date };
+}
+const inWin = () => SP.pts.filter((p) => p.date >= SP.win.from && p.date <= SP.win.to);
+
+function pressButtons() {
+  document.querySelectorAll('.sp-ranges button').forEach((x) => x.setAttribute('aria-pressed', String(x.getAttribute('data-range') === SP.range)));
+}
+
+function drawStats() {
+  const pts = inWin();
+  if (pts.length < 2) return;
+  const first = pts[0], last = pts[pts.length - 1];
+  const hi = pts.reduce((a, b) => (b.v > a.v ? b : a)), lo = pts.reduce((a, b) => (b.v < a.v ? b : a));
+  const change = last.v - first.v, pct = (100 * change) / first.v, up = change >= 0;
+  const set = (id, v) => { document.getElementById(id).textContent = v; };
+  set('price', SP.num(last.v));
+  set('chg', (up ? '▲ ' : '▼ ') + Math.abs(pct).toFixed(2) + '%');
+  set('asof', SP.label(last.t)); set('rangename', SP.names[SP.range]);
+  set('high', SP.num(hi.v)); set('highd', SP.label(hi.t));
+  set('low', SP.num(lo.v)); set('lowd', SP.label(lo.t));
+  set('first', SP.num(first.v)); set('firstd', SP.label(first.t));
+  set('change', SP.signed(change));
+  ['chg', 'change'].forEach((id) => { const el = document.getElementById(id); el.classList.toggle('up', up); el.classList.toggle('down', !up); });
+}
+
+function drawChart() {
+  const el = document.getElementById('chart');
+  const pts = inWin();
+  if (pts.length < 2) return;
+  el.replaceChildren();
+  const first = pts[0];
+  const up = pts[pts.length - 1].v >= first.v;
+  const col = up ? 'var(--ok)' : 'var(--bad)';
+  const W = Math.max(280, el.clientWidth), H = 320;
+  const [lo, hi] = d3.extent(pts, (p) => p.v);
+  const pad = (hi - lo) * 0.08 || 1;
+  const y = d3.scaleLinear([lo - pad, hi + pad], [H - 26, 10]).nice(5);
+  const yTicks = y.ticks(5), yFmt = d3.format(',.0f');
+  const m = { t: 10, r: 8, b: 26, l: 12 + 7.2 * d3.max(yTicks, (v) => yFmt(v).length) };
+  const x = d3.scaleUtc(d3.extent(pts, (p) => p.t), [m.l, W - m.r]);
+  const spanDays = (pts[pts.length - 1].t - pts[0].t) / 864e5;
+  const xFmt = spanDays > 200 ? d3.utcFormat("%b '%y") : d3.utcFormat('%-d %b');
+  const maxTicks = Math.max(2, Math.floor(W / 95));
+  let xTicks;
+  if (pts.length <= maxTicks) xTicks = pts.map((p) => p.t);
+  else if (spanDays <= 62) { const every = Math.ceil(pts.length / maxTicks); xTicks = pts.filter((_, i) => (pts.length - 1 - i) % every === 0).map((p) => p.t); }
+  else { const seen = new Set(); xTicks = x.ticks(maxTicks).filter((t) => { const k = xFmt(t); if (seen.has(k)) return false; seen.add(k); return true; }); }
+
+  const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('width', '100%')
+    .attr('role', 'img').attr('aria-label', `Line chart of the S&P 500 daily close from ${SP.label(pts[0].t)} to ${SP.label(pts[pts.length - 1].t)}`);
+  const grad = svg.append('defs').append('linearGradient').attr('id', 'sp-grad').attr('x1', 0).attr('x2', 0).attr('y1', 0).attr('y2', 1);
+  grad.append('stop').attr('offset', '0%').style('stop-color', col).style('stop-opacity', 0.28);
+  grad.append('stop').attr('offset', '100%').style('stop-color', col).style('stop-opacity', 0);
+  svg.append('g').attr('class', 'sp-grid').attr('transform', `translate(${m.l},0)`)
+    .call(d3.axisLeft(y).tickValues(yTicks).tickSize(-(W - m.l - m.r)).tickFormat(yFmt)).call((g) => g.select('.domain').remove());
+  svg.append('g').attr('class', 'sp-axis').attr('transform', `translate(0,${H - m.b})`)
+    .call(d3.axisBottom(x).tickValues(xTicks).tickFormat(xFmt).tickSizeOuter(0));
+  svg.append('line').attr('class', 'sp-start').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(first.v)).attr('y2', y(first.v));
+  svg.append('path').datum(pts).style('fill', 'url(#sp-grad)')
+    .attr('d', d3.area().curve(d3.curveMonotoneX).x((p) => x(p.t)).y0(H - m.b).y1((p) => y(p.v)));
+  svg.append('path').datum(pts).style('fill', 'none').style('stroke', col).attr('stroke-width', 1.8).attr('stroke-linejoin', 'round')
+    .attr('d', d3.line().curve(d3.curveMonotoneX).x((p) => x(p.t)).y((p) => y(p.v)));
+  if (pts.length <= 40) svg.append('g').selectAll('circle').data(pts).join('circle').attr('cx', (p) => x(p.t)).attr('cy', (p) => y(p.v)).attr('r', 2.5).style('fill', col);
+  const lastP = pts[pts.length - 1];
+  svg.append('circle').attr('cx', x(lastP.t)).attr('cy', y(lastP.v)).attr('r', 3.5).style('fill', col);
+
+  const cross = svg.append('line').attr('class', 'sp-cross').attr('y1', m.t).attr('y2', H - m.b).style('display', 'none');
+  const dot = svg.append('circle').attr('r', 4.5).style('fill', col).style('stroke', 'var(--bg)').attr('stroke-width', 2).style('display', 'none');
+  const tip = document.createElement('div'); tip.className = 'sp-tip'; tip.hidden = true; el.appendChild(tip);
+  const bis = d3.bisector((p) => p.t).center;
+  const fmtDay = d3.utcFormat('%a %-d %b %Y');
+  svg.append('rect').attr('x', m.l).attr('y', m.t).attr('width', W - m.l - m.r).attr('height', H - m.t - m.b).style('fill', 'transparent')
+    .on('pointermove', (ev) => {
+      const [mx] = d3.pointer(ev);
+      const p = pts[bis(pts, x.invert(mx))];
+      const px = x(p.t), py = y(p.v);
+      cross.attr('x1', px).attr('x2', px).style('display', null);
+      dot.attr('cx', px).attr('cy', py).style('display', null);
+      const vs = (100 * (p.v - first.v)) / first.v;
+      const a = document.createElement('div'); a.className = 'sp-tip-v'; a.textContent = SP.num(p.v);
+      const b = document.createElement('div'); b.textContent = fmtDay(p.t);
+      const c = document.createElement('div'); c.textContent = (vs >= 0 ? '+' : '') + vs.toFixed(2) + '% from range start';
+      tip.replaceChildren(a, b, c); tip.hidden = false;
+      const scale = el.clientWidth / W;
+      let left = px * scale + 12;
+      if (left + tip.offsetWidth > el.clientWidth) left = px * scale - tip.offsetWidth - 12;
+      tip.style.left = Math.max(0, left) + 'px';
+      tip.style.top = Math.max(0, py * scale - tip.offsetHeight - 10) + 'px';
+    })
+    .on('pointerleave', () => { cross.style('display', 'none'); dot.style('display', 'none'); tip.hidden = true; });
+}
+
+const NAV = { w: 0 };
+function drawNav() {
+  const el = document.getElementById('nav');
+  const pts = SP.pts;
+  const W = Math.max(280, el.clientWidth), H = 84, m = { t: 4, r: 8, b: 22, l: 8 };
+  if (NAV.w !== W) {
+    el.replaceChildren();
+    const x = d3.scaleUtc(d3.extent(pts, (p) => p.t), [m.l, W - m.r]);
+    const y = d3.scaleLinear(d3.extent(pts, (p) => p.v), [H - m.b, m.t + 4]);
+    const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('width', '100%')
+      .attr('role', 'img').attr('aria-label', 'Overview of the whole period with draggable handles to choose the date range');
+    svg.append('path').datum(pts).style('fill', 'var(--nav)').style('fill-opacity', 0.25)
+      .attr('d', d3.area().curve(d3.curveMonotoneX).x((p) => x(p.t)).y0(H - m.b).y1((p) => y(p.v)));
+    svg.append('path').datum(pts).style('fill', 'none').style('stroke', 'var(--nav)').attr('stroke-width', 1)
+      .attr('d', d3.line().curve(d3.curveMonotoneX).x((p) => x(p.t)).y((p) => y(p.v)));
+    svg.append('g').attr('class', 'sp-axis').attr('transform', `translate(0,${H - m.b})`)
+      .call(d3.axisBottom(x).ticks(Math.max(2, Math.floor(W / 95))).tickFormat(d3.utcFormat("%b '%y")).tickSizeOuter(0));
+    const snap = (px) => Math.max(0, Math.min(pts.length - 1, d3.bisector((p) => p.t).center(pts, x.invert(px))));
+    const grips = svg.append('g');
+    const placeGrips = (sel) => {
+      grips.selectAll('line').data(sel ? [sel[0] - 2, sel[0] + 2, sel[1] - 2, sel[1] + 2] : []).join('line')
+        .attr('class', 'sp-grip').attr('x1', (v) => v).attr('x2', (v) => v)
+        .attr('y1', (H - m.b + m.t) / 2 - 6).attr('y2', (H - m.b + m.t) / 2 + 6);
+    };
+    const brush = d3.brushX().extent([[m.l, m.t], [W - m.r, H - m.b]]).handleSize(12)
+      .on('brush', (ev) => {
+        placeGrips(ev.selection);
+        if (!ev.sourceEvent || !ev.selection) return;
+        let a = snap(ev.selection[0]), b = snap(ev.selection[1]);
+        if (b <= a) b = Math.min(pts.length - 1, a + 1);
+        SP.range = 'Custom';
+        SP.win = { from: pts[a].date, to: pts[b].date };
+        pressButtons(); drawChart(); drawStats();
+      })
+      .on('end', (ev) => {
+        if (!ev.sourceEvent) return;
+        if (!ev.selection) { setRange('All'); }
+      });
+    const g = svg.append('g').call(brush);
+    grips.raise();
+    Object.assign(NAV, { w: W, x, brush, g });
+  }
+  NAV.g.call(NAV.brush.move, [NAV.x(day(SP.win.from)), NAV.x(day(SP.win.to))]);
+}
+
+function setRange(range) {
+  SP.range = range;
+  SP.win = presetWindow(range);
+  pressButtons(); drawStats(); drawChart(); drawNav();
+}
+
+document.querySelectorAll('.sp-ranges button').forEach((b) => b.addEventListener('click', () => setRange(b.getAttribute('data-range'))));
+
+let lastW = 0;
+new ResizeObserver(() => {
+  const w = document.getElementById('chart').clientWidth;
+  if (SP.pts.length && w !== lastW) { lastW = w; drawChart(); drawNav(); }
+}).observe(document.querySelector('.sp'));
+
+d3.csv('sp500.csv').then((rows) => {
+  SP.pts = rows.filter((r) => r.close !== '').map((r) => ({ date: r.date, t: day(r.date), v: +r.close }));
+  setRange('All');
+}).catch(() => { document.getElementById('chart').textContent = 'Could not load sp500.csv.'; });
+</script>
+</body>
+</html>
