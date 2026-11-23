@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Meters</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<style>
+  :root {
+    --bg: #fbfaf8; --panel: #ffffff; --fg: #1f1e1c; --muted: #6b675f; --line: #e4e1da;
+    --grid: #ecebe7; --axis: #c9c5bc; --ok: #2f7d4f; --bad: #b3412f; --pop: #ffffff;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --serif: Georgia, "Times New Roman", serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1b1a18; --panel: #232220; --fg: #ece9e3; --muted: #a39e94; --line: #3a3833;
+      --grid: #2e2c29; --axis: #4a4741; --ok: #6cc28f; --bad: #e07a66; --pop: #2a2926; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); }
+  .mt { max-width: 1040px; margin: 0 auto; padding: 32px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 32px; }
+  .mt-head { display: grid; gap: 8px; }
+  .mt-title { font-family: var(--serif); font-weight: 400; font-size: 2.2rem; margin: 0; }
+  .mt-lede { margin: 0; color: var(--muted); max-width: 65ch; }
+  .mt-lede b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .mt-tabs { display: inline-flex; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 2px; gap: 2px; justify-self: start; }
+  .mt-tabs button { font: inherit; border: 0; background: transparent; color: var(--muted); padding: 6px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .mt-tabs button[aria-pressed="true"] { background: var(--bg); color: var(--fg); box-shadow: 0 0 0 1px var(--line); }
+  .mt-tabs button:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
+  .mt-tabs i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .mt-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .mt-tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; display: grid; gap: 4px; }
+  .mt-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .mt-big { font-family: var(--serif); font-size: 2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .mt-sub { font-size: 12px; color: var(--muted); }
+  .mt-sec { display: grid; gap: 8px; min-width: 0; }
+  .mt-sec h2 { font-size: 1.15rem; font-weight: 600; margin: 0; }
+  .mt-note { margin: 0; font-size: 13px; color: var(--muted); max-width: 70ch; }
+  .mt-chart { position: relative; min-height: 220px; }
+  .mt-chart svg { display: block; overflow: visible; }
+  .mt-chart .tick text, .mt-txt { fill: var(--muted); font-size: 12px; font-family: var(--sans); }
+  .mt-cell-txt { font-size: 10px; font-family: var(--sans); font-variant-numeric: tabular-nums; pointer-events: none; }
+  .mt-grid line { stroke: var(--grid); }
+  .mt-axis line, .mt-axis path { stroke: var(--axis); }
+  .mt-break { stroke: var(--muted); stroke-dasharray: 4 3; }
+  .mt-empty { fill: none; stroke: var(--line); }
+  .mt-tip { position: absolute; pointer-events: none; z-index: 2; background: var(--pop); border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0,0,0,.12); border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mt-tip-h { color: var(--fg); font-weight: 600; }
+  .mt-key { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .mt-key span { display: inline-flex; align-items: center; gap: 6px; }
+  .mt-ramp { width: 90px; height: 10px; border-radius: 2px; display: inline-block; }
+  .mt-hatch { width: 12px; height: 12px; display: inline-block; border: 1.5px dashed var(--muted); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="mt">
+  <header class="mt-head">
+    <h1 class="mt-title">Home Meters</h1>
+    <p class="mt-lede">Monthly gas, electricity and water use worked out from meter readings. In the 12 months to <b id="h-window">—</b>, <span id="h-name">gas</span> use was <b id="h-last">—</b> units, <b id="h-pct">—</b> compared with the 12 months before.</p>
+  </header>
+
+  <div class="mt-tabs" role="group" aria-label="Meter">
+    <button type="button" data-util="Gas" aria-pressed="true"><i style="background:#E8743B"></i>Gas</button>
+    <button type="button" data-util="Electricity" aria-pressed="false"><i style="background:#C9A227"></i>Electricity</button>
+    <button type="button" data-util="Water" aria-pressed="false"><i style="background:#2E86DE"></i>Water</button>
+  </div>
+
+  <div class="mt-tiles">
+    <div class="mt-tile"><span class="mt-label">Last 12 months</span><span class="mt-big" id="t-last">—</span><span class="mt-sub" id="t-lastw">—</span></div>
+    <div class="mt-tile"><span class="mt-label">12 months before</span><span class="mt-big" id="t-prev">—</span><span class="mt-sub" id="t-prevw">—</span></div>
+    <div class="mt-tile"><span class="mt-label">Change</span><span class="mt-big" id="t-pct">—</span><span class="mt-sub">year on year</span></div>
+  </div>
+
+  <section class="mt-sec">
+    <h2>Every month since 2010</h2>
+    <p class="mt-note">One row per year, one square per month. Darker means more used. Point at a square for the reading behind it.</p>
+    <div class="mt-chart" id="heat"></div>
+  </section>
+
+  <section class="mt-sec">
+    <h2>Total per year</h2>
+    <p class="mt-note">Paler bars are years with months missing, so their totals are short.</p>
+    <div class="mt-chart" id="annual"></div>
+  </section>
+
+  <p class="mt-note">Units are whatever each meter counts in. Gas and electricity meters were replaced at the start of 2018, and the water meter in December 2025; the dashed line marks the change. Gas numbers roughly double after 2018, which fits the old meter counting in hundreds of cubic feet and the new one in cubic metres (1 hundred cubic feet is 2.83 m³). When a reading was skipped, the use between the two readings either side is shared equally across the months in between. Data: <a href="usage.csv">usage.csv</a>.</p>
+</div>
+
+<script>
+const MT = {
+  util: 'Gas',
+  rows: [],
+  colors: { Gas: '#E8743B', Electricity: '#C9A227', Water: '#2E86DE' },
+  breaks: { Gas: '2018-01-01', Electricity: '2018-01-01', Water: '2025-12-01' },
+  num: d3.format(',.0f'),
+  monL: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+};
+const day = (s) => new Date(s + 'T00:00:00Z');
+const has = (r) => r && r.used !== '' && r.used !== null && r.used !== undefined;
+
+function tip(el) {
+  const t = document.createElement('div'); t.className = 'mt-tip'; t.hidden = true; el.appendChild(t);
+  return {
+    show(ev, lines) {
+      t.replaceChildren(...lines.map((l, i) => { const d = document.createElement('div'); d.textContent = l; if (i === 0) d.className = 'mt-tip-h'; return d; }));
+      t.hidden = false;
+      const b = el.getBoundingClientRect();
+      let x = ev.clientX - b.left + 12;
+      if (x + t.offsetWidth > b.width) x = ev.clientX - b.left - t.offsetWidth - 12;
+      t.style.left = Math.max(0, x) + 'px';
+      t.style.top = Math.max(0, ev.clientY - b.top - t.offsetHeight - 10) + 'px';
+    },
+    hide() { t.hidden = true; }
+  };
+}
+
+function rolling(utility) {
+  const lab = d3.utcFormat('%b %Y');
+  const rows = MT.rows.filter((r) => r.utility === utility && has(r));
+  const end = day(rows[rows.length - 1].month);
+  const s1 = d3.utcMonth.offset(end, -12), s2 = d3.utcMonth.offset(end, -24);
+  const sum = (a, b) => d3.sum(rows.filter((r) => day(r.month) > a && day(r.month) <= b), (r) => +r.used);
+  const last12 = Math.round(sum(s1, end)), prev12 = Math.round(sum(s2, s1));
+  const pct = prev12 ? (100 * (last12 - prev12)) / prev12 : 0;
+  return { last12, prev12, pct, pct_fmt: (pct >= 0 ? '+' : '−') + Math.abs(pct).toFixed(1) + '%', to_label: lab(end),
+    last_window: lab(d3.utcMonth.offset(s1, 1)) + ' – ' + lab(end), prev_window: lab(d3.utcMonth.offset(s2, 1)) + ' – ' + lab(s1) };
+}
+
+function annual(utility) {
+  const g = d3.rollup(MT.rows.filter((r) => r.utility === utility && has(r)), (v) => ({ total: Math.round(d3.sum(v, (r) => +r.used)), months: v.length }), (r) => r.month.slice(0, 4));
+  return [...g].map(([year, o]) => ({ year, ...o, complete: o.months === 12 })).sort((a, b) => (a.year < b.year ? -1 : 1));
+}
+
+function drawText() {
+  const r = rolling(MT.util);
+  const set = (id, v) => { document.getElementById(id).textContent = v; };
+  set('h-window', r.to_label); set('h-name', MT.util.toLowerCase()); set('h-last', MT.num(r.last12)); set('h-pct', r.pct_fmt);
+  set('t-last', MT.num(r.last12)); set('t-lastw', r.last_window); set('t-prev', MT.num(r.prev12)); set('t-prevw', r.prev_window); set('t-pct', r.pct_fmt);
+  const c = r.pct <= 0 ? 'var(--ok)' : 'var(--bad)';
+  document.getElementById('h-pct').style.color = c; document.getElementById('t-pct').style.color = c;
+}
+
+function drawHeat() {
+  const el = document.getElementById('heat');
+  const rows = MT.rows.filter((r) => r.utility === MT.util);
+  const by = new Map(rows.map((r) => [r.month, r]));
+  const years = d3.range(+MT.rows[0].month.slice(0, 4), +MT.rows[MT.rows.length - 1].month.slice(0, 4) + 1);
+  el.replaceChildren();
+  const W = Math.max(300, el.clientWidth);
+  const m = { t: 22, r: 4, b: 4, l: 40 };
+  const cw = (W - m.l - m.r) / 12;
+  const ch = Math.max(16, Math.min(26, cw * 0.62));
+  const H = m.t + years.length * ch + m.b;
+  const vals = rows.filter(has).map((r) => +r.used).sort(d3.ascending);
+  const op = d3.scaleLinear([0, d3.quantile(vals, 0.98)], [0.06, 1]).clamp(true);
+  const col = MT.colors[MT.util];
+  const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('width', '100%')
+    .attr('role', 'img').attr('aria-label', `Calendar heatmap of monthly ${MT.util.toLowerCase()} use by year`);
+  svg.append('g').selectAll('text').data(cw > 34 ? MT.monL : MT.monL.map((s) => s[0])).join('text').attr('class', 'mt-txt')
+    .attr('x', (_, i) => m.l + i * cw + cw / 2).attr('y', m.t - 8).attr('text-anchor', 'middle').text((t) => t);
+  svg.append('g').selectAll('text').data(years).join('text').attr('class', 'mt-txt')
+    .attr('x', m.l - 8).attr('y', (_, i) => m.t + i * ch + ch / 2).attr('dy', '0.35em').attr('text-anchor', 'end').text((y) => y);
+  const cells = [];
+  years.forEach((y, yi) => d3.range(12).forEach((mi) => {
+    const key = `${y}-${String(mi + 1).padStart(2, '0')}-01`;
+    cells.push({ y, yi, mi, r: by.get(key) });
+  }));
+  const tp = tip(el);
+  const g = svg.append('g');
+  g.selectAll('rect').data(cells).join('rect')
+    .attr('x', (c) => m.l + c.mi * cw + 1).attr('y', (c) => m.t + c.yi * ch + 1)
+    .attr('width', cw - 2).attr('height', ch - 2).attr('rx', 2)
+    .attr('class', (c) => (has(c.r) ? '' : 'mt-empty'))
+    .style('fill', (c) => (has(c.r) ? col : 'none'))
+    .style('fill-opacity', (c) => (has(c.r) ? op(+c.r.used) : null))
+    .style('stroke', (c) => (has(c.r) && c.r.method !== 'measured' ? 'var(--muted)' : null))
+    .style('stroke-dasharray', (c) => (has(c.r) && c.r.method !== 'measured' ? '3 2' : null))
+    .on('pointermove', (ev, c) => {
+      const head = MT.monL[c.mi] + ' ' + c.y;
+      if (!has(c.r)) return tp.show(ev, [head, 'No figure for this month']);
+      tp.show(ev, [head, MT.util + ': ' + d3.format(',.1~f')(+c.r.used) + ' units',
+        ...(c.r.reading ? ['Meter reading ' + MT.num(+c.r.reading)] : []),
+        c.r.method === 'measured' ? 'From two monthly readings' : c.r.method[0].toUpperCase() + c.r.method.slice(1)]);
+    })
+    .on('pointerleave', () => tp.hide());
+  if (cw >= 26) {
+    g.selectAll('text').data(cells.filter((c) => has(c.r))).join('text').attr('class', 'mt-cell-txt')
+      .attr('x', (c) => m.l + c.mi * cw + cw / 2).attr('y', (c) => m.t + c.yi * ch + ch / 2).attr('dy', '0.35em').attr('text-anchor', 'middle')
+      .style('fill', (c) => (op(+c.r.used) > 0.6 ? '#fff' : 'var(--fg)'))
+      .text((c) => d3.format(',.0f')(+c.r.used));
+  }
+  const bk = MT.breaks[MT.util];
+  const byi = years.indexOf(+bk.slice(0, 4)), bm = +bk.slice(5, 7) - 1;
+  if (byi >= 0) {
+    const x0 = m.l + bm * cw, yTop = m.t + byi * ch;
+    const pts = bm === 0 ? [[m.l, yTop], [W - m.r, yTop]] : [[m.l, yTop + ch], [x0, yTop + ch], [x0, yTop], [W - m.r, yTop]];
+    svg.append('path').attr('class', 'mt-break').style('fill', 'none').attr('d', d3.line()(pts));
+  }
+  const key = document.createElement('div'); key.className = 'mt-key';
+  const k1 = document.createElement('span'); const ramp = document.createElement('i'); ramp.className = 'mt-ramp';
+  ramp.style.background = `linear-gradient(90deg, ${col}10, ${col})`;
+  k1.append(document.createTextNode('less'), ramp, document.createTextNode('more'));
+  const k2 = document.createElement('span'); const h = document.createElement('i'); h.className = 'mt-hatch';
+  k2.append(h, document.createTextNode('shared out over a missed reading'));
+  const k3 = document.createElement('span'); k3.textContent = '- - - new meter';
+  key.append(k1, k2, k3);
+  el.appendChild(key);
+}
+
+function drawAnnual() {
+  const el = document.getElementById('annual');
+  const rows = annual(MT.util);
+  el.replaceChildren();
+  const W = Math.max(300, el.clientWidth), H = 230, m = { t: 18, r: 4, b: 24, l: 44 };
+  const x = d3.scaleBand(rows.map((r) => r.year), [m.l, W - m.r]).padding(0.22);
+  const y = d3.scaleLinear([0, d3.max(rows, (r) => r.total)], [H - m.b, m.t]).nice(4);
+  const col = MT.colors[MT.util];
+  const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('width', '100%')
+    .attr('role', 'img').attr('aria-label', `Bar chart of total ${MT.util.toLowerCase()} use per year`);
+  svg.append('g').attr('class', 'mt-grid').attr('transform', `translate(${m.l},0)`)
+    .call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(d3.format(',.0f'))).call((g) => g.select('.domain').remove());
+  const step = W < 520 ? 2 : 1;
+  svg.append('g').attr('class', 'mt-axis').attr('transform', `translate(0,${H - m.b})`)
+    .call(d3.axisBottom(x).tickValues(rows.map((r) => r.year).filter((_, i) => i % step === 0)).tickFormat((s) => (W < 520 ? "'" + s.slice(2) : s)).tickSizeOuter(0));
+  svg.append('g').selectAll('rect').data(rows).join('rect')
+    .attr('x', (r) => x(r.year)).attr('width', x.bandwidth()).attr('y', (r) => y(r.total)).attr('height', (r) => y(0) - y(r.total)).attr('rx', 2)
+    .style('fill', col).style('fill-opacity', (r) => (r.complete ? 0.9 : 0.3));
+  if (x.bandwidth() > 26) {
+    svg.append('g').selectAll('text').data(rows).join('text').attr('class', 'mt-txt')
+      .attr('x', (r) => x(r.year) + x.bandwidth() / 2).attr('y', (r) => y(r.total) - 4).attr('text-anchor', 'middle')
+      .text((r) => d3.format(',.0f')(r.total));
+  }
+  const bk = MT.breaks[MT.util].slice(0, 4);
+  if (x(bk) !== undefined) {
+    const bx = x(bk) - (x.step() * x.paddingInner()) / 2;
+    svg.append('line').attr('class', 'mt-break').attr('x1', bx).attr('x2', bx).attr('y1', m.t - 10).attr('y2', H - m.b);
+    svg.append('text').attr('class', 'mt-txt').attr('x', bx + 4).attr('y', m.t - 4).text('new meter');
+  }
+  const tp = tip(el);
+  svg.append('g').selectAll('rect').data(rows).join('rect')
+    .attr('x', (r) => x(r.year) - (x.step() * x.paddingInner()) / 2).attr('width', x.step()).attr('y', m.t).attr('height', H - m.t - m.b).style('fill', 'transparent')
+    .on('pointermove', (ev, r) => tp.show(ev, [r.year, MT.util + ': ' + MT.num(r.total) + ' units', r.complete ? 'All 12 months' : r.months + ' of 12 months have a figure']))
+    .on('pointerleave', () => tp.hide());
+}
+
+function drawAll() { drawText(); drawHeat(); drawAnnual(); }
+
+document.querySelectorAll('.mt-tabs button').forEach((b) => {
+  b.addEventListener('click', () => {
+    MT.util = b.getAttribute('data-util');
+    document.querySelectorAll('.mt-tabs button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    drawAll();
+  });
+});
+
+let lastW = 0;
+new ResizeObserver(() => { const w = document.getElementById('heat').clientWidth; if (MT.rows.length && w !== lastW) { lastW = w; drawHeat(); drawAnnual(); } })
+  .observe(document.querySelector('.mt'));
+
+d3.csv('usage.csv').then((rows) => { MT.rows = rows; drawAll(); })
+  .catch(() => { document.getElementById('heat').textContent = 'Could not load usage.csv.'; });
+</script>
+</body>
+</html>
