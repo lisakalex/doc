@@ -1,0 +1,31 @@
+/* 00-interview-answers: one article per lesson; the card table, then the spoken answer. */
+.jump{display:flex;flex-wrap:wrap;gap:.4rem;}
+.jump a{font-family:"IBM Plex Mono",monospace;font-size:.78rem;font-weight:600;text-decoration:none;
+  padding:.22rem .55rem;border:1px solid var(--rule-strong);border-radius:4px;background:var(--surface);color:var(--ink-2);}
+.jump a.done{border-color:var(--good-rule);background:var(--good-soft);color:var(--good);}
+.jump a:hover{border-color:var(--accent);}
+
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:.8rem;}
+.how .card b{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);}
+
+.ia{display:flex;flex-direction:column;gap:.9rem;padding-top:1.6rem;border-top:1px solid var(--rule-strong);scroll-margin-top:1rem;}
+.ia-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:.35rem .8rem;}
+.ia-head .no{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:1rem;color:var(--accent);min-width:2.4rem;}
+.ia-head h3{font-size:1.25rem;}
+.ia-head h3 a{color:var(--ink);text-decoration-color:var(--rule-strong);text-underline-offset:.2em;}
+.ia-head .chip{margin-left:auto;}
+.prompt{font-family:Archivo,"IBM Plex Sans",sans-serif;font-size:1.08rem;font-weight:600;color:var(--ink);
+  border-left:3px solid var(--accent);padding:.15rem 0 .15rem .9rem;max-width:62ch;}
+.cardtab td:first-child{font-weight:600;color:var(--ink);white-space:nowrap;}
+.cardtab td{color:var(--ink-2);}
+
+.ia details{counter-increment:none;}
+.ia summary{padding-left:1.05rem;font-family:"IBM Plex Mono",monospace;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink);}
+.ia summary::before{content:none;}
+.ia summary::after{content:"+";float:right;font-weight:600;}
+.ia details[open] summary::after{content:"−";}
+.ia .answer p{max-width:66ch;font-size:.97rem;line-height:1.66;color:var(--ink);}
+.short{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.55rem;}
+.short li{font-size:.93rem;color:var(--ink-2);max-width:68ch;}
+.short li b{color:var(--ink);}
+.ia .note{font-size:.86rem;}

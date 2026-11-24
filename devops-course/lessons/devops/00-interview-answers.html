@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sixty Seconds</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/00-interview-answers.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+<p class="eyebrow">Interview answers · one per lesson · updated 24 Nov 2026</p>
+<h1>Sixty seconds</h1>
+<p class="lede">Every lesson ends with one interview question, answered out loud in about a minute.
+  This page keeps them all in one place: the question, the card to remember, and a model answer
+  to read before an interview. Each title links back to its lesson.</p>
+<nav class="jump" aria-label="Lessons">
+  <a href="#l0-1">0.1</a><a href="#l0-2">0.2</a><a href="#l0-3">0.3</a><a href="#l0-4">0.4</a><a href="#l0-5">0.5</a>
+  <a href="#l1-1">1.1</a><a href="#l1-2">1.2</a><a href="#l1-3">1.3</a>
+  <a class="done" href="#l1-4">1.4</a><a class="done" href="#l1-5">1.5</a><a href="#l2-1">2.1</a>
+</nav>
+</header>
+
+<section>
+<div class="sec-head">
+  <p class="eyebrow">How to use it</p>
+  <h2>Remember the card, not the words</h2>
+</div>
+<div class="how">
+  <div class="card"><b>Shape</b><p>Problem, then what I did, then <strong>because</strong> (the mechanism), then one failure I know how to find. Interviewers probe the because.</p></div>
+  <div class="card"><b>Card</b><p>Each lesson has a small table: a point, its because, its tool. Learn the rows; the sentences come by themselves when you speak.</p></div>
+  <div class="card"><b>Practise</b><p>Row 1 out loud, then rows 1–2, then 1–3. Cover the card and say it all with a 60-second timer. Look only at the row you got stuck on.</p></div>
+  <div class="card"><b>Cold first</b><p>Where the interview stage is still open, the model answer is folded. Try it cold, then open it. A green lesson number means the stage is done.</p></div>
+</div>
+<p class="note">Say "our production servers", not product names. Keep only the work examples that really happened.</p>
+</section>
+
+<!-- ============ 0.1 ============ -->
+<article class="ia" id="l0-1">
+<div class="ia-head"><span class="no">0.1</span>
+  <h3><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/p0-1-build-once-deploy-many.html">Build Once, Deploy Many</a></h3>
+  <span class="chip imp">open</span></div>
+<p class="prompt">"Your team lead wants the deploy pipeline to rebuild from the tag, because it's the same code. What do you say?"</p>
+<div class="tw"><table class="cardtab"><thead><tr><th>Point</th><th>Because</th><th>Tool / proof</th></tr></thead><tbody>
+<tr><td>Same code ≠ same artifact</td><td>A rebuild re-resolves dependencies (SNAPSHOT), uses that week's JDK and plugins, and stamps new timestamps</td><td>compare SHA-256 of two builds</td></tr>
+<tr><td>Promote the bytes you tested</td><td>Only the promoted jar went through test and UAT</td><td>Artifactory promotion</td></tr>
+<tr><td>Config lives outside</td><td>Identical bytes in every environment, so every difference must be injected at deploy</td><td>env vars, config server</td></tr>
+<tr><td>A tag isn't a version</td><td>Tags can be moved; a digest can't</td><td>deploy <code>image@sha256:…</code></td></tr>
+<tr><td>Rollback has a limit</td><td>The artifact rolls back; the database schema doesn't</td><td>expand, then contract</td></tr>
+</tbody></table></div>
+<details><summary>Model answer · try it cold first</summary><div class="answer">
+<p>"Same code isn't the same artifact. A rebuild re-resolves dependencies, runs on whatever JDK and plugins the agent has that week, and produces bytes nobody has tested. So we'd be shipping to production the one build that skipped test and UAT. Promoting the artifact costs us a repository we already have, and production gets exactly what we verified. That also means the configuration has to live outside the artifact, because the bytes are identical everywhere. With containers it's the same idea, but I'd deploy by digest, not by tag, because a tag can be moved. And I'd keep one caveat in mind: rolling back the jar is easy, but a database migration doesn't roll back with it, so schema changes go in as expand, then contract."</p>
+</div></details>
+<ul class="short">
+<li><b>Two builds of one commit differ. Does it matter?</b> (0.1a) Four causes: a dependency resolved differently, a different JDK patch on the agent, a plugin that pulled a newer version, a generated timestamp. Only the last is bytes-only. The Maven enforcer catches the first and third; a pinned build image and <code>project.build.outputTimestamp</code> close the other two. To find out, diff the unpacked jars and the dependency trees.</li>
+</ul>
+</article>
+
+<!-- ============ 0.2 ============ -->
+<article class="ia" id="l0-2">
+<div class="ia-head"><span class="no">0.2</span>
+  <h3><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/p0-2-jenkins-to-github-actions.html">Jenkins to GitHub Actions</a></h3>
+  <span class="chip imp">open</span></div>
+<p class="prompt">"Have you used GitHub Actions? What changes when you move a Jenkins pipeline to it?"</p>
+<div class="tw"><table class="cardtab"><thead><tr><th>Point</th><th>Because</th><th>Fix</th></tr></thead><tbody>
+<tr><td>Every job is a fresh machine</td><td>Without <code>needs:</code>, jobs run in parallel and share nothing</td><td><code>needs:</code>, upload/download artifact</td></tr>
+<tr><td>A new job can rebuild</td><td>A separate publish job that runs <code>mvn deploy</code> ships untested bytes</td><td>publish the artifact the test job built</td></tr>
+<tr><td>Hosted runners are outside</td><td>They can't reach servers inside our network</td><td>self-hosted runner</td></tr>
+<tr><td>An action is someone else's code</td><td>It runs with your token, and <code>@v2</code> can change under you</td><td>pin to a commit SHA, least <code>permissions:</code></td></tr>
+<tr><td>Approval gate</td><td>Jenkins <code>input</code> becomes an environment with required reviewers</td><td>environments</td></tr>
+</tbody></table></div>
+<details><summary>Model answer · try it cold first</summary><div class="answer">
+<p>"Not in production. I run Jenkins in production, and I use Actions in my own project, so I know what changes when you move. First, every job is a fresh machine, so jobs share nothing and run in parallel unless you chain them with <code>needs</code>. Second, if you split publishing into its own job and it runs <code>mvn deploy</code> again, you've rebuilt the artifact, so it has to pass along the jar that was tested. Third, GitHub's runners are outside our network, so anything that deploys to internal servers needs a self-hosted runner. And fourth, an action is someone else's code running with your token, so I pin it to a commit SHA and give the workflow the least permissions. In my project the workflow reaches AWS with OIDC and holds no stored keys."</p>
+</div></details>
+</article>
+
+<!-- ============ 0.3 ============ -->
+<article class="ia" id="l0-3">
+<div class="ia-head"><span class="no">0.3</span>
+  <h3><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/p0-3-pipeline-secrets-and-oidc.html">Pipeline Secrets and OIDC</a></h3>
+  <span class="chip imp">open</span></div>
+<p class="prompt">"How do you handle secrets in a CI/CD pipeline?"</p>
+<div class="tw"><table class="cardtab"><thead><tr><th>Point</th><th>Because</th><th>Tool / proof</th></tr></thead><tbody>
+<tr><td>Masked isn't safe</td><td>Anyone who can edit the pipeline can print it transformed, or send it out with curl</td><td>branch protection, review</td></tr>
+<tr><td>Secret zero</td><td>A secrets manager still needs a credential to open it; the risk is concentrated, not gone</td><td>Secrets Manager + its key</td></tr>
+<tr><td>Best secret is none</td><td>OIDC: GitHub signs a token, AWS trusts the issuer and hands out credentials for one hour</td><td><code>AssumeRoleWithWebIdentity</code></td></tr>
+<tr><td>The trust policy is the security</td><td>Check <code>aud</code> <em>and</em> <code>sub</code>; without <code>sub</code>, any repo on GitHub can assume the role</td><td><code>repo:owner/name:ref:…</code></td></tr>
+<tr><td>Leaked anyway</td><td>Short-lived, but an hour is enough</td><td>revoke sessions, CloudTrail</td></tr>
+</tbody></table></div>
+<details><summary>Model answer · try it cold first</summary><div class="answer">
+<p>"Masking in the logs isn't real protection, because anyone who can edit the pipeline can print the secret transformed or send it somewhere. Moving it into a secrets manager helps, but you still need a credential to read the manager, so the risk is concentrated, not removed. The better answer is to have no long-lived secret at all. With OIDC, GitHub signs a token for each run, AWS trusts GitHub as an identity provider and gives back credentials that expire within an hour. The whole security model is the role's trust policy: it has to check the audience and the subject, meaning which repository and which branch, otherwise any repository on GitHub could assume the role. In my project the pipeline reaches AWS that way with no stored keys. If those temporary credentials did leak, I'd still revoke the role's sessions, check CloudTrail for what they did, and fix whatever printed them."</p>
+</div></details>
+</article>
+
+<!-- ============ 0.4 ============ -->
+<article class="ia" id="l0-4">
+<div class="ia-head"><span class="no">0.4</span>
+  <h3><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/p0-4-ansible-idempotency-named.html">Ansible Idempotency, Named</a></h3>
+  <span class="chip imp">open</span></div>
+<p class="prompt">"What does idempotent mean in Ansible, and how do you make sure a playbook is?"</p>
+<div class="tw"><table class="cardtab"><thead><tr><th>Point</th><th>Because</th><th>Tool / proof</th></tr></thead><tbody>
+<tr><td>Two meanings</td><td>Same end state, <em>and</em> a second run reports <code>changed=0</code></td><td>run it twice</td></tr>
+<tr><td>Why the report matters</td><td>"changed" fires handlers: a restart on every deploy, and real drift hides in the noise</td><td>handlers</td></tr>
+<tr><td>Shell always says changed</td><td>Ansible can't know what a command did</td><td>use a module</td></tr>
+<tr><td>Four fixes</td><td>module; <code>creates</code>/<code>removes</code> (only checks a file exists); <code>changed_when</code>/<code>failed_when</code>; check, then act</td><td><code>register</code></td></tr>
+<tr><td><code>--check</code> can lie</td><td>Shell tasks are skipped in check mode</td><td>idempotence test in CI</td></tr>
+</tbody></table></div>
+<details><summary>Model answer · try it cold first</summary><div class="answer">
+<p>"Idempotent means two things. Running the playbook again leaves the server in the same state, and, the part people forget, the second run reports nothing changed. That report matters because 'changed' triggers handlers, so a dishonest task restarts the service on every deploy, and a real change gets lost in the noise. Most of it comes from shell and command tasks, which always report changed, because Ansible can't know what the command did. There are four fixes: use a module, use <code>creates</code> or <code>removes</code>, which only check that a file exists, so they miss a version bump, set <code>changed_when</code> from the command's output, or check first and act only if needed. I also don't trust <code>--check</code> on a shell-heavy playbook, because shell tasks are skipped in check mode. So I test it like any behaviour: run it twice in CI and fail if the second run changes anything."</p>
+</div></details>
+</article>
+
+<!-- ============ 0.5 ============ -->
+<article class="ia" id="l0-5">
+<div class="ia-head"><span class="no">0.5</span>
+  <h3><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/p0-5-python-that-survives.html">Python That Survives Leaving Your Laptop</a></h3>
+  <span class="chip imp">open</span></div>
+<p class="prompt">"A Python script works on your laptop but fails on the build agent with 'No module named requests'. Why, and how do you make it reliable?"</p>
+<div class="tw"><table class="cardtab"><thead><tr><th>Point</th><th>Because</th><th>Tool / proof</th></tr></thead><tbody>
+<tr><td>Two Pythons</td><td><code>pip</code> installed into one Python, the script runs with another</td><td><code>python3 -m pip</code>, <code>which -a</code></td></tr>
+<tr><td>A venv is a directory</td><td>Its own site-packages and a <code>python</code> link; no activate needed</td><td><code>.venv/bin/python</code></td></tr>
+<tr><td>A venv can't move</td><td>Absolute paths in its scripts: "bad interpreter"</td><td>rebuild it in place</td></tr>
+<tr><td><code>==</code> pins only the top</td><td>Transitive dependencies drift; <code>pip freeze</code> has no hashes</td><td>lock file, <code>uv sync --locked</code></td></tr>
+<tr><td>The wheel is the artifact</td><td>Build once, install the same wheel; it doesn't carry the lock</td><td>wheel + constraints</td></tr>
+</tbody></table></div>
+<details><summary>Model answer · try it cold first</summary><div class="answer">
+<p>"Usually there are two Pythons on the agent: someone ran <code>pip install</code> for one, and the job runs with another. So I always use <code>python3 -m pip</code>, and better, a virtual environment per job. A venv is just a directory with its own packages and its own <code>python</code>, so the job calls <code>.venv/bin/python</code> directly and doesn't need activate. It can't be copied somewhere else, though, because its scripts contain absolute paths: that's the 'bad interpreter' error. The second problem is drift: pinning <code>requests==2.28.1</code> pins only the top, and its dependencies can change from one year to the next. So I use a lock file with hashes and install with <code>--locked</code> in CI, so a different resolution fails the build. For something we deploy, I build a wheel once and install that same wheel, with the locked versions, on every server: the same build-once rule as for a jar."</p>
+</div></details>
+</article>
+
+<!-- ============ 1.1 ============ -->
+<article class="ia" id="l1-1">
+<div class="ia-head"><span class="no">1.1</span>
+  <h3><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/p1-1-where-the-disk-space-went.html">Where the Disk Space Went</a></h3>
+  <span class="chip imp">open</span></div>
+<p class="prompt">"The disk is 100% full, but du adds up to far less. What's going on, and how do you fix it?"</p>
+<div class="tw"><table class="cardtab"><thead><tr><th>Point</th><th>Because</th><th>Tool / proof</th></tr></thead><tbody>
+<tr><td>Deleted but open</td><td><code>rm</code> removes the name; the inode stays until the last process closes it</td><td><code>lsof +L1</code>, <code>/proc/PID/fd</code></td></tr>
+<tr><td>df vs du</td><td><code>df</code> counts used blocks; <code>du</code> walks names, and the file has none</td><td>both, side by side</td></tr>
+<tr><td>Get it back</td><td>Restart or signal the process, or truncate through its descriptor</td><td><code>: &gt; /proc/PID/fd/N</code></td></tr>
+<tr><td>Rotate properly</td><td>A rename keeps the app writing to the old file; <code>copytruncate</code> can lose lines</td><td><code>create</code> + reload, or app rolling</td></tr>
+<tr><td>Open-file limit</td><td>It's per process; your shell's <code>ulimit</code> isn't the service's</td><td><code>/proc/PID/limits</code></td></tr>
+</tbody></table></div>
+<details><summary>Model answer · try it cold first</summary><div class="answer">
+<p>"That's almost always a file that was deleted while a process still had it open. <code>rm</code> only removes the name. The data stays on disk until the last process closes the file. <code>df</code> counts used blocks, so it still sees it, but <code>du</code> walks the names, and the file no longer has one. I find it with <code>lsof +L1</code>, or by listing <code>/proc/*/fd</code> for 'deleted'. To get the space back, I restart or signal the process, or truncate the file through its descriptor in <code>/proc</code> if I can't restart. Then I fix the cause, which is usually log rotation: if logrotate just renames the file, the app keeps writing to the old one, so it needs <code>create</code> and a reload, or the app does its own rolling. A related trap: 'too many open files' is a per-process limit, so I check <code>/proc/PID/limits</code> for the service, not <code>ulimit</code> in my own shell."</p>
+</div></details>
+</article>
+
+<!-- ============ 1.2 ============ -->
+<article class="ia" id="l1-2">
+<div class="ia-head"><span class="no">1.2</span>
+  <h3><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/p1-2-where-the-memory-went.html">Where the Memory Went</a></h3>
+  <span class="chip imp">open</span></div>
+<p class="prompt">"Monitoring says a server has 3% free memory. Do you need more RAM? And a Java container keeps restarting with exit code 137. What's happening?"</p>
+<div class="tw"><table class="cardtab"><thead><tr><th>Point</th><th>Because</th><th>Tool / proof</th></tr></thead><tbody>
+<tr><td>Free ≠ available</td><td>Spare RAM is used as page cache, and the kernel gives it back on demand</td><td><code>free -m</code>: <em>available</em></td></tr>
+<tr><td>Real pressure</td><td>The kernel drops cache, then swaps, then OOM-kills</td><td><code>vmstat</code> si/so, <code>journalctl -k</code></td></tr>
+<tr><td>137 = 128 + 9</td><td>SIGKILL from the kernel: the cgroup limit was hit. No stack trace, the log stops mid-line</td><td><code>docker inspect</code> OOMKilled</td></tr>
+<tr><td>Heap OOM is different</td><td>Java throws <code>OutOfMemoryError</code> with a stack trace</td><td>the app log</td></tr>
+<tr><td>Size the heap below the limit</td><td>Default heap is 25% of the limit; heap isn't all of Java's memory</td><td><code>-XX:MaxRAMPercentage=75</code></td></tr>
+</tbody></table></div>
+<details><summary>Model answer · try it cold first</summary><div class="answer">
+<p>"Not necessarily. Linux uses spare memory as page cache, and it gives it back as soon as a program needs it, so 'free' is always low on a healthy server. The number to look at is 'available' in <code>free -m</code>. Real pressure shows as swapping in <code>vmstat</code>, or OOM kills in the kernel log, because under pressure the kernel drops cache first, then swaps, then kills the process with the highest OOM score. Exit code 137 is 128 plus 9, SIGKILL: the container went over its memory limit and the kernel killed it, which is why the log stops mid-line with no exception. That's different from Java's own <code>OutOfMemoryError</code>, which leaves a stack trace. The fix is sizing: by default Java takes a quarter of the limit for the heap, and setting <code>-Xmx</code> equal to the limit gets you killed, because Java needs memory outside the heap too. In my project I run it with the heap at 75% of a 512 MB limit, and I tested that a 64 MB limit gets killed with 137."</p>
+</div></details>
+</article>
+
+<!-- ============ 1.3 ============ -->
+<article class="ia" id="l1-3">
+<div class="ia-head"><span class="no">1.3</span>
+  <h3><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/p1-3-the-job-nobody-saw-fail.html">The Job Nobody Saw Fail</a></h3>
+  <span class="chip imp">open</span></div>
+<p class="prompt">"A nightly job runs fine by hand but fails from cron, and nobody notices. Why, and how would you run it instead?"</p>
+<div class="tw"><table class="cardtab"><thead><tr><th>Point</th><th>Because</th><th>Tool / proof</th></tr></thead><tbody>
+<tr><td>A different environment</td><td>cron doesn't read <code>.bashrc</code>: minimal <code>PATH</code>, different directory</td><td>full paths, set <code>PATH</code></td></tr>
+<tr><td>Silent</td><td>Output goes to local mail that nobody reads</td><td>journald</td></tr>
+<tr><td>Timer + service</td><td>Output in the journal; <code>Persistent=true</code> runs a missed job after boot; <code>OnFailure=</code> alerts</td><td><code>systemctl list-timers</code></td></tr>
+<tr><td>Restart loop</td><td>"Start request repeated too quickly": the start limit was hit; the real error is earlier</td><td><code>journalctl -u</code>, <code>reset-failed</code></td></tr>
+<tr><td>Never edit the vendor unit</td><td>An upgrade overwrites it; a drop-in survives</td><td><code>systemctl edit</code>, <code>systemctl show</code></td></tr>
+</tbody></table></div>
+<details><summary>Model answer · try it cold first</summary><div class="answer">
+<p>"Two reasons. Cron runs the script with a minimal environment: it doesn't read <code>.bashrc</code>, so the <code>PATH</code> is short and the working directory is different, and a command that works in my terminal isn't found. And it's silent, because cron mails the output to a local mailbox nobody reads. I'd move it to a systemd timer with a service. Then the output goes to the journal, so <code>journalctl -u</code> shows exactly what failed, <code>Persistent=true</code> runs a missed job after the server comes back from patching, where cron would just skip it, and <code>OnFailure=</code> starts an alert unit when it fails. The same goes for long-running services started with nohup: under systemd they get restarts, limits like <code>LimitNOFILE</code> and <code>MemoryMax</code>, and logs, and I change vendor units only with a drop-in, so an upgrade doesn't overwrite it. In my project the service is restarted within five seconds after a <code>kill -9</code>."</p>
+</div></details>
+</article>
+
+<!-- ============ 1.4 ============ -->
+<article class="ia" id="l1-4">
+<div class="ia-head"><span class="no">1.4</span>
+  <h3><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/p1-4-running-but-unreachable.html">Running but Unreachable</a></h3>
+  <span class="chip ok">done · ¾ cold, 22 Nov</span></div>
+<p class="prompt">"A service is running, but users can't reach it. Walk me through how you'd debug it."</p>
+<div class="tw"><table class="cardtab"><thead><tr><th>The user sees</th><th>It means, because</th><th>I run</th></tr></thead><tbody>
+<tr><td>Slow, 5 s, then works</td><td>DNS: the first nameserver is dead; the resolver waits 5 s, then tries the next</td><td><code>getent hosts</code>, <code>/etc/resolv.conf</code></td></tr>
+<tr><td>Refused, at once</td><td>The machine answered, but nothing listens on that address and port (often bound to 127.0.0.1)</td><td><code>ss -ltnp</code> on the server</td></tr>
+<tr><td>Timed out</td><td>Nothing answered: the packets were dropped on the way</td><td>security group, firewall, <code>ip route get</code></td></tr>
+<tr><td>PKIX path building failed</td><td>Java trusts its own <code>cacerts</code>, not the system's</td><td><code>keytool -importcert</code>, restart</td></tr>
+</tbody></table></div>
+<details open><summary>Model answer</summary><div class="answer">
+<p>"I start from the error message, because it tells me which step failed: the name, the route, the connection or TLS. If every call takes just over five seconds and then works, that's DNS: the first nameserver is dead, so the resolver waits five seconds for it, then asks the next one. I prove it with <code>getent hosts</code>, not <code>dig</code>, because <code>getent</code> reads <code>/etc/hosts</code> first, the same way the app does. If I get 'connection refused' straight away, the machine answered, so the network is fine, but nothing is listening on that address and port. I run <code>ss -ltnp</code> on the server; often the app is bound to 127.0.0.1, so curl on the server works and everyone else is refused. If it times out, nothing answered at all: the packets were dropped, so I check the security group, the firewall and whether the IP is right. And if curl works but Java fails with PKIX, Java trusts its own <code>cacerts</code> file, not the system's, so I import the CA with <code>keytool</code> and restart the app. On our production servers I found that every server used one upstream DNS server, so that's the first thing I'd check there."</p>
+</div></details>
+<ul class="short">
+<li><b>dig shows the new IP, the app uses the old one. Two reasons?</b> An old line in <code>/etc/hosts</code> wins, because nsswitch checks <code>files</code> before <code>dns</code>, and dig skips it. And the JVM caches lookups (30 s by default, forever with <code>networkaddress.cache.ttl=-1</code>), while connection pools keep old TCP connections. A restart clears both.</li>
+</ul>
+</article>
+
+<!-- ============ 1.5 ============ -->
+<article class="ia" id="l1-5">
+<div class="ia-head"><span class="no">1.5</span>
+  <h3><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/p1-5-the-file-root-left-behind.html">The File Root Left Behind</a></h3>
+  <span class="chip ok">done · ¾ cold, 22 Nov</span></div>
+<p class="prompt">"How would you run a service on Linux so that a bug in it can't damage the box?"</p>
+<div class="tw"><table class="cardtab"><thead><tr><th>Point</th><th>Because</th><th>Where</th></tr></thead><tbody>
+<tr><td>Its own system user, no shell</td><td>Whatever its user can do, a bug can do</td><td><code>useradd --system</code></td></tr>
+<tr><td>Code owned by root, 644</td><td>The kernel checks owner, then group, then other; the service is <em>other</em>: read, no write</td><td><code>/opt/…/app.jar</code></td></tr>
+<tr><td>One writable place</td><td>Only its log directory, created by systemd</td><td><code>LogsDirectory=</code></td></tr>
+<tr><td>Private logs</td><td>New files lose all bits for other</td><td><code>UMask=0027</code></td></tr>
+<tr><td>No root for the port</td><td>Ports above 1024 need no privilege</td><td>8081</td></tr>
+<tr><td>Failure I can find</td><td>A log recreated by root: the app runs, health is green, nothing is logged</td><td>journal: "Permission denied"</td></tr>
+</tbody></table></div>
+<details open><summary>Model answer</summary><div class="answer">
+<p>"If a service runs as root or a normal user, any bug in it can do whatever that user can, so I give it the least it needs. In my project I created a system user for the service, with no login shell, so nobody can log in as it. The code is owned by root, in <code>/opt</code>, with mode 644, so the service can read its jar but can't change it. The only place it can write is its log directory, which systemd creates for it, and I set <code>UMask=0027</code>, so its log files aren't readable by everyone. It listens on port 8081, above 1024, so it never needs root. This works because the kernel checks owner, then group, then other, and the first match decides; for its own code, the service is <em>other</em>, which has read but no write. One failure I tested: if someone recreates the log as root, the app keeps running and health checks stay green, but nothing gets logged. The journal shows 'Permission denied'. I remove the file and restart."</p>
+</div></details>
+</article>
+
+<!-- ============ 2.1 ============ -->
+<article class="ia" id="l2-1">
+<div class="ia-head"><span class="no">2.1</span>
+  <h3><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/p2-1-ten-containers-one-image.html">Ten Containers, One Image</a></h3>
+  <span class="chip imp">open · Thu 26 Nov</span></div>
+<p class="prompt">"What's actually in a Docker image, and what happens on disk when you start ten containers from it?"</p>
+<div class="tw"><table class="cardtab"><thead><tr><th>Point</th><th>Because</th><th>Tool / proof</th></tr></thead><tbody>
+<tr><td>Read-only layers</td><td>One per build step that changes the filesystem, named by hash, shared between images</td><td><code>docker history</code></td></tr>
+<tr><td>One writable layer each</td><td>OverlayFS merges lower (image) and upper (container) into the container's <code>/</code></td><td><code>docker ps -s</code></td></tr>
+<tr><td>Copy-up</td><td>The first write to an image file copies the whole file up</td><td>own size vs virtual</td></tr>
+<tr><td><code>RUN rm</code> doesn't shrink</td><td>A later layer only adds a whiteout; the file, or a secret, still ships</td><td><code>&amp;&amp;</code> in one RUN, <code>--mount=type=secret</code></td></tr>
+<tr><td>Container files die with it</td><td>The writable layer goes on <code>docker rm</code></td><td>volumes, logs to stdout</td></tr>
+</tbody></table></div>
+<details><summary>Model answer · try it cold first</summary><div class="answer">
+<p>"An image is a stack of read-only layers, one for each build step that changes the filesystem. Each layer is named by its hash, so images built on the same base share those layers on disk. When a container starts, Docker adds one thin writable layer on top, and OverlayFS merges them into the container's root filesystem. Reads come from the top-most layer that has the file; the first write to a file from the image copies the whole file up into the writable layer. So ten containers from one image cost one copy of the image plus ten small writable layers. Two things follow that people get wrong. A <code>RUN rm</code> in a later line only adds a whiteout, so the file, or a secret, still ships and can be read back with <code>docker save</code>; you clean up in the same RUN, or pass secrets with a secret mount. And anything a container writes, logs included, lives in its writable layer and is deleted with the container, unless it goes to a volume or to stdout. In my project I put our Java service into an image on Temurin 21, running as a system user, UID 999, logging to stdout, with the heap at 75% of the container's memory limit."</p>
+</div></details>
+<ul class="short">
+<li><b>Why does <code>RUN rm /big</code> not make the image smaller?</b> Each RUN line becomes a read-only layer when it finishes. A delete in a later layer only adds a whiteout, so the file still ships. To keep it out, create and remove it in the same RUN with <code>&amp;&amp;</code>; that's why you clean up apt caches in the same RUN as the install.</li>
+<li><b>Why a container instead of a systemd service?</b> A systemd service needs the server prepared: the runtime, the user, the paths. An image carries all of that, so the same artifact runs identically on a laptop, in CI and in production, rollback is just the previous tag, and it's what Kubernetes needs. It's not a VM, though: it shares the kernel, so I still run it as non-root.</li>
+<li><b>Why UID 999?</b> <code>useradd --system</code> picks from the system range in <code>/etc/login.defs</code>, counting down from 999. The kernel only cares whether the UID is 0; names come from each machine's own <code>/etc/passwd</code>, so on the host the same 999 can show as a different user.</li>
+<li><b>Two services on port 8081, no clash?</b> The container's port is in its own network namespace; only the host side of <code>-p</code> can clash. I'd check with <code>ss -ltn</code> on the host, and publish on 127.0.0.1 unless it really must be reachable, because Docker's rules bypass ufw.</li>
+</ul>
+</article>
+
+<footer>
+<p>New answers are added after each lesson's interview stage. Model answers are checked against the lesson pages; the
+  examples from work are kept general on purpose.</p>
+<p><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/00-course-progress.html">Course progress</a> · <a href="https://lisakalex.github.io/doc/devops-course/lessons/index.html">All lessons</a></p>
+</footer>
+
+</div>
+</body>
+</html>
