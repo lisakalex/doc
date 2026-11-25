@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Log</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<style>
+  :root {
+    --bg: #fbfaf8; --panel: #ffffff; --fg: #1f1e1c; --muted: #6b675f; --line: #e4e1da;
+    --grid: #ecebe7; --axis: #c9c5bc; --ok: #2f7d4f; --warn: #b3412f; --pop: #ffffff;
+    --c1: #2a6fdb; --c2: #d9822b; --c3: #2f9e75; --c4: #a855c7; --c5: #c94f6d; --cm: #c9c5bc;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --serif: Georgia, "Times New Roman", serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1b1a18; --panel: #232220; --fg: #ece9e3; --muted: #a39e94; --line: #3a3833;
+      --grid: #2e2c29; --axis: #4a4741; --ok: #6cc28f; --warn: #e07a66; --pop: #2a2926;
+      --c1: #6aa0f5; --c2: #eba25a; --c3: #5cc49c; --c4: #c58ae0; --c5: #e47f97; --cm: #57534c; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); }
+  .dl { max-width: 1040px; margin: 0 auto; padding: 32px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 32px; }
+  .dl-head { display: grid; gap: 8px; }
+  .dl-title { font-family: var(--serif); font-weight: 400; font-size: 2.2rem; margin: 0; }
+  .dl-lede { margin: 0; color: var(--muted); max-width: 65ch; }
+  .dl-lede b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .dl-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .dl-tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; display: grid; gap: 4px; align-content: start; }
+  .dl-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .dl-big { font-family: var(--serif); font-size: 2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .dl-sub { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .dl-pill { font-size: 12px; padding: 0 8px; border-radius: 999px; border: 1px solid currentColor; }
+  .dl-pill.ok { color: var(--ok); } .dl-pill.warn { color: var(--warn); }
+  .dl-sec { display: grid; gap: 8px; min-width: 0; }
+  .dl-sec h2 { font-size: 1.15rem; font-weight: 600; margin: 0; }
+  .dl-note { margin: 0; font-size: 13px; color: var(--muted); max-width: 70ch; }
+  .dl-chart { position: relative; min-height: 220px; }
+  .dl-chart svg { display: block; overflow: visible; }
+  .dl-chart .tick text, .dl-txt { fill: var(--muted); font-size: 12px; font-family: var(--sans); }
+  .dl-grid line { stroke: var(--grid); }
+  .dl-axis line, .dl-axis path { stroke: var(--axis); }
+  .dl-ref { stroke: var(--muted); stroke-dasharray: 4 3; }
+  .dl-tip { position: absolute; pointer-events: none; z-index: 2; background: var(--pop); border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0,0,0,.12); border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .dl-tip-h { color: var(--fg); font-weight: 600; }
+  .dl-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .dl-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dl-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .dl-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px; }
+  .dl-cats { display: grid; gap: 6px; }
+  .dl-cat { display: grid; grid-template-columns: minmax(0, 11rem) 1fr auto; gap: 8px; align-items: center; font-size: 13px; }
+  .dl-cat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dl-cat-track { height: 12px; }
+  .dl-cat-bar { height: 100%; border-radius: 2px; }
+  .dl-cat-val { font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; min-width: 4.5rem; }
+  footer { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="dl">
+  <header class="dl-head">
+    <h1 class="dl-title">Daily Log</h1>
+    <p class="dl-lede">On <b id="s-date">—</b> I studied <b id="s-study">—</b> against a 2h daily goal. This week so far: <b id="s-week">—</b> of the 14h weekly goal.</p>
+  </header>
+
+  <div class="dl-tiles">
+    <div class="dl-tile">
+      <span class="dl-label">Study, last logged day</span>
+      <span class="dl-big" id="t-study">—</span>
+      <span class="dl-sub"><span id="t-date">—</span><span class="dl-pill ok" id="p-met" hidden>Goal met</span><span class="dl-pill warn" id="p-miss" hidden>Below 2h goal</span></span>
+    </div>
+    <div class="dl-tile">
+      <span class="dl-label">This week</span>
+      <span class="dl-big" id="t-week">—</span>
+      <span class="dl-sub">of 14h goal · week of <span id="t-weekof">—</span></span>
+    </div>
+    <div class="dl-tile">
+      <span class="dl-label">Days at 2h goal</span>
+      <span class="dl-big" id="t-goaldays">—</span>
+      <span class="dl-sub">of <span id="t-logged">—</span> logged days</span>
+    </div>
+    <div class="dl-tile">
+      <span class="dl-label">Total study</span>
+      <span class="dl-big" id="t-total">—</span>
+      <span class="dl-sub">since <span id="t-since">—</span></span>
+    </div>
+  </div>
+
+  <section class="dl-sec">
+    <h2>Study time per day</h2>
+    <p class="dl-note">Filled bars met the 2h goal. Days with no log count as zero.</p>
+    <div class="dl-chart" id="daily"></div>
+  </section>
+
+  <div class="dl-two">
+    <section class="dl-sec">
+      <h2>Study time per week</h2>
+      <p class="dl-note">Monday to Sunday, against the 14h weekly goal. The latest week may still be in progress.</p>
+      <div class="dl-chart" id="weekly"></div>
+    </section>
+    <section class="dl-sec">
+      <h2>Where the time went</h2>
+      <p class="dl-note">Total active time by category across all logged days.</p>
+      <div class="dl-cats" id="cats"></div>
+    </section>
+  </div>
+
+  <section class="dl-sec">
+    <h2>Daily time by category</h2>
+    <p class="dl-note">Active time at the computer each day, split by category. The five largest categories are shown on their own.</p>
+    <div class="dl-chart" id="mix"></div>
+  </section>
+
+  <footer id="foot">Updated automatically from the daily log.</footer>
+</div>
+
+<script>
+const DAILY_GOAL = 120, WEEKLY_GOAL = 840;
+const PAL = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)'];
+const fmt = (m) => { m = Math.round(m); const h = Math.floor(m / 60), r = m % 60; return h ? h + 'h ' + String(r).padStart(2, '0') + 'm' : r + 'm'; };
+const day = (s) => new Date(s + 'T00:00:00Z');
+const iso = d3.utcFormat('%Y-%m-%d');
+const dShort = d3.utcFormat('%-d %b'), dLong = d3.utcFormat('%a %-d %b');
+const $ = (id) => document.getElementById(id);
+
+function tip(el) {
+  const t = document.createElement('div'); t.className = 'dl-tip'; t.hidden = true; el.appendChild(t);
+  return {
+    show(ev, lines) {
+      t.replaceChildren(...lines.map((l, i) => { const d = document.createElement('div'); d.textContent = l; if (!i) d.className = 'dl-tip-h'; return d; }));
+      t.hidden = false;
+      const r = el.getBoundingClientRect();
+      let x = ev.clientX - r.left + 12;
+      const y = Math.max(0, ev.clientY - r.top - t.offsetHeight - 8);
+      if (x + t.offsetWidth > r.width) x = Math.max(0, ev.clientX - r.left - t.offsetWidth - 12);
+      t.style.left = x + 'px'; t.style.top = y + 'px';
+    },
+    hide() { t.hidden = true; }
+  };
+}
+
+function svgFor(el, W, H, label) {
+  return d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('width', '100%').attr('role', 'img').attr('aria-label', label);
+}
+
+let DAYS = [], CATS = [];
+
+function prepare(rows) {
+  rows.sort((a, b) => (a.date < b.date ? -1 : 1));
+  const by = new Map(rows.map((r) => [r.date, r]));
+  const first = day(rows[0].date), last = day(rows[rows.length - 1].date);
+  DAYS = d3.utcDay.range(first, d3.utcDay.offset(last, 1)).map((t) => {
+    const k = iso(t), r = by.get(k);
+    const cats = {};
+    if (r && r.categories) r.categories.split(';').forEach((p) => { const i = p.lastIndexOf('='); if (i > 0) cats[p.slice(0, i)] = +p.slice(i + 1) || 0; });
+    return { date: k, t, study: r ? +r.study_min : 0, active: r ? +r.active_min : 0, missing: !r, cats };
+  });
+}
+
+function summary(rows) {
+  const last = rows[rows.length - 1];
+  const monday = d3.utcMonday.floor(day(last.date));
+  const week = d3.sum(rows.filter((r) => day(r.date) >= monday), (r) => +r.study_min);
+  const total = d3.sum(rows, (r) => +r.study_min);
+  const met = +last.study_min >= DAILY_GOAL;
+  $('s-date').textContent = $('t-date').textContent = dLong(day(last.date));
+  $('s-study').textContent = $('t-study').textContent = fmt(+last.study_min);
+  $('s-week').textContent = $('t-week').textContent = fmt(week);
+  $('t-weekof').textContent = dShort(monday);
+  $('t-goaldays').textContent = rows.filter((r) => +r.study_min >= DAILY_GOAL).length;
+  $('t-logged').textContent = rows.length;
+  $('t-total').textContent = fmt(total);
+  $('t-since').textContent = dShort(day(rows[0].date));
+  $('p-met').hidden = !met; $('p-miss').hidden = met;
+  $('foot').textContent = 'Updated automatically from the daily log. Last logged day: ' + last.date + '.';
+}
+
+function mondayTicks(W) {
+  const mondays = DAYS.filter((v) => v.t.getUTCDay() === 1).map((v) => v.date);
+  const step = W < 480 ? 2 : 1;
+  return mondays.filter((_, i) => i % step === 0);
+}
+
+function drawDaily() {
+  const el = $('daily'); el.replaceChildren();
+  const W = Math.max(280, el.clientWidth), H = 240, m = { t: 14, r: 8, b: 26, l: 30 };
+  const x = d3.scaleBand(DAYS.map((v) => v.date), [m.l, W - m.r]).padding(0.2);
+  const yMax = Math.ceil(Math.max(DAILY_GOAL * 2, d3.max(DAYS, (v) => v.study)) / 60) * 60;
+  const y = d3.scaleLinear([0, yMax], [H - m.b, m.t]);
+  const svg = svgFor(el, W, H, 'Bar chart of study time per day against the 2 hour daily goal');
+  svg.append('g').attr('class', 'dl-grid').attr('transform', `translate(${m.l},0)`)
+    .call(d3.axisLeft(y).tickValues(d3.range(0, yMax + 1, yMax > 360 ? 120 : 60)).tickSize(-(W - m.l - m.r)).tickFormat((v) => v / 60 + 'h'))
+    .call((g) => g.select('.domain').remove());
+  svg.append('g').attr('class', 'dl-axis').attr('transform', `translate(0,${H - m.b})`)
+    .call(d3.axisBottom(x).tickValues(mondayTicks(W)).tickFormat((s) => dShort(day(s))).tickSizeOuter(0));
+  svg.append('g').selectAll('rect').data(DAYS).join('rect')
+    .attr('x', (v) => x(v.date)).attr('width', x.bandwidth())
+    .attr('y', (v) => y(v.study)).attr('height', (v) => y(0) - y(v.study)).attr('rx', 1.5)
+    .style('fill', (v) => (v.study >= DAILY_GOAL ? 'var(--c1)' : 'var(--cm)'));
+  svg.append('line').attr('class', 'dl-ref').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(DAILY_GOAL)).attr('y2', y(DAILY_GOAL));
+  svg.append('text').attr('class', 'dl-txt').attr('x', W - m.r).attr('y', y(DAILY_GOAL) - 4).attr('text-anchor', 'end').text('2h goal');
+  const tp = tip(el);
+  svg.append('g').selectAll('rect').data(DAYS).join('rect')
+    .attr('x', (v) => x(v.date) - (x.step() * x.paddingInner()) / 2).attr('width', x.step())
+    .attr('y', m.t).attr('height', H - m.t - m.b).style('fill', 'transparent')
+    .on('pointermove', (ev, v) => tp.show(ev, v.missing ? [dLong(v.t), 'No log for this day']
+      : [dLong(v.t), 'Study ' + fmt(v.study) + (v.study >= DAILY_GOAL ? ' · goal met' : ''), 'Active ' + fmt(v.active)]))
+    .on('pointerleave', () => tp.hide());
+}
+
+function drawWeekly() {
+  const el = $('weekly'); el.replaceChildren();
+  const roll = d3.rollup(DAYS, (v) => ({ study_min: d3.sum(v, (r) => r.study), days_logged: v.filter((r) => !r.missing).length }), (r) => iso(d3.utcMonday.floor(r.t)));
+  const rows = [...roll].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([week, o]) => ({ week, ...o }));
+  const W = Math.max(260, el.clientWidth), H = 240, m = { t: 14, r: 8, b: 26, l: 34 };
+  const x = d3.scaleBand(rows.map((r) => r.week), [m.l, W - m.r]).padding(0.25);
+  const yMax = Math.ceil(Math.max(WEEKLY_GOAL, d3.max(rows, (r) => r.study_min)) / 240) * 240;
+  const y = d3.scaleLinear([0, yMax], [H - m.b, m.t]);
+  const svg = svgFor(el, W, H, 'Bar chart of study time per week against the 14 hour weekly goal');
+  svg.append('g').attr('class', 'dl-grid').attr('transform', `translate(${m.l},0)`)
+    .call(d3.axisLeft(y).tickValues(d3.range(0, yMax + 1, 240)).tickSize(-(W - m.l - m.r)).tickFormat((v) => v / 60 + 'h'))
+    .call((g) => g.select('.domain').remove());
+  const every = Math.ceil(rows.length / Math.max(1, Math.floor((W - m.l) / 52)));
+  svg.append('g').attr('class', 'dl-axis').attr('transform', `translate(0,${H - m.b})`)
+    .call(d3.axisBottom(x).tickValues(rows.map((r) => r.week).filter((_, i) => i % every === 0)).tickFormat((s) => dShort(day(s))).tickSizeOuter(0));
+  svg.append('g').selectAll('rect').data(rows).join('rect')
+    .attr('x', (r) => x(r.week)).attr('width', x.bandwidth())
+    .attr('y', (r) => y(r.study_min)).attr('height', (r) => y(0) - y(r.study_min)).attr('rx', 2)
+    .style('fill', (r) => (r.study_min >= WEEKLY_GOAL ? 'var(--c1)' : 'var(--cm)'));
+  if (x.bandwidth() > 22) svg.append('g').selectAll('text').data(rows).join('text').attr('class', 'dl-txt')
+    .attr('x', (r) => x(r.week) + x.bandwidth() / 2).attr('y', (r) => y(r.study_min) - 4).attr('text-anchor', 'middle')
+    .text((r) => (x.bandwidth() > 34 ? fmt(r.study_min).replace(/ 00m$/, '') : Math.round(r.study_min / 60) + 'h'));
+  svg.append('line').attr('class', 'dl-ref').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(WEEKLY_GOAL)).attr('y2', y(WEEKLY_GOAL));
+  svg.append('text').attr('class', 'dl-txt').attr('x', m.l + 4).attr('y', y(WEEKLY_GOAL) - 4).text('14h goal');
+  const tp = tip(el);
+  svg.append('g').selectAll('rect').data(rows).join('rect')
+    .attr('x', (r) => x(r.week) - (x.step() * x.paddingInner()) / 2).attr('width', x.step())
+    .attr('y', m.t).attr('height', H - m.t - m.b).style('fill', 'transparent')
+    .on('pointermove', (ev, r) => tp.show(ev, ['Week of ' + dShort(day(r.week)), 'Study ' + fmt(r.study_min) + ' of 14h', r.days_logged + ' of 7 days logged']))
+    .on('pointerleave', () => tp.hide());
+}
+
+function catTotals() {
+  const sums = new Map();
+  DAYS.forEach((d) => Object.entries(d.cats).forEach(([c, v]) => sums.set(c, (sums.get(c) || 0) + v)));
+  return [...sums].map(([category, minutes]) => ({ category, minutes })).filter((r) => r.minutes > 0).sort((a, b) => b.minutes - a.minutes);
+}
+
+function drawCats() {
+  const el = $('cats');
+  const data = catTotals();
+  const max = d3.max(data, (r) => r.minutes);
+  el.replaceChildren(...data.map((r) => {
+    const row = document.createElement('div'); row.className = 'dl-cat';
+    const name = document.createElement('span'); name.className = 'dl-cat-name'; name.textContent = r.category; name.title = r.category;
+    const track = document.createElement('div'); track.className = 'dl-cat-track';
+    const bar = document.createElement('div'); bar.className = 'dl-cat-bar';
+    bar.style.width = (100 * r.minutes / max) + '%';
+    bar.style.background = /Other|unattributed/.test(r.category) ? 'var(--cm)' : (r.category === 'DevOps course' ? 'var(--c1)' : 'var(--c2)');
+    track.appendChild(bar);
+    const val = document.createElement('span'); val.className = 'dl-cat-val'; val.textContent = fmt(r.minutes);
+    row.append(name, track, val);
+    return row;
+  }));
+}
+
+function drawMix() {
+  const el = $('mix'); el.replaceChildren();
+  const top = catTotals().filter((r) => !/^Other$|unattributed/.test(r.category)).slice(0, 5).map((r) => r.category);
+  const keys = [...top, 'Everything else'];
+  const days = DAYS.map((d) => {
+    const o = { date: d.date, t: d.t }; keys.forEach((k) => (o[k] = 0));
+    Object.entries(d.cats).forEach(([c, v]) => { o[top.includes(c) ? c : 'Everything else'] += v; });
+    return o;
+  });
+  const series = d3.stack().keys(keys)(days);
+  const color = (k, i) => (k === 'Everything else' ? 'var(--cm)' : PAL[i % PAL.length]);
+  const W = Math.max(280, el.clientWidth), H = 260, m = { t: 14, r: 8, b: 26, l: 30 };
+  const x = d3.scaleBand(days.map((o) => o.date), [m.l, W - m.r]).padding(0.2);
+  const yMax = Math.max(60, Math.ceil(d3.max(series[series.length - 1], (p) => p[1]) / 60) * 60);
+  const y = d3.scaleLinear([0, yMax], [H - m.b, m.t]);
+  const svg = svgFor(el, W, H, 'Stacked bar chart of active time per day by category');
+  svg.append('g').attr('class', 'dl-grid').attr('transform', `translate(${m.l},0)`)
+    .call(d3.axisLeft(y).tickValues(d3.range(0, yMax + 1, yMax > 360 ? 120 : 60)).tickSize(-(W - m.l - m.r)).tickFormat((v) => v / 60 + 'h'))
+    .call((g) => g.select('.domain').remove());
+  svg.append('g').attr('class', 'dl-axis').attr('transform', `translate(0,${H - m.b})`)
+    .call(d3.axisBottom(x).tickValues(mondayTicks(W)).tickFormat((s) => dShort(day(s))).tickSizeOuter(0));
+  svg.append('g').selectAll('g').data(series).join('g').style('fill', (s, i) => color(s.key, i))
+    .selectAll('rect').data((s) => s).join('rect')
+    .attr('x', (p) => x(p.data.date)).attr('width', x.bandwidth())
+    .attr('y', (p) => y(p[1])).attr('height', (p) => y(p[0]) - y(p[1]));
+  const tp = tip(el);
+  svg.append('g').selectAll('rect').data(days).join('rect')
+    .attr('x', (o) => x(o.date) - (x.step() * x.paddingInner()) / 2).attr('width', x.step())
+    .attr('y', m.t).attr('height', H - m.t - m.b).style('fill', 'transparent')
+    .on('pointermove', (ev, o) => {
+      const parts = keys.filter((k) => o[k] > 0).map((k) => k + ': ' + fmt(o[k]));
+      tp.show(ev, [dLong(o.t), ...(parts.length ? parts : ['No log for this day'])]);
+    })
+    .on('pointerleave', () => tp.hide());
+  const legend = document.createElement('div'); legend.className = 'dl-legend';
+  keys.forEach((k, i) => {
+    const s = document.createElement('span'); const sw = document.createElement('i');
+    sw.style.background = color(k, i); s.append(sw, document.createTextNode(k)); legend.appendChild(s);
+  });
+  el.appendChild(legend);
+}
+
+function drawAll() { drawDaily(); drawWeekly(); drawCats(); drawMix(); }
+
+d3.csv('study.csv?v=' + Date.now()).then((rows) => {
+  rows = rows.filter((r) => r.date);
+  if (!rows.length) throw new Error('empty');
+  rows.sort((a, b) => (a.date < b.date ? -1 : 1));
+  prepare(rows); summary(rows); drawAll();
+  let w = 0;
+  new ResizeObserver(() => { const nw = document.body.clientWidth; if (nw !== w) { w = nw; drawAll(); } }).observe(document.body);
+}).catch(() => { $('daily').textContent = 'Could not load study.csv.'; });
+</script>
+</body>
+</html>
