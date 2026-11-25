@@ -88,6 +88,7 @@ TEMPLATE = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <title>Site map</title>
 <style>
 /* One column of folders; each folder is a collapsible list of pages. */
