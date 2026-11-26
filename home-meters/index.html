@@ -57,7 +57,7 @@
 <div class="mt">
   <header class="mt-head">
     <h1 class="mt-title">Home Meters</h1>
-    <p class="mt-lede">Monthly gas, electricity and water use worked out from meter readings. In the 12 months to <b id="h-window">—</b>, <span id="h-name">gas</span> use was <b id="h-last">—</b> units, <b id="h-pct">—</b> compared with the 12 months before.</p>
+    <p class="mt-lede">Monthly gas, electricity and water use worked out from meter readings. In the 12 months to <b id="h-window">—</b>, <span id="h-name">gas</span> use was <b id="h-last">—</b> <span id="h-unit">units</span>, <b id="h-pct">—</b> compared with the 12 months before.</p>
   </header>
 
   <div class="mt-tabs" role="group" aria-label="Meter">
@@ -84,7 +84,7 @@
     <div class="mt-chart" id="annual"></div>
   </section>
 
-  <p class="mt-note">Units are whatever each meter counts in. Gas and electricity meters were replaced at the start of 2018, and the water meter in December 2025; the dashed line marks the change. Gas numbers roughly double after 2018, which fits the old meter counting in hundreds of cubic feet and the new one in cubic metres (1 hundred cubic feet is 2.83 m³). When a reading was skipped, the use between the two readings either side is shared equally across the months in between. Data: <a href="usage.csv">usage.csv</a>.</p>
+  <p class="mt-note">Gas and water are in cubic metres (m³), electricity in kWh. Gas and electricity meters were replaced at the start of 2018, and the water meter in December 2025; the dashed line marks the change. The old gas meter counted in hundreds of cubic feet, so its figures have been converted to m³ (× 2.832) to compare with the new meter; its raw readings are kept as they were. When a reading was skipped, the use between the two readings either side is shared equally across the months in between. Data: <a href="usage.csv">usage.csv</a>.</p>
 </div>
 
 <script>
@@ -135,7 +135,7 @@ function annual(utility) {
 function drawText() {
   const r = rolling(MT.util);
   const set = (id, v) => { document.getElementById(id).textContent = v; };
-  set('h-window', r.to_label); set('h-name', MT.util.toLowerCase()); set('h-last', MT.num(r.last12)); set('h-pct', r.pct_fmt);
+  set('h-window', r.to_label); set('h-name', MT.util.toLowerCase()); set('h-last', MT.num(r.last12)); set('h-pct', r.pct_fmt); set('h-unit', { Gas: 'm³', Electricity: 'kWh', Water: 'm³' }[MT.util] || 'units');
   set('t-last', MT.num(r.last12)); set('t-lastw', r.last_window); set('t-prev', MT.num(r.prev12)); set('t-prevw', r.prev_window); set('t-pct', r.pct_fmt);
   const c = r.pct <= 0 ? 'var(--ok)' : 'var(--bad)';
   document.getElementById('h-pct').style.color = c; document.getElementById('t-pct').style.color = c;
@@ -179,8 +179,8 @@ function drawHeat() {
     .on('pointermove', (ev, c) => {
       const head = MT.monL[c.mi] + ' ' + c.y;
       if (!has(c.r)) return tp.show(ev, [head, 'No figure for this month']);
-      tp.show(ev, [head, MT.util + ': ' + d3.format(',.1~f')(+c.r.used) + ' units',
-        ...(c.r.reading ? ['Meter reading ' + MT.num(+c.r.reading)] : []),
+      tp.show(ev, [head, MT.util + ': ' + d3.format(',.1~f')(+c.r.used) + ' ' + (c.r.unit || 'units'),
+        ...(c.r.reading ? [(MT.util === 'Gas' && c.r.month < '2018-01-01' ? 'Old meter reading ' + MT.num(+c.r.reading) + ' (hundreds of cubic feet)' : 'Meter reading ' + MT.num(+c.r.reading))] : []),
         c.r.method === 'measured' ? 'From two monthly readings' : c.r.method[0].toUpperCase() + c.r.method.slice(1)]);
     })
     .on('pointerleave', () => tp.hide());
@@ -240,7 +240,7 @@ function drawAnnual() {
   const tp = tip(el);
   svg.append('g').selectAll('rect').data(rows).join('rect')
     .attr('x', (r) => x(r.year) - (x.step() * x.paddingInner()) / 2).attr('width', x.step()).attr('y', m.t).attr('height', H - m.t - m.b).style('fill', 'transparent')
-    .on('pointermove', (ev, r) => tp.show(ev, [r.year, MT.util + ': ' + MT.num(r.total) + ' units', r.complete ? 'All 12 months' : r.months + ' of 12 months have a figure']))
+    .on('pointermove', (ev, r) => tp.show(ev, [r.year, MT.util + ': ' + MT.num(r.total) + ' ' + ({ Gas: 'm³', Electricity: 'kWh', Water: 'm³' }[MT.util] || 'units'), r.complete ? 'All 12 months' : r.months + ' of 12 months have a figure']))
     .on('pointerleave', () => tp.hide());
 }
 
