@@ -1,0 +1,24 @@
+/* lesson 2.2: the build cache and multi-stage builds */
+.facts{display:flex;flex-wrap:wrap;gap:.5rem;}
+.fact{font-family:"IBM Plex Mono",monospace;font-size:.72rem;font-weight:500;padding:.22rem .55rem;border:1px solid var(--rule-strong);border-radius:4px;color:var(--ink-2);background:var(--surface);}
+ol.todo,ul.todo{margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.55rem;max-width:68ch;}
+ol.todo li,ul.todo li{font-size:.94rem;color:var(--ink-2);}
+h3 .muted{font-weight:400;color:var(--muted);font-size:.82em;}
+td.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap;}
+
+/* the cache: two Dockerfiles side by side, each step marked reused or rerun after one Java line changed */
+.cache{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;max-width:46rem;}
+.cache .col{display:flex;flex-direction:column;gap:.35rem;}
+.cache .label{font-family:"IBM Plex Mono",monospace;font-size:.66rem;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);}
+.cache .step{border:1px solid var(--rule-strong);border-radius:5px;padding:.42rem .65rem;background:var(--surface);
+  display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;flex-wrap:wrap;}
+.cache .step b{font-family:"IBM Plex Mono",monospace;font-size:.76rem;font-weight:500;color:var(--ink);}
+.cache .step span{font-family:"IBM Plex Mono",monospace;font-size:.7rem;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;font-variant-numeric:tabular-nums;}
+.cache .hit{background:var(--good-soft);border-color:var(--good-rule);}
+.cache .hit span{color:var(--good);}
+.cache .miss{background:var(--warn-soft);border-color:var(--warn-rule);border-style:dashed;}
+.cache .miss span{color:var(--ink);}
+.cache .total{font-family:"IBM Plex Mono",monospace;font-size:.8rem;font-weight:600;color:var(--ink);padding-top:.2rem;}
+@media (max-width:34rem){ .cache{grid-template-columns:1fr;} }

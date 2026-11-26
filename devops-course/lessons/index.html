@@ -200,6 +200,15 @@
 <span class="f">devops/p2-1-ten-containers-one-image.html</span>
 </span>
 </a>
+<a class="lrow" href="devops/p2-2-three-seconds-or-twenty-three.html">
+<span class="no">2.2</span>
+<span class="body">
+<span class="t">Three Seconds or Twenty-Three</span>
+<span class="d">The Docker build cache: the cache key (parent layer, instruction, checksum of copied files) and why one early miss reruns every step after it; ordering a Maven Dockerfile by change rate (22.8 s against 3.7 s after a one-line change); the dependency:go-offline gap and BuildKit cache mounts; multi-stage builds and COPY --from (632 MB against 359 MB, 238 MB on Alpine); the build context and .dockerignore; JDK, JRE, Alpine and musl; docker builder prune. Build 7: reference built inside Docker in two stages.</span>
+<span class="k">The order of a Dockerfile decides the build time, and its last stage decides what ships. Put what changes most often last; keep the build tools out of the final FROM.</span>
+<span class="f">devops/p2-2-three-seconds-or-twenty-three.html</span>
+</span>
+</a>
 </div>
 <div class="call">
 <h3>Next</h3>
@@ -494,7 +503,7 @@
 </div>
 <div class="pphase"><p class="ph"><span class="pn">P2</span> Containers, properly <span class="muted">· wks 7–10 · 23 Nov – 20 Dec · 36 h</span></p>
 <a class="prow now" href="devops/p2-1-ten-containers-one-image.html"><span class="no">2.1</span><span class="pt">Layers and copy-on-write<span class="pd">Why ten containers from one image do not use ten images of disk</span></span><span class="st">now</span></a>
-<div class="prow plan"><span class="no">2.2</span><span class="pt">The build cache and multi-stage builds<span class="pd">Instruction order on your Java/Maven stack; 700 MB down to 200 MB</span></span><span class="st">planned</span></div>
+<a class="prow plan" href="devops/p2-2-three-seconds-or-twenty-three.html"><span class="no">2.2</span><span class="pt">The build cache and multi-stage builds<span class="pd">Instruction order on your Java/Maven stack; 632 MB down to 359 MB, 22.8 s down to 3.7 s</span></span><span class="st">next</span></a>
 <div class="prow plan"><span class="no">2.3</span><span class="pt">Container networking<span class="pd">Bridge, published ports, DNS between containers, and the service bound to localhost</span></span><span class="st">planned</span></div>
 <div class="prow plan"><span class="no">2.4</span><span class="pt">Volumes<span class="pd">Named, bind and anonymous, and the Postgres trap that strands your data</span></span><span class="st">planned</span></div>
 <div class="prow plan"><span class="no">2.5</span><span class="pt">Registries and image provenance<span class="pd">JFrog again, one layer up: tags, digests, promotion</span></span><span class="st">planned</span></div>

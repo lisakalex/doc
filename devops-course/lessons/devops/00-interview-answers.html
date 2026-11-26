@@ -21,7 +21,7 @@
 <nav class="jump" aria-label="Lessons">
   <a href="#l0-1">0.1</a><a href="#l0-2">0.2</a><a href="#l0-3">0.3</a><a href="#l0-4">0.4</a><a href="#l0-5">0.5</a>
   <a href="#l1-1">1.1</a><a href="#l1-2">1.2</a><a href="#l1-3">1.3</a>
-  <a class="done" href="#l1-4">1.4</a><a class="done" href="#l1-5">1.5</a><a href="#l2-1">2.1</a>
+  <a class="done" href="#l1-4">1.4</a><a class="done" href="#l1-5">1.5</a><a href="#l2-1">2.1</a><a href="#l2-2">2.2</a>
 </nav>
 </header>
 
@@ -248,6 +248,25 @@
 <li><b>Two services on port 8081, no clash?</b> The container's port is in its own network namespace; only the host side of <code>-p</code> can clash. I'd check with <code>ss -ltn</code> on the host, and publish on 127.0.0.1 unless it really must be reachable, because Docker's rules bypass ufw.</li>
 </ul>
 </article>
+
+<!-- ============ 2.2 ============ -->
+<article class="ia" id="l2-2">
+<div class="ia-head"><span class="no">2.2</span>
+  <h3><a href="https://lisakalex.github.io/doc/devops-course/lessons/devops/p2-2-three-seconds-or-twenty-three.html">Three Seconds or Twenty-Three</a></h3>
+  <span class="chip">not yet · Wed 2 Dec</span></div>
+<p class="prompt">"Our Java service's Docker build is slow on every commit and the image is over 600 MB. How would you fix both?"</p>
+<div class="tw"><table class="cardtab"><thead><tr><th>Point</th><th>Because</th><th>Tool / proof</th></tr></thead><tbody>
+<tr><td>The cache key</td><td>Parent layer + instruction + checksum of copied files; the first miss reruns every step after it</td><td><code>--progress=plain</code>: CACHED or a time</td></tr>
+<tr><td>Order by change rate</td><td>POMs, then the dependency download, then the source, so a code change misses only at <code>COPY src</code></td><td>22.8 s → 3.7 s</td></tr>
+<tr><td><code>.dockerignore</code></td><td><code>target/</code>, <code>.git</code> and logs change on their own and bust <code>COPY . .</code></td><td><code>transferring context</code></td></tr>
+<tr><td>Multi-stage</td><td>Only the last stage ships: Maven and the JDK stay in the build stage</td><td><code>COPY --from=build</code>; 632 → 359 MB</td></tr>
+<tr><td>Cache mount</td><td>Keeps <code>~/.m2</code> between builds without putting it in a layer</td><td><code>RUN --mount=type=cache</code></td></tr>
+</tbody></table></div>
+<details><summary>Model answer · try it cold first</summary><div class="answer">
+<p>"Two separate causes. The slow build is the cache: Docker caches each step by its parent layer, its instruction and a checksum of the files it copies, and the first step that misses reruns everything after it. If the Dockerfile copies the whole source before downloading dependencies, every code change throws away the dependency layer. So I order by how often things change: the POMs first, then the dependency download in its own step, then the source and the package. I add a <code>.dockerignore</code> so <code>target/</code> and <code>.git</code> don't bust the cache, and on a long-lived agent a BuildKit cache mount for <code>~/.m2</code>. The size is the build tools shipping to production, so I use a multi-stage build: Maven in the first stage, then a second <code>FROM</code> on a JRE that copies in only the jar. On my project that took a one-line change from 22.8 seconds to 3.7, and the image from 632 MB to 359, with no Maven or compiler in production."</p>
+</div></details>
+</article>
+
 
 <footer>
 <p>New answers are added after each lesson's interview stage. Model answers are checked against the lesson pages; the

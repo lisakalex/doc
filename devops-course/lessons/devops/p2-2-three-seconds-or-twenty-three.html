@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Three Seconds or Twenty-Three</title>
+<link rel="icon" href="../../assets/img/favicon-lesson.svg">
+<link rel="stylesheet" href="../../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../assets/css/lesson.css">
+<link rel="stylesheet" href="../../assets/css/pages/p2-2-three-seconds-or-twenty-three.css">
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Phase 2 · Lesson 2.2 · AWS + DevOps course</p>
+<h1>Three Seconds or Twenty-Three</h1>
+<p class="lede">You change one line of Java and push. The Docker build downloads every Maven
+  dependency again, as it did on the last commit and the one before. The finished image has
+  Maven, a full JDK and 73 MB of <code>~/.m2</code> in it, none of which the running service
+  needs. Both problems come from the same place: the order of the Dockerfile and what ends up
+  in its last stage. On the <code>reference</code> service, the same one-line change rebuilds in
+  22.8 seconds or in 3.7, and the image is 632 MB or 359 MB, depending only on how the
+  Dockerfile is written.</p>
+<div class="facts">
+<span class="fact">~3 hours</span>
+<span class="fact">weeks 7–8</span>
+<span class="fact">laptop; Docker, no sudo</span>
+<span class="fact">Docker 29.9 · BuildKit · Maven 3.9 · Temurin 21</span>
+</div>
+</header>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Review · lessons 2.1 and 1.4, still open</p>
+<h2>Three retakes first</h2>
+</div>
+<p>Lesson 2.1 has its interview and review open, and lesson 1.4 has one review question
+  left. They come before anything new.</p>
+<ol class="todo">
+<li><strong>The 2.1 interview retake, cold.</strong> "What's actually in a Docker image, and
+  what happens on disk when you start ten containers from it?" On 26 Nov it scored ½: the
+  middle was right, but it opened with "each file is a layer" and ended with no consequence and
+  no example. Open with what a layer is and why it's shared; close with volumes and Build
+  6.</li>
+<li><strong>The 2.1 review, Q3 and then Q1,</strong> out loud, without notes.</li>
+<li><strong>The 1.4 review, Q2, cold.</strong> On 26 Nov it scored ½ cold and ¾ in
+  practice.</li>
+</ol>
+<details><summary>A Dockerfile copies <code>settings.xml</code> with a repository password in, runs <code>mvn package</code>, and deletes it in the next step. Is the password safe?</summary><div class="answer"><p><strong>No. It's in the layer the <code>COPY</code> made, and anyone who can pull the image can read it.</strong> The delete only adds a whiteout. <code>docker save</code> and <code>tar</code> get it back in two commands, and so does anything that reads the registry. Use <code>RUN --mount=type=secret</code>, which makes the file available to that one step without writing it into any layer. Then rotate the password, because it's already in every copy of the old image.</p></div></details>
+<details><summary>A build agent's <code>docker images</code> adds up to 24 GB, but <code>/var/lib/docker</code> uses 9 GB. Which number is right, and how do you see the real one?</summary><div class="answer"><p><strong>9 GB is right; the 24 GB counts shared layers many times.</strong> Each image's SIZE includes every layer it stands on, and most images on one agent share their base layers, which are stored once, named by their SHA-256. <code>docker system df</code> counts each layer once; <code>docker system df -v</code> splits every image into SHARED SIZE and UNIQUE SIZE.</p></div></details>
+<details><summary>"Connection refused" against "connection timed out": what does each tell you, and where do you look for each?</summary><div class="answer"><p><strong>Refused means the machine answered and nobody was listening. Timed out means nothing answered at all.</strong> Refused comes back in a millisecond, as a reset (RST) from the target's kernel, so the network path is fine. Look at the server: is the program running, and is it listening on that port and that address (<code>ss -ltnp</code>)? Timed out takes the full timeout, because the packets were dropped on the way. Look at firewalls, security groups, routing, and whether the IP is right at all.</p></div></details>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The mechanism</p>
+<h2>The build cache is the layers from lesson 2.1</h2>
+</div>
+<p>Every step in a Dockerfile makes a layer, and BuildKit keeps each one with a
+  <strong>cache key</strong>: the layer it was built on, plus the instruction text, plus, for
+  <code>COPY</code> and <code>ADD</code>, a checksum of the files being copied. On the next
+  build, each step asks one question: is there a layer with exactly this key? If there is, it's
+  reused and the step prints <code>CACHED</code>. If there isn't, the step runs.</p>
+<p>The key includes the layer underneath, so the first step that misses makes every step after
+  it miss too. A cache miss falls through the rest of the Dockerfile. <code>RUN</code> is never
+  checked against the outside world: <code>RUN apt-get update</code> with the same text on the
+  same layer is reused for months, whatever the mirror has since.</p>
+<p>In the library: the bindery assembles a reference volume in a fixed order, section by
+  section, and keeps every half-bound stage on a shelf. Change chapter 9 and the binder takes
+  the stage that ends at chapter 8 off the shelf and binds from there. Change chapter 1 and
+  every stage after it is useless, so the whole book is bound again. Put the chapters that
+  change most often at the back.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Order</p>
+<h2>What changes most often goes last</h2>
+</div>
+<p>Two Dockerfiles that build the same jar from the same source. The first copies everything,
+  then builds:</p>
+<div class="split">
+<div class="code"><code><span class="c"># naive</span>
+FROM maven:3.9-eclipse-temurin-21
+WORKDIR /src
+COPY . .
+RUN mvn -q -pl services/reference -am \
+      package -DskipTests</code></div>
+<div class="code"><code><span class="c"># build files first</span>
+FROM maven:3.9-eclipse-temurin-21
+WORKDIR /src
+COPY pom.xml .
+COPY services/reference/pom.xml services/reference/
+COPY services/status-api/pom.xml services/status-api/
+COPY services/ingest/pom.xml services/ingest/
+COPY services/enrich/pom.xml services/enrich/
+RUN mvn -q -pl services/reference -am \
+      dependency:go-offline
+COPY services/reference/src services/reference/src
+RUN mvn -q -pl services/reference -am \
+      package -DskipTests</code></div>
+</div>
+<p>All four module POMs are copied because the parent <code>pom.xml</code> lists all four as
+  modules, and Maven refuses to start if one is missing. Then one line of Java changes, and each
+  is built again:</p>
+<div class="cache" role="img" aria-label="After a one-line Java change, the naive Dockerfile reruns its Maven step with every download, 22.8 seconds; the ordered one reuses its POM and dependency steps and reruns only the package step, 3.7 seconds">
+<div class="col">
+<p class="label">COPY . . first</p>
+<div class="step hit"><b>WORKDIR /src</b><span>cached</span></div>
+<div class="step miss"><b>COPY . .</b><span>runs</span></div>
+<div class="step miss"><b>RUN mvn package</b><span>22.4 s</span></div>
+<p class="total">22.8 s, every dependency downloaded</p>
+</div>
+<div class="col">
+<p class="label">build files first</p>
+<div class="step hit"><b>COPY 5 × pom.xml</b><span>cached</span></div>
+<div class="step hit"><b>RUN mvn go-offline</b><span>cached</span></div>
+<div class="step miss"><b>COPY src</b><span>runs</span></div>
+<div class="step miss"><b>RUN mvn package</b><span>3.4 s</span></div>
+<p class="total">3.7 s, nothing downloaded</p>
+</div>
+</div>
+<div class="code"><code>$ docker build --progress=plain -f Dockerfile.ordered -t ref:ordered ctx
+#10 [ 3/10] COPY pom.xml .
+#10 CACHED
+…
+#12 [ 8/10] RUN mvn -q -pl services/reference -am dependency:go-offline
+#12 CACHED
+#13 [ 9/10] COPY services/reference/src services/reference/src
+#13 DONE 0.0s                         <span class="c"># the checksum changed: the first miss</span>
+#14 [10/10] RUN mvn -q -pl services/reference -am package -DskipTests
+#14 DONE 3.4s</code></div>
+<p>In the naive file, <code>COPY . .</code> checksums the whole context, so any change to any
+  file misses there, and the <code>RUN</code> below it starts in a fresh layer with an empty
+  <code>~/.m2</code>. The ordered file only misses at <code>COPY src</code>; the layer holding
+  the downloaded dependencies sits above it and is reused. The dependencies change when a POM
+  changes, which is rarely.</p>
+<p>The first build of each, with nothing cached, went the other way: 24.4 s for the naive file
+  and 60 s for the ordered one, because <code>dependency:go-offline</code> downloads more than
+  <code>package</code> needs (every plugin the POMs mention). You pay once to save on every
+  build after it.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The gap</p>
+<h2><code>go-offline</code> doesn't fetch everything</h2>
+</div>
+<p>The obvious next step is to add <code>-o</code> (offline) to the package step, to prove the
+  dependencies are all there. On 22 Nov that failed:</p>
+<div class="code"><code>Could not resolve dependencies for project uk.interchange:reference:jar:0.1.0-SNAPSHOT
+dependency: net.bytebuddy:byte-buddy:jar:1.17.6 (test)
+Cannot access central … in offline mode and the artifact … has not been downloaded from it before.</code></div>
+<p><code>dependency:go-offline</code> resolves what the POMs declare, but some artifacts are
+  only resolved when a plugin runs (here a test-scope dependency that Mockito pulls in). Two
+  fixes. Drop <code>-o</code> and let the package step download the few it missed: it still
+  saves almost everything. Or keep Maven's repository in a <strong>BuildKit cache
+  mount</strong>:</p>
+<div class="code"><code>RUN --mount=type=cache,target=/root/.m2 mvn -q -pl services/reference -am package -DskipTests</code></div>
+<p>A cache mount is a directory BuildKit keeps between builds and mounts into the step. It's
+  never written into the image. Measured with the naive order, <code>COPY . .</code> and all:
+  the first build took 24.6 s, and after a one-line change 2.3 s, because the step reran but
+  found <code>~/.m2</code> already full. The layer it made was 23.6 MB, just
+  <code>target/</code>, against 93.2 MB without the mount. The cache lives on the build machine,
+  so a fresh CI agent starts empty. On a long-lived Jenkins agent it's the fastest option.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Multi-stage</p>
+<h2>Build with Maven, ship only the jar</h2>
+</div>
+<p>The naive image is the build environment with a jar in it:</p>
+<div class="code"><code>$ docker history ref:naive --format '{{.Size}}\t{{.CreatedBy}}' | head -3
+0B      CMD ["java" "-jar" "services/reference/targe…
+93.2MB  RUN /bin/sh -c mvn -q -pl services/reference…   <span class="c"># ~/.m2 and target/</span>
+14.1kB  COPY . . # buildkit
+$ docker run --rm ref:naive sh -c 'which mvn javac; du -sh /root/.m2 /src'
+/usr/bin/mvn
+/opt/java/openjdk/bin/javac
+73M     /root/.m2
+23M     /src</code></div>
+<p>A <strong>multi-stage</strong> Dockerfile has more than one <code>FROM</code>. Each starts a
+  new stage with its own layers. Only the last stage becomes the image; earlier stages are used
+  during the build and then left in the build cache. <code>COPY --from=build</code> reaches back
+  into an earlier stage for one file:</p>
+<div class="code"><code>FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /src
+COPY pom.xml .
+COPY services/reference/pom.xml services/reference/
+<span class="c"># … the other three POMs, go-offline, src, package, as above</span>
+
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /src/services/reference/target/reference-0.1.0-SNAPSHOT.jar app.jar
+CMD ["java", "-jar", "app.jar"]</code></div>
+<div class="tw"><table>
+<thead><tr><th>Image</th><th>Dockerfile</th><th>Size</th><th>Has Maven and a JDK?</th></tr></thead>
+<tbody>
+<tr><td><code>ref:naive</code></td><td><code>COPY . .</code>, then <code>mvn package</code></td><td class="num">632 MB</td><td>yes, and <code>~/.m2</code></td></tr>
+<tr><td><code>ref:ordered</code></td><td>POMs, <code>go-offline</code>, src, <code>package</code></td><td class="num">676 MB</td><td>yes, and more of <code>~/.m2</code></td></tr>
+<tr><td><code>ref:multi</code></td><td>ordered build stage, runtime on <code>21-jre</code></td><td class="num">359 MB</td><td>no</td></tr>
+<tr><td><code>ref:alpine</code></td><td>the same, runtime on <code>21-jre-alpine</code></td><td class="num">238 MB</td><td>no</td></tr>
+</tbody></table></div>
+<p>The ordered image is the biggest of the four: faster to rebuild, but it keeps go-offline's
+  104 MB layer. The order fixes the build time and the stages fix the size; you want both. The
+  runtime stage has no compiler and no build tool, so an attacker who gets a shell in it has
+  less to work with, and a scanner has fewer packages to flag.</p>
+<p>In the library: the print shop has presses, plates, ink and offcuts. Only the bound book
+  goes on the shelf.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The context</p>
+<h2>What <code>docker build .</code> sends, and why it busts the cache</h2>
+</div>
+<p>The last argument to <code>docker build</code> is the <strong>build context</strong>: the
+  directory sent to the builder, and the only files <code>COPY</code> can see. Built from the
+  real Interchange repository with no <code>.dockerignore</code>, <code>COPY . .</code> sent
+  23.87 MB: 22.7 MB of it the old <code>services/reference/target</code>, 1.4 MB of
+  <code>.git</code>, and <code>logs/</code>. Each of those changes without any source changing,
+  and each change misses the <code>COPY . .</code> checksum and rebuilds everything after it.</p>
+<p>A <code>.dockerignore</code> at the root of the context leaves files out. Build 6 used an
+  allow-list: <code>*</code> to exclude everything, then <code>!</code> lines for the one file
+  it needs. Build 7 does the same with the POMs and <code>services/reference/src</code>.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Base images</p>
+<h2>JDK, JRE, Alpine</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Base</th><th>Size</th><th>What's in it</th></tr></thead>
+<tbody>
+<tr><td><code>maven:3.9-eclipse-temurin-21</code></td><td class="num">539 MB</td><td>JDK, Maven, Ubuntu. A build stage only.</td></tr>
+<tr><td><code>eclipse-temurin:21-jdk</code></td><td class="num">493 MB</td><td>The compiler and tools. You don't need it to run a jar.</td></tr>
+<tr><td><code>eclipse-temurin:21-jre</code></td><td class="num">336 MB</td><td>The runtime on Ubuntu 26.04, glibc, <code>bash</code>, <code>apt</code>. Build 6 uses it.</td></tr>
+<tr><td><code>eclipse-temurin:21-jre-alpine</code></td><td class="num">214 MB</td><td>The runtime on Alpine 3.24: musl libc instead of glibc, BusyBox, <code>apk</code>.</td></tr>
+</tbody></table></div>
+<p>Alpine saves 122 MB here, but it isn't free. musl isn't glibc, so a JNI library built for
+  glibc won't load, and DNS and locale behaviour differ in small ways. BusyBox's tools are
+  thinner when you debug inside the container. Test the service on it, not just the build. The
+  step after that is a <strong>distroless</strong> image: no shell and no package manager at
+  all.</p>
+<p>A tag like <code>21-jre</code> moves when a new patch is released. That's how you get
+  security fixes, and it's also how two builds a week apart differ. The measurements on this
+  page were taken with
+  <code>eclipse-temurin@sha256:d77e090a…</code> for <code>21-jre</code>. Pinning by digest
+  freezes the base until you choose to move it (lesson 2.5).</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">On disk, again</p>
+<h2>The build cache has a size too</h2>
+</div>
+<div class="code"><code>$ docker system df
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+…
+Build Cache     418       0         10.82GB   8.76GB</code></div>
+<p>That's this laptop on 26 Nov. Every intermediate layer, every earlier stage and every cache
+  mount stays until something removes it. On a build agent this is the third way Docker fills a
+  disk, after images and containers. <code>docker builder prune</code> removes the cache that
+  nothing is using; <code>--filter until=72h</code> keeps the recent part, which is the part that
+  makes builds fast.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">The method</p>
+<h2>"The Docker build is slow, and the image is big"</h2>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Question</th><th>Command</th><th>What it tells you</th></tr></thead>
+<tbody>
+<tr><td>Which step misses the cache?</td><td><code>docker build --progress=plain …</code></td><td>CACHED or a time for every step; the first step with a time is where the cache broke</td></tr>
+<tr><td>How much is sent?</td><td>the <code>transferring context</code> line</td><td>MBs mean <code>target/</code>, <code>.git</code> or logs are going in: add a <code>.dockerignore</code></td></tr>
+<tr><td>Which step made the image big?</td><td><code>docker history &lt;image&gt;</code></td><td>Size per layer; a Maven or npm cache in the final image means no build stage</td></tr>
+<tr><td>Is the build tool in the image?</td><td><code>docker run --rm &lt;image&gt; which mvn javac</code></td><td>Anything printed is shipped to production</td></tr>
+<tr><td>How big is the cache?</td><td><code>docker system df</code></td><td>The Build Cache line; prune with <code>docker builder prune</code></td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Lab</p>
+<h2>Six parts, five of them on your laptop</h2>
+</div>
+<p>Write your prediction down before each run. Work in <code>labs/p2-2/</code>, on a clean copy
+  of Interchange, so nothing in the repository changes. No <code>sudo</code> anywhere.</p>
+<div class="code"><code>mkdir -p labs/p2-2/ctx &amp;&amp; cd labs/p2-2
+git -C ~/IdeaProjects/interchange archive phase2-build6 pom.xml services | tar -x -C ctx
+du -sh ctx</code></div>
+
+<h3>Part 1: the naive build <span class="muted">· where the cache breaks</span></h3>
+<p>Write <code>Dockerfile.naive</code> from the Order section. Build it, then change one line
+  and build again:</p>
+<div class="code"><code>time docker build -q -f Dockerfile.naive -t ref:naive ctx
+echo '// one-line change' &gt;&gt; ctx/services/reference/src/main/java/uk/interchange/reference/ReferenceApplication.java
+time docker build --progress=plain -f Dockerfile.naive -t ref:naive ctx 2&gt;&amp;1 | grep -E 'CACHED|DONE [0-9]'</code></div>
+<p>Predict: which steps print CACHED the second time? How long does the second build take,
+  compared with the first?</p>
+
+<h3>Part 2: build files first <span class="muted">· order</span></h3>
+<p>Write <code>Dockerfile.ordered</code>. Build it twice with no change, then once after
+  another one-line change, with <code>--progress=plain</code> each time.</p>
+<p>Predict: the time of each of the three builds, and the first step that doesn't print
+  CACHED in the third. Then change <code>ctx/services/reference/pom.xml</code> (add a blank
+  line) and predict again.</p>
+
+<h3>Part 3: the go-offline gap <span class="muted">· cache mounts</span></h3>
+<p>Add <code>-o</code> to the package step of <code>Dockerfile.ordered</code> and build. Read
+  the error and name the artifact. Then remove <code>-o</code> and try
+  <code>Dockerfile.cachemount</code>: the naive order, but with
+  <code>RUN --mount=type=cache,target=/root/.m2</code> on the Maven step.</p>
+<p>Predict: the time after a one-line change, with <code>COPY . .</code> still first. How big
+  is the Maven layer in <code>docker history</code>, against 93.2 MB without the mount?</p>
+
+<h3>Part 4: two stages <span class="muted">· size</span></h3>
+<p>Write <code>Dockerfile.multi</code> and <code>Dockerfile.alpine</code>, then:</p>
+<div class="code"><code>docker images --format '{{.Repository}}:{{.Tag}}\t{{.Size}}' | grep '^ref:'
+docker history ref:multi
+docker run --rm ref:naive sh -c 'which mvn javac; du -sh /root/.m2'
+docker run --rm ref:multi sh -c 'which mvn javac; echo exit=$?'
+docker run --rm ref:alpine sh -c 'cat /etc/alpine-release; ldd --version 2&gt;&amp;1 | head -1'</code></div>
+<p>Predict the four sizes, in order. Which images have <code>mvn</code>? Which C library does
+  the Alpine image use?</p>
+
+<h3>Part 5: the context and the cache <span class="muted">· .dockerignore, prune</span></h3>
+<div class="code"><code>cd ~/IdeaProjects/interchange
+docker build --progress=plain -f ~/IdeaProjects/devops-course/labs/p2-2/Dockerfile.naive -t ref:ctx . 2&gt;&amp;1 | grep 'transferring context'
+cd - &amp;&amp; docker system df</code></div>
+<p>Predict the context size, and name the three biggest things in it. Don't add a
+  <code>.dockerignore</code> to the repository here; that's Build 7. How big is your Build Cache
+  line, and how much of it is reclaimable? Clean up with
+  <code>docker rmi ref:naive ref:ordered ref:multi ref:alpine ref:ctx</code>.</p>
+
+<h3>Part 6: your servers <span class="muted">· at work, look only</span></h3>
+<p>In the repositories you work with, <code>git ls-files | grep -i dockerfile</code>. For each
+  Dockerfile: how many <code>FROM</code> lines? Does a <code>COPY . .</code> or
+  <code>COPY src</code> come before the dependency download? Is the base pinned by tag or by
+  digest? Is there a <code>.dockerignore</code>? In Jenkins, compare the duration of the Docker
+  step on two builds where only code changed. On a build agent with Docker, look at
+  <code>docker system df</code>, Build Cache line. Run nothing that builds, removes or
+  prunes. Leave out hostnames, image names that name the customer, and anything that looks like a
+  password.</p>
+<p><strong>Done when:</strong> you can say, without notes, how BuildKit decides a step is
+  cached, why one early miss rebuilds everything below it, what a second <code>FROM</code> does
+  to the final image, and why <code>target/</code> in the context slows the build.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Check</p>
+<h2>Five questions</h2>
+</div>
+<p>Out loud first, and end each one with "because…" and the consequence.</p>
+<details><summary>A Java service's Docker build downloads every Maven dependency on every commit, even when only one line of Java changed. Why, and what's the fix?</summary><div class="answer"><p><strong>The source is copied before the dependencies are fetched, so every source change misses the cache at that <code>COPY</code>, and every step after it runs again.</strong> BuildKit's key for a <code>COPY</code> includes a checksum of the files, and a miss falls through the rest of the file. Copy the POMs first, fetch dependencies in their own <code>RUN</code>, then copy the source and package. The dependency layer is then reused until a POM changes. Or keep <code>~/.m2</code> in a <code>RUN --mount=type=cache</code>.</p></div></details>
+<details><summary>A production image contains Maven, a JDK and the whole <code>~/.m2</code> repository. What's wrong with that, and how do you fix it?</summary><div class="answer"><p><strong>The image is the build environment, so production ships tools it never uses.</strong> It's bigger (632 MB against 359 MB here), so every pull and every node is slower, and a compiler and a build tool are there for an attacker and for the scanner's report. Use a multi-stage build: Maven in a <code>build</code> stage, then a second <code>FROM</code> on a JRE and <code>COPY --from=build</code> of the jar alone. Only the last stage becomes the image.</p></div></details>
+<details><summary>You add <code>RUN mvn dependency:go-offline</code>, then <code>RUN mvn -o package</code>. It fails: a test-scope dependency "has not been downloaded". Why, and what are two fixes?</summary><div class="answer"><p><strong><code>go-offline</code> resolves what the POMs declare, not everything plugins pull in while they run.</strong> Here, byte-buddy, a test dependency that came in through Mockito. Drop <code>-o</code> and let the package step fetch the few it missed; the big download is still cached. Or put the Maven repository in a BuildKit cache mount, <code>--mount=type=cache,target=/root/.m2</code>, so whatever any build downloads is kept for the next one without going into a layer.</p></div></details>
+<details><summary>Every build of a service sends a 24 MB context and never reuses the <code>COPY . .</code> layer, even when the source hasn't changed. Why, and what's the fix?</summary><div class="answer"><p><strong>The context includes files that change on their own: the old <code>target/</code>, <code>.git</code>, logs.</strong> <code>COPY . .</code> checksums all of them, so any change there is a cache miss for that step and everything after it. Add a <code>.dockerignore</code>, ideally an allow-list (<code>*</code>, then <code>!</code> for the POMs and the source), and copy only what the build needs.</p></div></details>
+<details><summary>Someone wants to move the runtime image from <code>21-jre</code> to <code>21-jre-alpine</code> to save 120 MB. What do you check before agreeing?</summary><div class="answer"><p><strong>That the service really runs on musl, not just that the image builds.</strong> Alpine uses musl libc instead of glibc, so any native library built for glibc fails to load, and DNS and locale handling differ slightly. BusyBox makes debugging inside the container harder. Run the service's tests and a real request on the Alpine image, check for native libraries in the jar, and remember that the 120 MB is pulled once per node and shared by every container from that base, so the saving is smaller than it looks.</p></div></details>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Build 7 · Interchange</p>
+<h2><code>reference</code> built inside Docker, in two stages</h2>
+</div>
+<p>Build 6 copied in a jar you built on the laptop, so building the image needed Java and
+  Maven on the machine first. Build 7 moves the Maven build into a first stage, so any machine
+  with Docker builds the same image from source, and a one-line change rebuilds in seconds. The
+  runtime stage stays Build 6, line for line. Predict before each step.</p>
+<ol class="todo">
+<li><strong>Predict:</strong> will Build 7's image be smaller than Build 6's 359 MB? Why, or
+  why not?</li>
+<li><strong>Branch:</strong> <code>git switch phase2-build6</code>, then
+  <code>git switch -c phase2-build7</code>.</li>
+<li><strong>The context moves to the repo root,</strong> because the build needs the parent
+  <code>pom.xml</code> and all four module POMs. Write a root <code>.dockerignore</code> as an
+  allow-list: <code>*</code>, then <code>!pom.xml</code>, <code>!services/*/pom.xml</code> and
+  <code>!services/reference/src</code>. Delete
+  <code>services/reference/.dockerignore</code>: Docker reads the one at the context root.</li>
+<li><strong>The Dockerfile.</strong> In <code>services/reference/Dockerfile</code>, add a
+  <code>build</code> stage above Build 6's lines:
+  <code>FROM maven:3.9-eclipse-temurin-21 AS build</code>, the five POMs, the dependency step,
+  the source, <code>package</code>. In the runtime stage, change the <code>COPY</code> to
+  <code>COPY --from=build --chmod=644</code>. Keep <code>useradd</code>, <code>USER</code>,
+  <code>ENV LOGGING_FILE_NAME=</code> and the <code>ENTRYPOINT</code>. Comment each new line
+  with its "because", and update the build command in the header comment.</li>
+<li><strong>Build from the root:</strong>
+  <code>docker build -f services/reference/Dockerfile -t interchange/reference:build7 .</code>
+  Check the <code>transferring context</code> line: predict the size first.</li>
+<li><strong>The cache:</strong> change one line of Java, rebuild with
+  <code>--progress=plain</code>, and write down the first step that isn't CACHED and the total
+  time. Then add a blank line to <code>services/reference/pom.xml</code> and predict
+  again.</li>
+<li><strong>Prove it:</strong> <code>docker history</code>, <code>which mvn</code> in the
+  image, then run it on <code>127.0.0.1:18081</code> as in Build 6, and
+  <code>curl localhost:18081/customers/C001</code>, <code>docker exec … id</code>,
+  <code>docker logs</code>. Revert the test changes to the Java and the POM.</li>
+<li><strong>Commit</strong> the Dockerfile and both <code>.dockerignore</code> changes on the
+  branch.</li>
+</ol>
+<p><strong>Done when:</strong> the image builds on a machine with only Docker, a one-line Java
+  change rebuilds with the dependency step CACHED, the image has no <code>mvn</code>, and C001
+  comes back from the container running as UID 999.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Interview answer · 60 seconds, spoken</p>
+<h2>"Our Java service's Docker build is slow on every commit and the image is over 600 MB. How would you fix both?"</h2>
+</div>
+<p>Mechanism first: each step is cached by its parent layer, its instruction and the checksum
+  of the files it copies, and the first miss rebuilds everything after it. So order by how often
+  things change: POMs, then the dependency download, then the source. A
+  <code>.dockerignore</code> keeps <code>target/</code> and <code>.git</code> from busting the
+  cache. Then size: a multi-stage build, Maven in the first stage and only the jar copied onto a
+  JRE, so the build tools never reach production. End with your numbers: 22.8 seconds to 3.7,
+  and 632 MB to 359. Say it with a timer, then type what you said.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Review</p>
+<h2>At the start of the next lesson</h2>
+</div>
+<p>The two lowest-scored questions above are asked again, without notes, before the next
+  lesson starts. They count as done at ¾ or better.</p>
+</section>
+
+<section>
+<div class="sec-head">
+<p class="eyebrow">Interchange</p>
+<h2>Where this comes back</h2>
+</div>
+<p>In Phase 3 the GitHub Actions pipeline builds this Dockerfile on a fresh runner with an
+  empty cache, and the cache has to be carried between runs (<code>cache-from</code> and
+  <code>cache-to</code>) or every build is a first build. In 2.5 the registry stores the layers
+  by hash, so a push after a one-line change uploads only the 23.6 MB jar layer. In 2.6 Compose
+  builds the same Dockerfile with a <code>build:</code> key. In Phase 5, a smaller runtime image
+  means a faster pull when Kubernetes schedules a pod on a new node.</p>
+</section>
+
+<footer>
+<p>Sources: Docker documentation, "Docker build cache", "Optimize cache usage in builds" (cache
+  mounts), "Multi-stage builds" and "Build context" (<code>.dockerignore</code>); the Dockerfile
+  reference (<code>COPY --from</code>, <code>RUN --mount=type=cache</code>); Maven Dependency
+  Plugin, <code>dependency:go-offline</code>; <code>docker builder prune</code>. Sizes, the
+  go-offline error and the context size come from real runs on 22 November 2026; the build times
+  and the Build Cache line from real runs on 26 November 2026. Docker 29.9.2, buildx 0.38.1,
+  overlay2 on ext4; <code>maven:3.9-eclipse-temurin-21</code> (Maven 3.9.16),
+  <code>eclipse-temurin:21-jre</code> (21.0.13.1, Ubuntu 26.04.1),
+  <code>eclipse-temurin:21-jre-alpine</code> (Alpine 3.24). Times are from one laptop and vary
+  with the network; the ratio is the point.</p>
+</footer>
+
+</div>
+</body>
+</html>
