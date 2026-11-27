@@ -2,41 +2,41 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="light">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Home Meters</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <style>
   :root {
-    --bg: #fbfaf8; --panel: #ffffff; --fg: #1f1e1c; --muted: #6b675f; --line: #e4e1da;
-    --grid: #ecebe7; --axis: #c9c5bc; --ok: #2f7d4f; --bad: #b3412f; --pop: #ffffff;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --serif: Georgia, "Times New Roman", serif;
+    --bg: #f9f9f9; --panel: #ffffff; --fg: #141414; --muted: #858585; --line: #ececec;
+    --grid: #ebebeb; --axis: #c2c2c2; --ok: #006c10; --bad: #c9372c; --pop: #ffffff;
+    --sans: "Anthropic Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --serif: "Anthropic Serif", ui-serif, Georgia, "Times New Roman", serif;
     color-scheme: light;
   }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #1b1a18; --panel: #232220; --fg: #ece9e3; --muted: #a39e94; --line: #3a3833;
-      --grid: #2e2c29; --axis: #4a4741; --ok: #6cc28f; --bad: #e07a66; --pop: #2a2926; color-scheme: dark; }
-  }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); }
-  .mt { max-width: 1040px; margin: 0 auto; padding: 32px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 32px; }
-  .mt-head { display: grid; gap: 8px; }
-  .mt-title { font-family: var(--serif); font-weight: 400; font-size: 2.2rem; margin: 0; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 var(--sans); }
+  .mt { margin: 0; padding: 24px max(24px, env(safe-area-inset-right, 0px)) 48px max(24px, env(safe-area-inset-left, 0px)); display: grid; gap: 40px; }
+  .mt-head { display: grid; gap: 12px; }
+  .mt-title { font-family: var(--serif); font-weight: 400; font-size: 22px; margin: 0; text-wrap: balance; }
   .mt-lede { margin: 0; color: var(--muted); max-width: 65ch; }
-  .mt-lede b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .mt-lede b { color: var(--fg); font-weight: 500; font-variant-numeric: tabular-nums; }
   .mt-tabs { display: inline-flex; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 2px; gap: 2px; justify-self: start; }
   .mt-tabs button { font: inherit; border: 0; background: transparent; color: var(--muted); padding: 6px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
   .mt-tabs button[aria-pressed="true"] { background: var(--bg); color: var(--fg); box-shadow: 0 0 0 1px var(--line); }
   .mt-tabs button:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
   .mt-tabs i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-  .mt-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
-  .mt-tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; display: grid; gap: 4px; }
+  .mt-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+  .mt-tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 8px; }
   .mt-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .mt-big { font-family: var(--serif); font-size: 2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .mt-big { font-family: var(--serif); font-weight: 400; font-size: 2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .mt-sub { font-size: 12px; color: var(--muted); }
-  .mt-sec { display: grid; gap: 8px; min-width: 0; }
-  .mt-sec h2 { font-size: 1.15rem; font-weight: 600; margin: 0; }
-  .mt-note { margin: 0; font-size: 13px; color: var(--muted); max-width: 70ch; }
+  .mt-sec { display: grid; gap: 12px; min-width: 0; }
+  .mt-sec h2 { font-size: 15px; font-weight: 500; margin: 0; }
+  .mt-note { margin: 0; font-size: 12px; color: var(--muted); max-width: 65ch; }
   .mt-chart { position: relative; min-height: 220px; }
   .mt-chart svg { display: block; overflow: visible; }
   .mt-chart .tick text, .mt-txt { fill: var(--muted); font-size: 12px; font-family: var(--sans); }
@@ -45,8 +45,8 @@
   .mt-axis line, .mt-axis path { stroke: var(--axis); }
   .mt-break { stroke: var(--muted); stroke-dasharray: 4 3; }
   .mt-empty { fill: none; stroke: var(--line); }
-  .mt-tip { position: absolute; pointer-events: none; z-index: 2; background: var(--pop); border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0,0,0,.12); border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .mt-tip-h { color: var(--fg); font-weight: 600; }
+  .mt-tip { position: absolute; pointer-events: none; z-index: 2; background: var(--pop); border: 1px solid var(--line); box-shadow: 0 8px 24px #0000001f, 0 2px 6px #00000014; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mt-tip-h { color: var(--fg); font-weight: 500; }
   .mt-key { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; font-size: 12px; color: var(--muted); margin-top: 8px; }
   .mt-key span { display: inline-flex; align-items: center; gap: 6px; }
   .mt-ramp { width: 90px; height: 10px; border-radius: 2px; display: inline-block; }
@@ -61,9 +61,9 @@
   </header>
 
   <div class="mt-tabs" role="group" aria-label="Meter">
-    <button type="button" data-util="Gas" aria-pressed="true"><i style="background:#E8743B"></i>Gas</button>
-    <button type="button" data-util="Electricity" aria-pressed="false"><i style="background:#C9A227"></i>Electricity</button>
-    <button type="button" data-util="Water" aria-pressed="false"><i style="background:#2E86DE"></i>Water</button>
+    <button type="button" data-util="Gas" aria-pressed="true"><i style="background:#f47230"></i>Gas</button>
+    <button type="button" data-util="Electricity" aria-pressed="false"><i style="background:#f2a600"></i>Electricity</button>
+    <button type="button" data-util="Water" aria-pressed="false"><i style="background:#257de0"></i>Water</button>
   </div>
 
   <div class="mt-tiles">
@@ -91,7 +91,7 @@
 const MT = {
   util: 'Gas',
   rows: [],
-  colors: { Gas: '#E8743B', Electricity: '#C9A227', Water: '#2E86DE' },
+  colors: { Gas: '#f47230', Electricity: '#f2a600', Water: '#257de0' },
   breaks: { Gas: '2018-01-01', Electricity: '2018-01-01', Water: '2025-12-01' },
   num: d3.format(',.0f'),
   monL: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
