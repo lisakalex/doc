@@ -2,22 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="light">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Daily Log</title>
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <style>
   :root {
-    --bg: #f9f9f9; --panel: #ffffff; --fg: #1f1f1f; --muted: #6b6b6b; --line: #e5e5e5;
+    --bg: #ffffff; --panel: #ffffff; --fg: #1f1f1f; --muted: #6b6b6b; --line: #e5e5e5;
     --grid: #ebebeb; --axis: #c2c2c2; --ok: #1f8a4c; --warn: #c9372c; --pop: #ffffff;
     --c1: #257de0; --c2: #f47230; --c3: #00b894; --c4: #f2a600; --c5: #ee7fac; --cm: #c2c2c2;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --serif: Georgia, "Times New Roman", serif;
     color-scheme: light;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #1a1a1a; --panel: #242424; --fg: #ececec; --muted: #a3a3a3; --line: #383838;
-      --grid: #2e2e2e; --axis: #4a4a4a; --ok: #4cc27f; --warn: #ef7a6e; --pop: #2a2a2a;
-      --c1: #338ced; --c2: #f47230; --c3: #00b894; --c4: #f2a600; --c5: #ee7fac; --cm: #5e5e5e; color-scheme: dark; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); }
